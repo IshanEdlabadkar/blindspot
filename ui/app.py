@@ -122,9 +122,11 @@ def get_pipeline(server):
 def turn_html(q, result, trace):
     chips = ""
     if trace:
+        fetch = (f'Top {trace["top_k"]} read locally from the full store' if trace["fetch_mode"] == "download"
+                 else f'{trace["top_k"]} fetched privately')
         chips = ('<div class="br-chips"><span>Encrypted on device</span>'
                  f'<span>{trace["num_chunks"]:,} chunks scored blind</span>'
-                 f'<span>{trace["top_k"]} fetched privately</span>'
+                 f'<span>{fetch}</span>'
                  f'<span>Answered on device · {trace["total_seconds"]:.2f} s</span></div>')
     srcs = ""
     for i, cit in enumerate(result["citations"], 1):
@@ -170,7 +172,7 @@ with st.sidebar:
     server = st.text_input("Document server", os.environ.get("BLIND_RAG_SERVER", "http://127.0.0.1:8080"))
     st.caption(f"crypto: `{os.environ.get('BLIND_RAG_CRYPTO', 'mock')}`  ·  "
                f"answer: `{os.environ.get('BLIND_RAG_ANSWER', 'stub')}`  ·  "
-               f"fetch: `{os.environ.get('BLIND_RAG_FETCH', 'pir')}`")
+               f"fetch: `{os.environ.get('BLIND_RAG_FETCH', 'auto')}`")
     if st.button("New session (wipe key and history)"):
         if "pipeline" in ss:
             ss.pipeline.close()

@@ -46,7 +46,7 @@ python -m pytest tests -q                             # 6 checks, should all pas
 - [ ] Hour 0: get the eight proposals above agreed, update `contracts.py`, commit
 - [ ] Hour 5: point the mock at B's real tables (`--data <B's folder>`), unset `BLIND_RAG_EMBED`, sanity-check answers
 - [ ] Hour 9: send `eval/questions.jsonl` to B
-- [ ] Hours 9 to 13: `BLIND_RAG_CRYPTO=real BLIND_RAG_ANSWER=real BLIND_RAG_SERVER=<A's url> BLIND_RAG_SERVER_LOG=<A's log>`
+- [ ] Hours 9 to 13: `make server`, `make helper`, then `BLIND_RAG_CRYPTO=real BLIND_RAG_ANSWER=real streamlit run ui/app.py` (see SETUP.md; fetch switches to trivial PIR on its own)
 - [ ] Gate 2 (hour 13): one question answered on the real server; if fetch fails, `BLIND_RAG_FETCH=download` (A must serve `GET /v1/fetch_store`)
 - [ ] Hours 13 to 16: polish panel and status line, attacker console on real logs, slides
 - [ ] Hours 16 to 18: freeze, backup video, rehearse the 3-minute script

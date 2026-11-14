@@ -26,8 +26,23 @@ def test_no_answer_from_model_declines_with_closest_passages():
     assert [c["id"] for c in r["citations"]] == [0, 1, 2]
 
 
-def test_uncited_answer_declines():
+def test_uncited_unsupported_answer_declines():
     assert answer("q?", CHUNKS, llm=lambda p: "Some unsupported text.")["status"] == "declined"
+
+
+def test_cited_answer_followed_by_stray_no_answer_is_kept():
+    r = answer("q?", CHUNKS, llm=lambda p: "Fact two is true [2].\n\nNO_ANSWER")
+    assert r["status"] == "answered" and "NO_ANSWER" not in r["answer"]
+    assert [c["id"] for c in r["citations"]] == [1]
+
+
+def test_uncited_answer_grounded_in_one_source_cites_it():
+    chunks = [{**CHUNKS[0], "text": "Unrelated passage about taxes."},
+              {**CHUNKS[1], "text": "Call or text the 988 Suicide and Crisis Lifeline for help right away."}]
+    r = answer("q?", chunks, llm=lambda p: "Call or text the 988 Suicide and Crisis Lifeline right away.")
+    assert r["status"] == "answered"
+    assert [c["id"] for c in r["citations"]] == [1]
+    assert r["answer"].startswith("Call or text the 988 Suicide and Crisis Lifeline right away. [1]")
 
 
 def test_low_retrieval_score_declines_without_calling_model():

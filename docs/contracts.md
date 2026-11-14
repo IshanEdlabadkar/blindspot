@@ -110,6 +110,8 @@ A stale `corpus_version` returns HTTP 409.
 answer(question: str, chunks: list[dict]) -> dict   # chunks: decoded records, in rank order
 ```
 
+Pass all k = 10 chunks; `answer()` uses the first 5 as sources. Each chunk may also carry `score`, the cosine estimate `raw_int_score / scale**2` (`common.embedding.score_to_cosine`). When it is present, `answer()` declines without calling the model if the top score is below `MIN_SCORE`.
+
 `ask()`, `ask_plain()` and `answer()` all return this shape:
 
 ```python

@@ -32,6 +32,23 @@ def ollama_generate(prompt: str, model: str = MODEL, url: str = OLLAMA_URL, time
     return r.json()["response"].strip()
 
 
+GROUNDING_MIN = 0.6  # share of the answer's content words that must appear in one source
+
+
+def _words(s: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", s.lower()) if len(w) > 3}
+
+
+def _grounding_source(text: str, ctx: list[dict]) -> int | None:
+    """1-based index of the source covering most of an uncited answer's words, if enough."""
+    answer_words = _words(text)
+    if not answer_words:
+        return None
+    cover = [len(answer_words & _words(c["text"])) / len(answer_words) for c in ctx]
+    best = max(range(len(ctx)), key=cover.__getitem__)
+    return best + 1 if cover[best] >= GROUNDING_MIN else None
+
+
 def _cite(c: dict) -> dict:
     return {**{k: c[k] for k in ("id", "title", "url", "updated", "text")}, "score": float(c.get("score", 0.0))}
 
@@ -53,13 +70,18 @@ def answer(question: str, chunks: list[dict], llm=ollama_generate,
         return decline()
 
     sources = "\n\n".join(f"[{i}] {c['title']}\n{c['text']}" for i, c in enumerate(ctx, 1))
-    text = llm(PROMPT.format(sources=sources, question=question))
-    if not text or "NO_ANSWER" in text.upper():
+    # Small models sometimes append NO_ANSWER after a real answer, so drop the token and
+    # decline only if nothing usable is left.
+    text = re.sub(r"\bNO_ANSWER\b", "", llm(PROMPT.format(sources=sources, question=question))).strip()
+    if not text:
         return decline()
 
     used = sorted({int(n) for n in re.findall(r"\[(\d+)\]", text) if 1 <= int(n) <= len(ctx)})
     if not used:
-        return decline()
+        best = _grounding_source(text, ctx)
+        if best is None:
+            return decline()
+        text, used = f"{text} [{best}]", [best]
     renumber = {n: i for i, n in enumerate(used, 1)}
 
     def fix(m):

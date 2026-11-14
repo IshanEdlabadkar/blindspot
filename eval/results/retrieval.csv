@@ -1,26 +1,26 @@
 question,gold,float_rank,float_top1,int8_rank,int8_top1
-Why do I get a sudden stabbing pain on one side of my face when I chew or brush my teeth?,https://medlineplus.gov/trigeminalneuralgia.html,5,0.7028,5,0.6984
-"My eye is red, itchy and crusty in the morning. Is it contagious?",https://medlineplus.gov/pinkeye.html,1,0.7149,1,0.7127
-What is LDL and why is it called the bad kind?,https://medlineplus.gov/ldlthebadcholesterol.html,1,0.8279,1,0.8301
-Why should women take folic acid before getting pregnant?,https://medlineplus.gov/folicacid.html,1,0.8186,1,0.8179
-I had a few minutes of slurred speech and arm weakness that went away. Was that a mini stroke?,https://medlineplus.gov/transientischemicattack.html,1,0.7444,1,0.7431
-What is MRSA and how do people catch it?,https://medlineplus.gov/mrsa.html,1,0.7571,1,0.7561
-Can high blood pressure while I'm pregnant hurt my baby?,https://medlineplus.gov/highbloodpressureinpregnancy.html,1,0.8508,1,0.8553
-How is chlamydia treated and can I get it again?,https://medlineplus.gov/chlamydiainfections.html,1,0.8255,1,0.8266
-My baby spits up after almost every feeding. Is that normal?,https://medlineplus.gov/refluxininfants.html,1,0.7411,1,0.7408
-What happens to your body when your kidneys stop working?,https://medlineplus.gov/kidneyfailure.html,1,0.7648,1,0.7671
-A kitten scratched me and now a lymph node near the scratch is swollen. What could it be?,https://medlineplus.gov/catscratchdisease.html,1,0.719,1,0.7201
-Is it safe to keep taking my prescriptions while I'm pregnant?,https://medlineplus.gov/pregnancyandmedicines.html,1,0.8148,1,0.816
-My grandmother suddenly became confused and agitated in the hospital. What could cause that?,https://medlineplus.gov/delirium.html,1,0.6506,2,0.6494
-What is the difference between a heart attack and the heart suddenly stopping?,https://medlineplus.gov/suddencardiacarrest.html,2,0.826,2,0.8248
-I'm a smoker with a cough and shortness of breath that keep getting worse. What lung disease could this be?,https://medlineplus.gov/copd.html,6,0.7405,6,0.7414
-What is PKU and why are newborns tested for it?,https://medlineplus.gov/phenylketonuria.html,1,0.7725,1,0.7728
-How much salt should I eat in a day?,https://medlineplus.gov/sodium.html,1,0.813,1,0.8138
-Why do I have so much bloating and burping?,https://medlineplus.gov/gas.html,5,0.7161,4,0.7176
-Can LASIK fix my nearsightedness?,https://medlineplus.gov/lasereyesurgery.html,1,0.7499,1,0.7509
-I keep having thoughts of ending my life. Where can I get help?,https://medlineplus.gov/suicide.html,1,0.6515,1,0.6512
-How do I file an extension for my federal income taxes?,,,0.5421,,0.5421
-Can my landlord evict me for reporting mold?,,,0.6472,,0.6459
-What is the best engine oil for a 2015 Honda Civic?,,,0.4646,,0.4662
-How do I appeal a denied FMLA leave request at work?,,,0.5739,,0.5749
-What were the main causes of the French Revolution?,,,0.5554,,0.5546
+Why do I get a sudden stabbing pain on one side of my face when I chew or brush my teeth?,https://medlineplus.gov/trigeminalneuralgia.html,5,0.7028,4,0.7078
+"My eye is red, itchy and crusty in the morning. Is it contagious?",https://medlineplus.gov/pinkeye.html,1,0.7149,1,0.7148
+What is LDL and why is it called the bad kind?,https://medlineplus.gov/ldlthebadcholesterol.html,1,0.8279,1,0.8281
+Why should women take folic acid before getting pregnant?,https://medlineplus.gov/folicacid.html,1,0.8186,1,0.8144
+I had a few minutes of slurred speech and arm weakness that went away. Was that a mini stroke?,https://medlineplus.gov/transientischemicattack.html,1,0.7444,1,0.7453
+What is MRSA and how do people catch it?,https://medlineplus.gov/mrsa.html,1,0.7571,1,0.7511
+Can high blood pressure while I'm pregnant hurt my baby?,https://medlineplus.gov/highbloodpressureinpregnancy.html,1,0.8508,1,0.8527
+How is chlamydia treated and can I get it again?,https://medlineplus.gov/chlamydiainfections.html,1,0.8255,1,0.8263
+My baby spits up after almost every feeding. Is that normal?,https://medlineplus.gov/refluxininfants.html,1,0.7411,1,0.7395
+What happens to your body when your kidneys stop working?,https://medlineplus.gov/kidneyfailure.html,1,0.7648,1,0.7642
+A kitten scratched me and now a lymph node near the scratch is swollen. What could it be?,https://medlineplus.gov/catscratchdisease.html,1,0.719,1,0.7197
+Is it safe to keep taking my prescriptions while I'm pregnant?,https://medlineplus.gov/pregnancyandmedicines.html,1,0.8148,1,0.8161
+My grandmother suddenly became confused and agitated in the hospital. What could cause that?,https://medlineplus.gov/delirium.html,1,0.6506,1,0.6503
+What is the difference between a heart attack and the heart suddenly stopping?,https://medlineplus.gov/suddencardiacarrest.html,2,0.826,2,0.8267
+I'm a smoker with a cough and shortness of breath that keep getting worse. What lung disease could this be?,https://medlineplus.gov/copd.html,6,0.7405,6,0.7427
+What is PKU and why are newborns tested for it?,https://medlineplus.gov/phenylketonuria.html,1,0.7725,1,0.7714
+How much salt should I eat in a day?,https://medlineplus.gov/sodium.html,1,0.813,1,0.8124
+Why do I have so much bloating and burping?,https://medlineplus.gov/gas.html,5,0.7161,4,0.7155
+Can LASIK fix my nearsightedness?,https://medlineplus.gov/lasereyesurgery.html,1,0.7499,1,0.7514
+I keep having thoughts of ending my life. Where can I get help?,https://medlineplus.gov/suicide.html,1,0.6515,1,0.6468
+How do I file an extension for my federal income taxes?,,,0.5421,,0.5436
+Can my landlord evict me for reporting mold?,,,0.6472,,0.6448
+What is the best engine oil for a 2015 Honda Civic?,,,0.4646,,0.4722
+How do I appeal a denied FMLA leave request at work?,,,0.5739,,0.5704
+What were the main causes of the French Revolution?,,,0.5554,,0.5529

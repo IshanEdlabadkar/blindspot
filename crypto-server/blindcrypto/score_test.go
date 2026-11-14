@@ -1,6 +1,7 @@
 package blindcrypto
 
 import (
+	"bytes"
 	"math"
 	mrand "math/rand"
 	"testing"
@@ -24,16 +25,23 @@ func roundTrip(t *testing.T, table, q []int8, n, d uint64) []int64 {
 	defer cli.Free()
 
 	start := time.Now()
-	cli.HintRecover(srv.HintAnswer(cli.HintQuery()))
-	t.Logf("token phase: %v", time.Since(start))
-
-	start = time.Now()
+	tok := cli.Token()
 	enc, err := cli.EncryptQuery(q)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ans := srv.Answer(enc)
-	got := cli.DecryptScores(ans, n)
+	// Round-trip through the wire format, as over HTTP.
+	req, err := UnmarshalScoreRequest(bytes.NewReader((&ScoreRequest{CorpusVersion: "v", Token: *tok, Query: enc}).MarshalBinary()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	respBytes := (&ScoreResponse{TokenAnswer: srv.HintAnswer(&req.Token), Scores: srv.Answer(req.Query)}).MarshalBinary()
+	resp, err := UnmarshalScoreResponse(bytes.NewReader(respBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := cli.DecryptScores(resp.TokenAnswer, resp.Scores)
+	t.Logf("download %d KB", len(respBytes)/1024)
 	t.Logf("query phase: %v", time.Since(start))
 	return got
 }

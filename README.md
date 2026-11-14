@@ -8,12 +8,9 @@ Search a sensitive knowledge base without the server learning the question, the 
 | B: ML and content | `ingest/`, `baseline/`, `client/answer.py`, `eval/run_eval.py` |
 | C: Client, UI, demo | `ui/`, `client/pipeline.py`, mocks, `tools/make_dummy_tables.py`, `eval/questions.jsonl` |
 
-## Setup (crypto)
+## Setup
 
-```bash
-./scripts/install_seal.sh          # Microsoft SEAL 4.1.1, needed by underhood (cgo)
-cd crypto-server && go test ./blindcrypto -v
-```
+See **[SETUP.md](SETUP.md)** for per-person, per-OS setup. Short version for crypto: `make seal`, `make test`, `make server`.
 
 `third_party/` holds Tiptoe's `underhood` and `simplepir`, patched for Go 1.24+ (newer Go rejects methods on cgo types; `T(0).Bitlen()` became `matrix.Bitlen[T]()`). `go.mod` points at them with `replace`, so no network fetch is needed for those two.
 
@@ -23,9 +20,9 @@ Note: `third_party/underhood/rlwe/rlwe.go` and `third_party/simplepir/matrix/mat
 
 - [x] Gate 1: encrypted dot product round-trips (4 x 8 toy, signed int8)
 - [x] Encrypted scoring at full size: 5,000 x 384, every score exact, ~1 ms server compute per query
-- [ ] `/v1/score` HTTP endpoint
-- [ ] PIR fetch at `/v1/fetch`
-- [ ] Python `crypto_client` bindings
+- [x] Document server: `/v1/manifest`, `/v1/score`, `/v1/fetch_store`, tested end to end over HTTP
+- [x] Fetch: trivial PIR (whole store downloaded once; decided by A)
+- [ ] Client helper (local Go process) + Python `crypto_client`
 
 ## Hour-0 contracts (proposed; agree and edit)
 
@@ -50,7 +47,7 @@ Note: `third_party/underhood/rlwe/rlwe.go` and `third_party/simplepir/matrix/mat
 | --- | --- | --- |
 | `GET /v1/manifest` | none | manifest JSON (spec schema) |
 | `POST /v1/score` | `corpus_version`, token blob, encrypted query | token answer, N encrypted scores |
-| `POST /v1/fetch` | `corpus_version`, token blob, k encrypted selectors | token answer, k encrypted records |
+| `GET /v1/fetch_store` | none | the whole fetch store (trivial PIR) |
 
 **Change from the spec:** underhood needs a per-query "token": the client sends an encrypted copy of a fresh secret key, and the server answers with a matching blob. It does not depend on the question and fits in the same request, so scoring stays one round trip.
 
@@ -73,4 +70,6 @@ Scoring stays on underhood (already working). If PIR fetch fails, use trivial PI
 ### Decided by A
 
 - Length prefix and all wire integers: little-endian.
-- The token goes inside `/v1/score` and `/v1/fetch` (one round trip each, server stays stateless).
+- The token goes inside `/v1/score` (one round trip, server stays stateless).
+- Fetch is trivial PIR: Tiptoe's PIR would need a fresh ~33 MB key per fetch (~330 MB per question at k = 10). Downloading the 10 MB store once is cheaper and leaks nothing.
+- Python reaches the Go crypto through a local helper process (works the same on Mac and on Windows via WSL2).

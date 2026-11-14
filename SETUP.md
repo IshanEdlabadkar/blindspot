@@ -60,20 +60,20 @@ Verified on A's Windows laptop (WSL2, Ubuntu): `make test` passes.
 
 ## Data files (B writes, the server reads)
 
-The server reads these three files from `data/` (B's real ones, or `tools/make_dummy_tables.py` output):
+The server reads these three files from `artifacts/` by default (B's folder). For C's dummy tables: `make server DATA=data`.
 
 | File | Format |
 | --- | --- |
 | `manifest.json` | Spec schema. Must have `corpus_version`, `num_chunks`, `embedding.dim`, `pir.record_bytes`. |
-| `score_table.bin` | N x 384 int8, row by row. **Rows L2-normalized before `round(x * 127)`**, or encrypted scores can wrap. The server prints a WARNING at startup if they aren't. |
-| `fetch_store.bin` | N x 2048 bytes; use `contracts.pack_record()`. |
+| `score_table.bin` | N x 384 int8, row by row. **Rows L2-normalized, then `round(x * 127)`: the scale is exactly 127**, and the manifest says `quantization.scale: 127`. A larger scale lets close matches overflow the encrypted math and vanish from the top 10, so the server refuses to start. (`-allow-wrap` overrides this, for random dummy tables only.) |
+| `fetch_store.bin` | N x 2048 bytes. **2-byte length prefix is little-endian**; use `contracts.pack_record()`. |
 
 ## Switching C's pipeline to real crypto
 
 Three processes, each in its own terminal:
 
 ```bash
-make server      # A's document server :8080, ~5 s to start, log at data/server.log
+make server      # A's document server :8080 on artifacts/, ~3 s to start, log at data/server.log
 make helper      # asker-side key holder :8090 (on the demo laptop)
 BLIND_RAG_CRYPTO=real BLIND_RAG_FETCH=download streamlit run ui/app.py
 ```
@@ -94,6 +94,7 @@ BLIND_RAG_CRYPTO=real BLIND_RAG_FETCH=download streamlit run ui/app.py
 
 ## Changelog
 
+- **Nov 14, 17:40:** server reads `artifacts/` by default (`make server DATA=data` for dummy tables) and logs to `data/server.log`. It refuses tables whose scale can overflow. **B: rebuild with scale 127 and a little-endian length prefix** (see Data files).
 - **Nov 14, 17:20:** `make test` verified on A's Windows laptop (WSL2). Added the WSL "Catastrophic failure" fix.
 - **Nov 14, 17:10:** aligned with C's `contracts.py`: `X-Corpus-Version` header, log to `data/server.log` with the four agreed fields. Added the crypto-helper and real `client/crypto_client`, plus `make helper` and `make integration`.
 - **Nov 14, 17:00:** document server with `/v1/manifest`, `/v1/score`, `/v1/fetch_store`. Fetch is trivial PIR. `make seal`, `make test`, `make server`.

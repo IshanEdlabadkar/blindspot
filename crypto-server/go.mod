@@ -1,6 +1,6 @@
 module github.com/IshanEdlabadkar/blindspot/crypto-server
 
-go 1.24.7
+go 1.22
 
 require (
 	github.com/ahenzinger/underhood v0.0.0-20230922182337-f053a81c6385

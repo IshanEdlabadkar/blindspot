@@ -47,9 +47,10 @@ func main() {
 	dataDir := flag.String("data", "../data", "directory with manifest.json, score_table.bin, fetch_store.bin")
 	addr := flag.String("addr", "127.0.0.1:8080", "listen address (use 0.0.0.0:8080 to serve other machines)")
 	logPath := flag.String("log", "", "request log file (default <data>/server.log)")
+	allowWrap := flag.Bool("allow-wrap", false, "start even if scores can exceed the modulus (random dummy tables only)")
 	flag.Parse()
 
-	s, err := load(*dataDir)
+	s, err := load(*dataDir, *allowWrap)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -73,7 +74,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 
-func load(dir string) (*server, error) {
+func load(dir string, allowWrap bool) (*server, error) {
 	raw, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	if err != nil {
 		return nil, err
@@ -112,7 +113,9 @@ func load(dir string) (*server, error) {
 	for i, b := range tableBytes {
 		table[i] = int8(b)
 	}
-	warnIfUnnormalized(table, n, d)
+	if err := checkScoreRange(table, n, d, allowWrap); err != nil {
+		return nil, err
+	}
 	db, err := blindcrypto.NewScoreDB(table, n, d)
 	if err != nil {
 		return nil, err
@@ -140,10 +143,12 @@ func load(dir string) (*server, error) {
 	}, nil
 }
 
-// warnIfUnnormalized: scores are exact only while |score| < P/2 = 65,536.
-// L2-normalized rows at scale 127 have norm ~127 and always fit; uniform
-// random int8 rows (norm ~1,440) can wrap and give wrong rankings.
-func warnIfUnnormalized(table []int8, n, d uint64) {
+// checkScoreRange: scores are exact only while |score| < P/2 = 65,536.
+// By Cauchy-Schwarz a query quantized like the rows scores at most about
+// (max row norm)^2. Unit vectors at scale 127 give ~16,100, a 4x margin.
+// Refuse to start if a close match could wrap: it would silently vanish
+// from the top k.
+func checkScoreRange(table []int8, n, d uint64, allowWrap bool) error {
 	var worst float64
 	for i := uint64(0); i < n; i++ {
 		var ss float64
@@ -152,10 +157,18 @@ func warnIfUnnormalized(table []int8, n, d uint64) {
 		}
 		worst = math.Max(worst, math.Sqrt(ss))
 	}
-	if worst > 140 {
-		log.Printf("WARNING: score_table rows are not L2-normalized (max row norm %.0f, expected ~127). "+
-			"Encrypted scores can wrap mod %d and rank wrongly. Normalize before quantizing.", worst, blindcrypto.P)
+	bound := worst * worst
+	if bound < float64(blindcrypto.P/2) {
+		log.Printf("score range OK: max row norm %.0f, worst-case score ~%.0f < %d", worst, bound, blindcrypto.P/2)
+		return nil
 	}
+	msg := fmt.Sprintf("score_table can overflow: max row norm %.0f, so a close match scores ~%.0f, above the limit %d. "+
+		"Rebuild with L2-normalized rows and quantization scale 127 (manifest quantization.scale = 127).", worst, bound, blindcrypto.P/2)
+	if allowWrap {
+		log.Printf("WARNING: %s Continuing because -allow-wrap is set.", msg)
+		return nil
+	}
+	return fmt.Errorf("%s Use -allow-wrap only for random dummy tables", msg)
 }
 
 func (s *server) handleManifest(w http.ResponseWriter, r *http.Request) {

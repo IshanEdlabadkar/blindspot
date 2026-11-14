@@ -49,7 +49,9 @@ class Pipeline:
         self.server = (server or _env("BLIND_RAG_SERVER", "http://127.0.0.1:8080")).rstrip("/")
         self.crypto = crypto or load_crypto()
         self.answer_fn = answer_fn or load_answer()
-        self.fetch_mode = fetch_mode or _env("BLIND_RAG_FETCH", "pir")
+        # A's real crypto_client declares FETCH_MODE = "download" (trivial PIR); the env var still wins.
+        self.fetch_mode = (fetch_mode or os.environ.get("BLIND_RAG_FETCH")
+                           or getattr(self.crypto, "FETCH_MODE", "pir"))
         self.http = requests.Session()
         self.manifest = None
         self.key = None            # session key: memory only, never written or sent

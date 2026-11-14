@@ -8,7 +8,8 @@
 //	POST /v1/score        encrypted query in, encrypted scores out (see blindcrypto/wire.go)
 //	GET  /v1/fetch_store  the whole fetch store (trivial PIR: the client reads chunks locally)
 //
-// Logs one JSON line per request: ts, endpoint, status, response_bytes, latency_ms.
+// Logs one JSON line per request to -log (default <data>/server.log), the
+// fields fixed in contracts.py: ts, endpoint, response_bytes, latency_ms.
 // Request bodies are never logged or stored.
 package main
 
@@ -18,7 +19,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -42,13 +45,24 @@ type server struct {
 
 func main() {
 	dataDir := flag.String("data", "../data", "directory with manifest.json, score_table.bin, fetch_store.bin")
-	addr := flag.String("addr", "127.0.0.1:8080", "listen address")
+	addr := flag.String("addr", "127.0.0.1:8080", "listen address (use 0.0.0.0:8080 to serve other machines)")
+	logPath := flag.String("log", "", "request log file (default <data>/server.log)")
 	flag.Parse()
 
 	s, err := load(*dataDir)
 	if err != nil {
 		log.Fatal(err)
 	}
+	if *logPath == "" {
+		*logPath = filepath.Join(*dataDir, "server.log")
+	}
+	lf, err := os.OpenFile(*logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer lf.Close()
+	s.logOut = json.NewEncoder(lf)
+	log.Printf("request log: %s", *logPath)
 	defer s.score.Free()
 
 	mux := http.NewServeMux()
@@ -98,6 +112,7 @@ func load(dir string) (*server, error) {
 	for i, b := range tableBytes {
 		table[i] = int8(b)
 	}
+	warnIfUnnormalized(table, n, d)
 	db, err := blindcrypto.NewScoreDB(table, n, d)
 	if err != nil {
 		return nil, err
@@ -121,8 +136,26 @@ func load(dir string) (*server, error) {
 
 	return &server{
 		version: version, manifest: out, store: store, score: ss,
-		logOut: json.NewEncoder(os.Stdout),
+		logOut: json.NewEncoder(io.Discard),
 	}, nil
+}
+
+// warnIfUnnormalized: scores are exact only while |score| < P/2 = 65,536.
+// L2-normalized rows at scale 127 have norm ~127 and always fit; uniform
+// random int8 rows (norm ~1,440) can wrap and give wrong rankings.
+func warnIfUnnormalized(table []int8, n, d uint64) {
+	var worst float64
+	for i := uint64(0); i < n; i++ {
+		var ss float64
+		for _, x := range table[i*d : (i+1)*d] {
+			ss += float64(x) * float64(x)
+		}
+		worst = math.Max(worst, math.Sqrt(ss))
+	}
+	if worst > 140 {
+		log.Printf("WARNING: score_table rows are not L2-normalized (max row norm %.0f, expected ~127). "+
+			"Encrypted scores can wrap mod %d and rank wrongly. Normalize before quantizing.", worst, blindcrypto.P)
+	}
 }
 
 func (s *server) handleManifest(w http.ResponseWriter, r *http.Request) {
@@ -137,13 +170,13 @@ func (s *server) handleFetchStore(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) handleScore(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("X-Corpus-Version") != s.version {
+		http.Error(w, "stale corpus_version", http.StatusConflict)
+		return
+	}
 	req, err := blindcrypto.UnmarshalScoreRequest(http.MaxBytesReader(w, r.Body, maxScoreBody))
 	if err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-	if req.CorpusVersion != s.version {
-		http.Error(w, "stale corpus_version", http.StatusConflict)
 		return
 	}
 	if req.Query.Query.Rows() < s.score.DB.Info.M {
@@ -189,11 +222,10 @@ func (s *server) logged(endpoint string, h http.HandlerFunc) http.HandlerFunc {
 			}
 			s.logMu.Lock()
 			s.logOut.Encode(map[string]any{
-				"ts":             start.UTC().Format(time.RFC3339Nano),
+				"ts":             start.UTC().Format("2006-01-02T15:04:05.000Z"),
 				"endpoint":       endpoint,
-				"status":         cw.status,
 				"response_bytes": cw.n,
-				"latency_ms":     float64(time.Since(start).Microseconds()) / 1000,
+				"latency_ms":     math.Round(float64(time.Since(start).Microseconds())/10) / 100,
 			})
 			s.logMu.Unlock()
 		}()

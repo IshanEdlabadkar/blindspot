@@ -2,8 +2,9 @@ package blindcrypto
 
 // Wire format for /v1/score. All integers little-endian.
 //
+// The corpus version travels in the X-Corpus-Version header (contracts.py).
+//
 // Score request:
-//   u16 len, corpus_version (UTF-8)
 //   u32 count, then count x (u32 len, bytes)   -- token (underhood HintQuery)
 //   u32 d, then d x u64                         -- encrypted query (pir.Query)
 //
@@ -34,9 +35,8 @@ const (
 )
 
 type ScoreRequest struct {
-	CorpusVersion string
-	Token         underhood.HintQuery
-	Query         *pir.Query[Elem]
+	Token underhood.HintQuery
+	Query *pir.Query[Elem]
 }
 
 type ScoreResponse struct {
@@ -109,10 +109,6 @@ func readVec(r io.Reader) (*matrix.Matrix[Elem], error) {
 
 func (q *ScoreRequest) MarshalBinary() []byte {
 	var w bytes.Buffer
-	var b [2]byte
-	le.PutUint16(b[:], uint16(len(q.CorpusVersion)))
-	w.Write(b[:])
-	w.WriteString(q.CorpusVersion)
 	putU32(&w, uint32(len(q.Token)))
 	for _, c := range q.Token {
 		putBlob(&w, c)
@@ -122,18 +118,6 @@ func (q *ScoreRequest) MarshalBinary() []byte {
 }
 
 func UnmarshalScoreRequest(r io.Reader) (*ScoreRequest, error) {
-	var b [2]byte
-	if _, err := io.ReadFull(r, b[:]); err != nil {
-		return nil, err
-	}
-	vlen := le.Uint16(b[:])
-	if vlen > maxVersion {
-		return nil, errors.New("corpus_version too long")
-	}
-	v := make([]byte, vlen)
-	if _, err := io.ReadFull(r, v); err != nil {
-		return nil, err
-	}
 	n, err := readU32(r)
 	if err != nil {
 		return nil, err
@@ -151,7 +135,7 @@ func UnmarshalScoreRequest(r io.Reader) (*ScoreRequest, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ScoreRequest{CorpusVersion: string(v), Token: tok, Query: &pir.Query[Elem]{Query: q}}, nil
+	return &ScoreRequest{Token: tok, Query: &pir.Query[Elem]{Query: q}}, nil
 }
 
 func (s *ScoreResponse) MarshalBinary() []byte {

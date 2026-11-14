@@ -31,7 +31,7 @@ func roundTrip(t *testing.T, table, q []int8, n, d uint64) []int64 {
 		t.Fatal(err)
 	}
 	// Round-trip through the wire format, as over HTTP.
-	req, err := UnmarshalScoreRequest(bytes.NewReader((&ScoreRequest{CorpusVersion: "v", Token: *tok, Query: enc}).MarshalBinary()))
+	req, err := UnmarshalScoreRequest(bytes.NewReader((&ScoreRequest{Token: *tok, Query: enc}).MarshalBinary()))
 	if err != nil {
 		t.Fatal(err)
 	}

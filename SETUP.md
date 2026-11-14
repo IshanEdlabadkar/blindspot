@@ -1,16 +1,16 @@
 # Setup
 
-Maintained by A. Updated whenever a piece lands that changes what you need to install or run. Check the changelog at the bottom after every pull.
+Maintained by A. Updated whenever a piece lands that changes what you need to install or run. **Check the changelog at the bottom after every pull.**
 
 ## Who needs what
 
-| | A (Windows) | B (Mac) | C (Mac) |
+| | A (Windows) | B (Mac) | C (Mac, demo laptop) |
 | --- | --- | --- | --- |
 | Git, Python 3.11+ | Yes | Yes | Yes |
-| Go 1.22+ and Microsoft SEAL | Yes (inside WSL2) | **No** | Yes (runs the client helper on the demo laptop) |
-| ML stack (sentence-transformers, Ollama) | Optional | Yes | Yes (for the live demo) |
+| Go 1.22+ and Microsoft SEAL | Yes, inside WSL2 | **No** | Yes (runs the crypto-helper) |
+| ML stack (sentence-transformers, Ollama) | No | Yes | Yes |
 
-B never needs the crypto toolchain. B's only contract with crypto is the three files in `data/` (format below).
+B never needs the crypto toolchain. B's whole contract with crypto is the three files in `data/` (format below).
 
 ## Mac (B and C)
 
@@ -20,70 +20,65 @@ brew install go cmake python@3.12
 git clone https://github.com/IshanEdlabadkar/blindspot && cd blindspot
 ```
 
-C only, for the crypto parts:
+C only, once, for the crypto parts:
 
 ```bash
 make seal        # builds Microsoft SEAL 4.1.1 into /usr/local (~5 min, asks for sudo)
-make test        # should end with PASS twice
+make test        # should print "ok" twice
 ```
 
-If `make test` fails with an error mentioning `-march=native`, run `./scripts/fix_march.sh` and then `make test` again.
+If the build fails with an error mentioning `-march=native`, run `./scripts/fix_march.sh`, then `make test` again.
 
 ## Windows (A): use WSL2
 
 The crypto code wraps a C++ library through cgo, which does not build cleanly on native Windows. Run it in WSL2. Servers started there are reachable from Windows at `http://localhost:8080`.
 
-In PowerShell as administrator, once:
-
-```powershell
-wsl --install -d Ubuntu
-```
-
-Then in the Ubuntu terminal:
+In PowerShell as administrator, once: `wsl --install -d Ubuntu`. Then in the Ubuntu terminal:
 
 ```bash
-sudo apt update && sudo apt install -y build-essential cmake git golang-go python3 python3-pip
+sudo apt update && sudo apt install -y build-essential cmake git golang-go python3 python3-pip python3-numpy python3-requests
 go version       # needs 1.22 or newer
-git clone https://github.com/IshanEdlabadkar/blindspot && cd blindspot
+git clone https://github.com/IshanEdlabadkar/blindspot ~/blindspot && cd ~/blindspot
 make seal && make test
 ```
 
 Keep the repo inside the WSL filesystem (`~/blindspot`), not under `/mnt/c/`. Builds there are much slower.
 
-## Running the document server
+## Data files (B writes, the server reads)
 
-Needs these three files in `data/` (B's real ones, or C's dummy ones):
+The server reads these three files from `data/` (B's real ones, or `tools/make_dummy_tables.py` output):
 
 | File | Format |
 | --- | --- |
 | `manifest.json` | Spec schema. Must have `corpus_version`, `num_chunks`, `embedding.dim`, `pir.record_bytes`. |
-| `score_table.bin` | N x d int8, row by row, no header. Rows must be L2-normalized before `round(x * 127)`. |
-| `fetch_store.bin` | N x L bytes. Each record: u16 little-endian length, chunk JSON, zero padding. |
+| `score_table.bin` | N x 384 int8, row by row. **Rows L2-normalized before `round(x * 127)`**, or encrypted scores can wrap. The server prints a WARNING at startup if they aren't. |
+| `fetch_store.bin` | N x 2048 bytes; use `contracts.pack_record()`. |
+
+## Switching C's pipeline to real crypto
+
+Three processes, each in its own terminal:
 
 ```bash
-make server      # http://127.0.0.1:8080; takes ~5 s to precompute before it accepts requests
+make server      # A's document server :8080, ~5 s to start, log at data/server.log
+make helper      # asker-side key holder :8090 (on the demo laptop)
+BLIND_RAG_CRYPTO=real BLIND_RAG_FETCH=download streamlit run ui/app.py
 ```
 
-The server checks the file sizes against the manifest and refuses to start with a clear message if they don't match.
+- **`BLIND_RAG_FETCH=download` is required with real crypto.** Fetch is trivial PIR: the client downloads the whole 10 MB store once and reads chunks locally.
+- The UI reads `data/server.log` by default, which is where the real server writes too.
+- To check everything at once after merging: `make integration`. It runs C's pipeline with real crypto and with the mock, and checks that both return the same top 10 chunks. Last run: ALL PASS, about 4 s per question.
 
-## Server API (for C)
+## What to expect (measured, N = 5,000, 2-vCPU cloud VM)
 
-| Endpoint | What it does |
+| | Value |
 | --- | --- |
-| `GET /v1/manifest` | B's manifest plus `scoring.seed` (hex), `scoring.modulus`, `pir.mode = "trivial"` |
-| `POST /v1/score` | Binary body, see `crypto-server/blindcrypto/wire.go`. 409 if `corpus_version` is stale. |
-| `GET /v1/fetch_store` | The whole fetch store (~10 MB). Download once per corpus version and read chunks locally. |
-
-Log format, one JSON object per line on stdout (no request bodies, ever):
-
-```json
-{"ts": "2026-11-14T22:55:45Z", "endpoint": "/v1/score", "status": 200, "response_bytes": 829288, "latency_ms": 3061.4}
-```
-
-## Coming next (not usable yet)
-
-- **Client helper (`crypto-helper`):** a local Go process on the asker's device that holds keys in memory. C's Python `crypto_client` functions will call it on localhost. Same signatures as `client/crypto_client/__init__.py`.
+| Server startup precompute | ~5 s |
+| Per question: encrypt on device | ~1.1 s |
+| Per question: `/v1/score` round trip | ~3.0 s |
+| Upload per question | ~34 MB |
+| Download per question | ~0.8 MB, plus 10 MB fetch store once per corpus version |
 
 ## Changelog
 
-- **Nov 14, 17:00:** document server with `/v1/manifest`, `/v1/score`, `/v1/fetch_store`. Fetch is trivial PIR (decided by A). `make seal`, `make test`, `make server`.
+- **Nov 14, 17:10:** aligned with C's `contracts.py`: `X-Corpus-Version` header, log to `data/server.log` with the four agreed fields. Added the crypto-helper and real `client/crypto_client`, plus `make helper` and `make integration`.
+- **Nov 14, 17:00:** document server with `/v1/manifest`, `/v1/score`, `/v1/fetch_store`. Fetch is trivial PIR. `make seal`, `make test`, `make server`.

@@ -86,8 +86,8 @@ func TestEndToEndHTTP(t *testing.T) {
 	q := table[123*d : 124*d]
 	tok := cli.Token()
 	enc, _ := cli.EncryptQuery(q)
-	body := (&blindcrypto.ScoreRequest{CorpusVersion: "test.1", Token: *tok, Query: enc}).MarshalBinary()
-	resp, err = http.Post(ts.URL+"/v1/score", "application/octet-stream", bytes.NewReader(body))
+	body := (&blindcrypto.ScoreRequest{Token: *tok, Query: enc}).MarshalBinary()
+	resp, err = post(ts.URL+"/v1/score", "test.1", body)
 	if err != nil || resp.StatusCode != 200 {
 		t.Fatalf("score: %v %v", err, resp.Status)
 	}
@@ -105,13 +105,13 @@ func TestEndToEndHTTP(t *testing.T) {
 	t.Logf("upload %.1f MB; all %d scores exact over HTTP", float64(len(body))/1e6, n)
 
 	// Stale version -> 409.
-	bad := (&blindcrypto.ScoreRequest{CorpusVersion: "old", Token: *tok, Query: enc}).MarshalBinary()
-	resp, _ = http.Post(ts.URL+"/v1/score", "application/octet-stream", bytes.NewReader(bad))
+	bad := (&blindcrypto.ScoreRequest{Token: *tok, Query: enc}).MarshalBinary()
+	resp, _ = post(ts.URL+"/v1/score", "old", bad)
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("stale version: got %d", resp.StatusCode)
 	}
 	// Garbage -> 400, server survives.
-	resp, _ = http.Post(ts.URL+"/v1/score", "application/octet-stream", bytes.NewReader([]byte{1, 2, 3}))
+	resp, _ = post(ts.URL+"/v1/score", "test.1", []byte{1, 2, 3})
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("garbage: got %d", resp.StatusCode)
 	}
@@ -121,4 +121,11 @@ func TestEndToEndHTTP(t *testing.T) {
 	rec := store[123*L:]
 	ln := binary.LittleEndian.Uint16(rec)
 	t.Logf("fetch_store %d bytes; record 123 = %s", len(store), rec[2:2+ln])
+}
+
+func post(url, version string, body []byte) (*http.Response, error) {
+	req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("X-Corpus-Version", version)
+	return http.DefaultClient.Do(req)
 }

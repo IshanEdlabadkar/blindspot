@@ -30,7 +30,7 @@ python -m pytest tests -q                             # 6 checks, should all pas
 ## Hour 0: bring these proposals (all in `contracts.py`)
 
 1. **Byte order:** little-endian for the 2-byte record length and the int32 scores.
-2. **Embedding:** `sentence-transformers/all-MiniLM-L6-v2`, L2-normalized, `round(x * 127)` clipped to ±127. Pin the revision hash and set `EMBED_REVISION`.
+2. **Embedding:** B's `BAAI/bge-small-en-v1.5` at a pinned revision, L2-normalized, with B's query prefix on questions only. Quantize as `clip(round(x * scale), -127, 127)` with `scale` from the manifest.
 3. **Wire format:** body is raw ciphertext bytes (`application/octet-stream`), corpus version in the `X-Corpus-Version` header, HTTP 409 when stale, one selector per `/v1/fetch` call and the client always sends 10.
 4. **Crypto client signatures:** `keygen(manifest)`, `encrypt_query(key, int8_vec)`, `decrypt_scores(key, blob)`, `make_selector(key, index, N)`, `decrypt_record(key, blob)`.
 5. **Answer shape:** `{"declined": bool, "answer": str, "citations": [{"id","title","url","text"}]}`. On a decline, `citations` holds the closest passages.

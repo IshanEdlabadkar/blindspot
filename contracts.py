@@ -15,9 +15,11 @@ QUANT_SCALE = 127
 LEN_FMT = "<H"        # 2-byte record length prefix (B writes, A reads)
 SCORE_DTYPE = "<i4"   # decrypted scores: N signed 32-bit integers
 
-# PROPOSED: embedding model. B embeds chunks with it, C embeds questions.
-EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-EMBED_REVISION = "TBD-pin-commit-hash"
+# Embedding: B's pinned model. B embeds chunks with it, C embeds questions.
+# The manifest is the source of truth for scale and query prefix; these are the defaults.
+EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+EMBED_REVISION = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
+QUERY_PREFIX = "Represent this sentence for searching relevant passages: "  # questions only
 
 # PROPOSED wire format for /v1/score and /v1/fetch:
 #   request : Content-Type application/octet-stream, body = ciphertext bytes,

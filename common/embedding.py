@@ -10,6 +10,7 @@ MODEL_REVISION = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
 DIM = 384
 QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 ARTIFACTS = Path(__file__).resolve().parent.parent / "artifacts"
+SCALE = 127  # fixed int8 quantization scale: q = clip(round(v * 127), -127, 127)
 
 
 @lru_cache(maxsize=1)
@@ -26,10 +27,6 @@ def embed_texts(texts: list[str], batch_size: int = 64) -> np.ndarray:
 
 def embed_query_float(text: str) -> np.ndarray:
     return embed_texts([QUERY_PREFIX + text])[0]
-
-
-def compute_scale(vecs: np.ndarray) -> float:
-    return float(127.0 / np.abs(vecs).max())
 
 
 def quantize(vecs: np.ndarray, scale: float) -> np.ndarray:

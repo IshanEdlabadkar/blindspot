@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import requests
 
-from common.embedding import (ARTIFACTS, DIM, MODEL_NAME, MODEL_REVISION, QUERY_PREFIX,
-                              compute_scale, embed_texts, quantize)
+from common.embedding import (ARTIFACTS, DIM, MODEL_NAME, MODEL_REVISION, QUERY_PREFIX, SCALE,
+                              embed_texts, quantize)
 from common.records import RECORD_BYTES, pack_record
 from common.tables import sha256_file
 from ingest.chunk import chunk_page
@@ -50,8 +50,7 @@ def build_chunks(pages: list[dict]) -> list[dict]:
 def write_artifacts(chunks: list[dict], vecs: np.ndarray, out_dir, corpus_version: str) -> dict:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    scale = compute_scale(vecs)
-    (out / "score_table.bin").write_bytes(quantize(vecs, scale).tobytes(order="C"))
+    (out / "score_table.bin").write_bytes(quantize(vecs, SCALE).tobytes(order="C"))
     with open(out / "fetch_store.bin", "wb") as f:
         for c in chunks:
             f.write(pack_record(c))
@@ -66,7 +65,7 @@ def write_artifacts(chunks: list[dict], vecs: np.ndarray, out_dir, corpus_versio
         "attribution": "Source: MedlinePlus, National Library of Medicine",
         "embedding": {"model": MODEL_NAME, "revision": MODEL_REVISION, "dim": DIM,
                       "normalize": "l2", "query_prefix": QUERY_PREFIX},
-        "quantization": {"type": "int8", "scale": scale},
+        "quantization": {"type": "int8", "scale": SCALE},
         "scoring": {"library": "set by crypto server", "params": "set by crypto server"},
         "pir": {"library": "set by crypto server", "params": "set by crypto server",
                 "record_bytes": RECORD_BYTES},
@@ -95,7 +94,7 @@ def main():
     DATA.mkdir(exist_ok=True)
     np.save(DATA / "embeddings_f32.npy", vecs)
     m = write_artifacts(chunks, vecs, args.out, f"{generated}.1")
-    print(f"wrote {args.out}: corpus_version {m['corpus_version']}, scale {m['quantization']['scale']:.2f}")
+    print(f"wrote {args.out}: corpus_version {m['corpus_version']}, scale {m['quantization']['scale']}")
 
 
 if __name__ == "__main__":

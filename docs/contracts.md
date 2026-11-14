@@ -57,7 +57,7 @@ Implemented once in `common/embedding.py`. C imports it and does not re-implemen
 | Normalization | L2 |
 | Query prefix | `"Represent this sentence for searching relevant passages: "` (questions only, not chunks) |
 | Quantization | `q = clip(round(v * scale), -127, 127)` as int8 |
-| `scale` | Float, set once from the corpus so the largest absolute chunk value maps to 127; read from the manifest |
+| `scale` | Fixed at 127 (`common.embedding.SCALE`), also written to the manifest |
 
 Functions:
 
@@ -76,7 +76,7 @@ Schema from the spec.
 |---|---|
 | `protocol`, `corpus_version`, `corpus_name`, `attribution` | B |
 | `embedding` (`model`, `revision`, `dim`, `normalize`, `query_prefix`) | B |
-| `quantization` (`type`: `"int8"`, `scale`: float) | B |
+| `quantization` (`type`: `"int8"`, `scale`: 127) | B |
 | `num_chunks`, `top_k` (10) | B |
 | `pir.record_bytes` (2048) | B |
 | `hashes.score_table`, `hashes.fetch_store` (`"sha256:<hex>"` of the file bytes) | B |

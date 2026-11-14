@@ -26,23 +26,22 @@ def _fake(text: str) -> np.ndarray:
     return v
 
 
-def embed(text: str) -> np.ndarray:
-    """Question -> 384 float32, L2-normalized."""
+def embed(text: str, prefix: str = c.QUERY_PREFIX) -> np.ndarray:
+    """Question -> 384 float32, L2-normalized. The prefix goes on questions only."""
     global _model
     if mode() == "fake":
         v = _fake(text)
     else:
         if _model is None:
             from sentence_transformers import SentenceTransformer
-            rev = None if c.EMBED_REVISION.startswith("TBD") else c.EMBED_REVISION
-            _model = SentenceTransformer(c.EMBED_MODEL, revision=rev)
-        v = np.asarray(_model.encode(text), dtype=np.float32)
+            _model = SentenceTransformer(c.EMBED_MODEL, revision=c.EMBED_REVISION, device="cpu")
+        v = np.asarray(_model.encode(prefix + text), dtype=np.float32)
     return v / (np.linalg.norm(v) or 1.0)
 
 
-def quantize(vec: np.ndarray, scale: int = c.QUANT_SCALE) -> np.ndarray:
-    """Must match ingest/build_tables.quantize (B)."""
-    return np.clip(np.rint(vec * scale), -scale, scale).astype(np.int8)
+def quantize(vec: np.ndarray, scale: float = c.QUANT_SCALE) -> np.ndarray:
+    """Same formula as B's common/embedding.quantize: clip to int8 range whatever the scale."""
+    return np.clip(np.rint(vec * scale), -127, 127).astype(np.int8)
 
 
 def warm():

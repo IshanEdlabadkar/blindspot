@@ -111,7 +111,8 @@ class Pipeline:
             trace["requests"].append({"endpoint": endpoint, "request_bytes": up, "response_bytes": down})
 
         # 3. embed and quantize
-        q = emb.quantize(emb.embed(question), m["quantization"]["scale"])
+        q = emb.quantize(emb.embed(question, m["embedding"].get("query_prefix", c.QUERY_PREFIX)),
+                         m["quantization"]["scale"])
         stage("embedding")
 
         # 4. encrypt

@@ -41,7 +41,7 @@ def main(out="data", n=5000, seed=0):
         "corpus_name": "DUMMY random tables",
         "attribution": "Random data, not a real corpus",
         "embedding": {"model": c.EMBED_MODEL, "revision": c.EMBED_REVISION,
-                      "dim": c.DIM, "normalize": "l2"},
+                      "dim": c.DIM, "normalize": "l2", "query_prefix": c.QUERY_PREFIX},
         "quantization": {"type": "int8", "scale": c.QUANT_SCALE},
         "scoring": {"library": "<placeholder>", "params": "<placeholder>"},
         "pir": {"library": "<placeholder>", "params": "<placeholder>",

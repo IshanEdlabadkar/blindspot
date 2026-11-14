@@ -44,6 +44,20 @@ make seal && make test
 
 Keep the repo inside the WSL filesystem (`~/blindspot`), not under `/mnt/c/`. Builds there are much slower.
 
+**If WSL says "Catastrophic failure, Error code: Wsl/Service/E_UNEXPECTED"** (seen on A's laptop):
+
+1. PowerShell as admin: `wsl --shutdown`, `wsl --update`, then `wsl -d Ubuntu`.
+2. If Ubuntu opens as `root` or the username prompt keeps failing, create the user by hand. Usernames must be lowercase.
+   ```bash
+   adduser --gecos "" ishan && usermod -aG sudo ishan
+   printf '[user]\ndefault=ishan\n' > /etc/wsl.conf
+   exit
+   ```
+   Then `wsl --shutdown` and `wsl -d Ubuntu` in PowerShell.
+3. "Failed to detect nested virtualization support" is a harmless warning; ignore it.
+
+Verified on A's Windows laptop (WSL2, Ubuntu): `make test` passes.
+
 ## Data files (B writes, the server reads)
 
 The server reads these three files from `data/` (B's real ones, or `tools/make_dummy_tables.py` output):
@@ -80,5 +94,6 @@ BLIND_RAG_CRYPTO=real BLIND_RAG_FETCH=download streamlit run ui/app.py
 
 ## Changelog
 
+- **Nov 14, 17:20:** `make test` verified on A's Windows laptop (WSL2). Added the WSL "Catastrophic failure" fix.
 - **Nov 14, 17:10:** aligned with C's `contracts.py`: `X-Corpus-Version` header, log to `data/server.log` with the four agreed fields. Added the crypto-helper and real `client/crypto_client`, plus `make helper` and `make integration`.
 - **Nov 14, 17:00:** document server with `/v1/manifest`, `/v1/score`, `/v1/fetch_store`. Fetch is trivial PIR. `make seal`, `make test`, `make server`.

@@ -82,6 +82,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--xml", type=Path, help="local MedlinePlus XML (default: download the latest)")
     ap.add_argument("--out", type=Path, default=ARTIFACTS)
+    ap.add_argument("--corpus-version", help="manifest corpus_version; bump it whenever the tables change "
+                                              "(default: <XML date>.1)")
     args = ap.parse_args()
 
     xml = args.xml or download(latest_xml_url(), DATA / "raw")
@@ -93,7 +95,7 @@ def main():
     vecs = embed_texts([c["embed_text"] for c in chunks])
     DATA.mkdir(exist_ok=True)
     np.save(DATA / "embeddings_f32.npy", vecs)
-    m = write_artifacts(chunks, vecs, args.out, f"{generated}.1")
+    m = write_artifacts(chunks, vecs, args.out, args.corpus_version or f"{generated}.1")
     print(f"wrote {args.out}: corpus_version {m['corpus_version']}, scale {m['quantization']['scale']}")
 
 

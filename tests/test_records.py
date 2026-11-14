@@ -11,9 +11,10 @@ def test_round_trip():
     assert unpack_record(rec) == CHUNK
 
 
-def test_layout_is_big_endian_length_then_json_then_zeros():
+def test_layout_is_little_endian_length_then_json_then_zeros():
     rec = pack_record(CHUNK)
-    n = int.from_bytes(rec[:2], "big")
+    n = int.from_bytes(rec[:2], "little")
+    assert rec[0] == n & 0xFF and rec[1] == n >> 8
     assert rec[2 + n:] == bytes(RECORD_BYTES - 2 - n)
     assert rec[2:2 + n].startswith(b'{"id":7,"title":"Asthma"')
 

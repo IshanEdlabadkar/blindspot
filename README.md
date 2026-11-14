@@ -33,7 +33,7 @@ Note: `third_party/underhood/rlwe/rlwe.go` and `third_party/simplepir/matrix/mat
 
 - `data/score_table.bin`: N x 384 int8, row by row, no header.
 - `data/fetch_store.bin`: N x 2048 bytes. Each record: 2-byte length, chunk JSON (UTF-8), zero padding.
-- **Proposal: the length prefix is little-endian unsigned 16-bit** (`struct.pack("<H", n)`).
+- **Decided: the length prefix is little-endian unsigned 16-bit** (`struct.pack("<H", n)`).
 - All integers on the wire are little-endian too.
 
 ### Embedding (B embeds chunks, C embeds questions)
@@ -66,6 +66,11 @@ The spec's five functions, with one adjustment: `keygen` also returns the token 
 
 One JSON object per line: `{"ts": ISO8601, "endpoint": "/v1/score", "response_bytes": int, "latency_ms": float}`. No request bodies, ever.
 
-### Fallback if underhood breaks later
+### Fallback (decided)
 
-Apple `swift-homomorphic-encryption`. The work split notes there is no fallback after that; agree one in hour 0 (proposal: trivial PIR for fetch plus underhood for scoring, since scoring is already working).
+Scoring stays on underhood (already working). If PIR fetch fails, use trivial PIR: the client downloads the whole fetch store (~10 MB) once. We are not switching to Apple's library.
+
+### Decided by A
+
+- Length prefix and all wire integers: little-endian.
+- The token goes inside `/v1/score` and `/v1/fetch` (one round trip each, server stays stateless).

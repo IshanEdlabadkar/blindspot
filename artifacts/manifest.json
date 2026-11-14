@@ -12,7 +12,7 @@
   },
   "quantization": {
     "type": "int8",
-    "scale": 278.667236328125
+    "scale": 127
   },
   "scoring": {
     "library": "set by crypto server",
@@ -26,7 +26,7 @@
   "num_chunks": 2101,
   "top_k": 10,
   "hashes": {
-    "score_table": "sha256:6d492a929191b24d3af9cfc063afee1f1084ee52edb3daebbed7d47c0a53c0df",
+    "score_table": "sha256:800ccea72576503bc41eb242c85db07705a49f60b2a092c597bb8e07d049a76b",
     "fetch_store": "sha256:b9bc789b4549b4b62087df34970a1ac904d1b1fd12628f893af3dac1891b26ff"
   }
 }

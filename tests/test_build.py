@@ -19,12 +19,13 @@ def test_artifacts_round_trip(tmp_path):
     assert (tmp_path / "score_table.bin").stat().st_size == 5 * 384
     assert (tmp_path / "fetch_store.bin").stat().st_size == 5 * RECORD_BYTES
     assert m["num_chunks"] == 5 and m["pir"]["record_bytes"] == RECORD_BYTES
+    assert m["quantization"] == {"type": "int8", "scale": 127}
     assert json.loads((tmp_path / "manifest.json").read_text()) == m
 
     m2, table, store = load_artifacts(tmp_path)
     verify_hashes(m2, tmp_path)
     assert table.shape == (5, 384) and table.dtype == np.int8
-    assert np.abs(table).max() == 127
+    assert np.array_equal(table, np.clip(np.rint(vecs * 127), -127, 127).astype(np.int8))
     assert get_record(store, 3) == {k: chunks[3][k] for k in ("id", "title", "url", "updated", "text")}
     lines = (tmp_path / "chunks.jsonl").read_text().splitlines()
     assert json.loads(lines[4])["id"] == 4

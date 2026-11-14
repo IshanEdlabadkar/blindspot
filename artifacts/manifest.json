@@ -1,6 +1,6 @@
 {
   "protocol": "blind-rag/1",
-  "corpus_version": "2026-11-13.1",
+  "corpus_version": "2026-11-14.2",
   "corpus_name": "MedlinePlus health topics (public domain subset)",
   "attribution": "Source: MedlinePlus, National Library of Medicine",
   "embedding": {
@@ -27,6 +27,6 @@
   "top_k": 10,
   "hashes": {
     "score_table": "sha256:800ccea72576503bc41eb242c85db07705a49f60b2a092c597bb8e07d049a76b",
-    "fetch_store": "sha256:b9bc789b4549b4b62087df34970a1ac904d1b1fd12628f893af3dac1891b26ff"
+    "fetch_store": "sha256:fb5ebc84b45e184c0abbb87667e700343225ee3f526ef9176498e7be612765a8"
   }
 }

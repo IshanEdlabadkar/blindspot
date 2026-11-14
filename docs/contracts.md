@@ -26,7 +26,7 @@ N records of exactly 2,048 bytes each. Size: exactly `N * 2048` bytes.
 
 | Bytes | Content |
 |---|---|
-| 0–1 | Length `n` of the JSON, unsigned 16-bit, big-endian |
+| 0–1 | Length `n` of the JSON, unsigned 16-bit, little-endian (changed from big-endian in corpus version 2026-11-14.2) |
 | 2 to 2+n | Chunk JSON, UTF-8 |
 | 2+n to 2047 | Zero bytes |
 
@@ -41,7 +41,7 @@ Chunk JSON, written compactly (`separators=(",", ":")`, `ensure_ascii=False`):
 Decoding a record in Python:
 
 ```python
-n = int.from_bytes(rec[0:2], "big")
+n = int.from_bytes(rec[0:2], "little")
 chunk = json.loads(rec[2:2 + n].decode("utf-8"))
 ```
 

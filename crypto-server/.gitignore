@@ -1,2 +1,3 @@
-crypto-server
-crypto-helper
+# compiled binaries only (anchored so cmd/crypto-helper/ source is not ignored)
+/crypto-server
+/crypto-helper

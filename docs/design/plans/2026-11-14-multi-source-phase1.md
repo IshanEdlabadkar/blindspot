@@ -1,14 +1,12 @@
 # Multi-source Phase 1 (MedlinePlus + FMLA) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Turn ingestion into per-source adapters, add the FMLA regulations (29 CFR 825) as a second source with its own artifacts, and make the plaintext baseline, `answer()` and the eval work across several sources.
 
 **Architecture:** `ingest/sources/<id>.py` adapters share one interface (`fetch`, `parse`, metadata). `ingest.build --source <id>` writes `artifacts/<id>/` with `source_id`/`source_name` in the manifest. `baseline.retrieve.MultiIndex` queries every local source, takes exactly k from each, and merges by score; `answer()` reranks the merged list and cites with source fields.
 
 **Tech Stack:** Python 3.12, numpy, requests, sentence-transformers, pytest (as before).
 
-**Spec:** `docs/superpowers/specs/2026-11-14-multi-source-design.md`
+**Spec:** `docs/design/specs/2026-11-14-multi-source-design.md`
 
 ## Global Constraints
 

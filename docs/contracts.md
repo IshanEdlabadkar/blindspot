@@ -142,7 +142,7 @@ One line per request: timestamp, endpoint, response size in bytes, latency in ms
 
 ## 9. Multiple document servers (added 2026-11-14)
 
-Design: `docs/superpowers/specs/2026-11-14-multi-source-design.md`. Each source is its own document server, built from `artifacts/<source_id>/` (same four files as section 8). Built today: `artifacts/medlineplus/` (byte-identical to the root tables) and `artifacts/fmla/` (29 CFR Part 825, 310 chunks). The root `artifacts/` stays as-is until A and C read the per-source folders; removing it needs the team's agreement.
+Design: `docs/design/specs/2026-11-14-multi-source-design.md`. Each source is its own document server, built from `artifacts/<source_id>/` (same four files as section 8). Built today: `artifacts/medlineplus/` (byte-identical to the root tables) and `artifacts/fmla/` (29 CFR Part 825, 310 chunks). The root `artifacts/` stays as-is until A and C read the per-source folders; removing it needs the team's agreement.
 
 **Manifest fields added:** `source_id` (for example `"fmla"`) and `source_name` (for display). Every source uses the identical `embedding` and `quantization` blocks; a client must refuse a server whose blocks differ, because its scores would not be comparable. Each source has its own `corpus_version`.
 

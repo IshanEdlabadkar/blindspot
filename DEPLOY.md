@@ -1,6 +1,6 @@
 # Deploying the document server remotely
 
-This lives on the `deploy/render` branch; `main` runs locally only. Render deploys from this branch.
+The `Dockerfile` and `render.yaml` in this repository are what Render builds from.
 
 Three separate pieces, owned the way a real provider would own them:
 

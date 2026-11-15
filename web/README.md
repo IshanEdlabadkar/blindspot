@@ -34,7 +34,7 @@ cd web && npm run dev                     # Vite on :5173, proxies /api to :8600
 | `src/api.ts` | Typed client for `api/app.py` (Server-Sent Events over POST) |
 | `../api/app.py` | Thin FastAPI wrapper over C's pipeline, B's wiretap search and the plaintext server |
 
-Design notes: `docs/superpowers/specs/2026-11-15-web-ui-design.md`. Colours and type are tokens in `src/index.css`.
+Design notes: `docs/design/specs/2026-11-15-web-ui-design.md`. Colours and type are tokens in `src/index.css`.
 
 ## Node.js on WSL or Linux
 

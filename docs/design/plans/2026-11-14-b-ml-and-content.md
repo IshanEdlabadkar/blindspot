@@ -1,7 +1,5 @@
 # B: ML and Content Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Build Blindspot's content side: MedlinePlus ingestion into the score table, fetch store and manifest; a plaintext baseline `ask_plain()`; the local-model `answer()` with citations and safe decline; and a retrieval and answer eval.
 
 **Architecture:** Pure Python modules that talk through the files and shapes in `docs/contracts.md`. `common/` holds code shared with C (record format, embedding, table loading). `ingest/` turns the MedlinePlus XML into `artifacts/`. `baseline/` does plaintext int8 retrieval, which ranks exactly as Blindspot will. `client/answer.py` calls Ollama. `eval/` measures recall and answer outcomes.

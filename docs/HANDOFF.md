@@ -1,8 +1,10 @@
 # Blindspot: detailed handoff
 
-For a person or an AI agent picking this project up cold. Read this once, top to bottom, before changing anything. The short public overview is [`README.md`](../README.md).
+For anyone picking this project up cold. Read this once, top to bottom, before changing anything. The short public overview is [`README.md`](../README.md).
 
-Last updated: Nov 14, 2026, about 20:00 Central, on branch `person-c-client-ui`. The team's expanded task plan (C1 to C8) is tracked in section 12.
+> **Historical snapshot.** Written mid-hackathon (Nov 14, 2026, about 20:00 Central). Since then every branch has been merged into `main` and the per-person branches were deleted; the branch names below are kept for context. For the current overview, read the [README](../README.md).
+
+Last updated: Nov 14, 2026, about 20:00 Central. The team's expanded task plan (C1 to C8) is tracked in section 12.
 
 ## 1. What this is, in one paragraph
 
@@ -36,7 +38,7 @@ Rules that have been followed so far:
 - **No force pushes.** History includes two throwaway push-test commits; leave them.
 - **Merge A and B into C's branch, not the other way round.** Use `git merge --no-ff origin/<branch>`. Both have merged cleanly every time except the first B merge (see section 10).
 - **Do not edit files another person owns** unless they ask. If their code needs a change, tell them. The one exception already made: `README.md` was A's status page and is now the project overview; A's text moved verbatim to `docs/crypto.md`.
-- The product spec (`blind-rag-spec.md`) and the 18-hour work split are **not in this repository**. They live in the team's Claude Project. Ask for them if you need the original requirements.
+- The product spec (`blind-rag-spec.md`) is **not in this repository**; ask the team for it if you need the original requirements. The 18-hour work split is [`docs/blind-rag-work-split.pdf`](blind-rag-work-split.pdf).
 
 ## 4. How a question flows through the code
 
@@ -223,6 +225,6 @@ Record a backup video of every step.
 | File and answer formats in prose | `docs/contracts.md` |
 | C's run commands and checklist | `README_C.md` |
 | Presenting: script, prompts, runbook | `demo/` |
-| How B built the corpus | `ingest/`, `docs/superpowers/plans/2026-11-14-b-ml-and-content.md` |
+| How B built the corpus | `ingest/`, `docs/design/plans/2026-11-14-b-ml-and-content.md` |
 | Adding sources (Genetics, MyHealthfinder) | `docs/corpus.md`, `make corpus-expanded` |
 | Eval results | `eval/results/` |

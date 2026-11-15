@@ -1,4 +1,4 @@
-"""Source adapters. Each provider's content can become its own document server (docs/superpowers/specs/
+"""Source adapters. Each provider's content can become its own document server (docs/design/specs/
 2026-11-14-multi-source-design.md), or be merged into one library (ingest.build_multi). An adapter
 module exposes:
 

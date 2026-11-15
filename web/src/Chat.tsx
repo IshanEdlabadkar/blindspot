@@ -205,7 +205,7 @@ function CarbonCopy({ plain, onXray, libraries }: { plain?: Plain; onXray: () =>
   )
 }
 
-export function TurnView({ turn, number, onXray, nameOf }: { turn: Turn; number: number; onXray: () => void; nameOf: (url?: string) => string | undefined }) {
+export function TurnView({ turn, number, onXray, onRetry, nameOf }: { turn: Turn; number: number; onXray: () => void; onRetry?: () => void; nameOf: (url?: string) => string | undefined }) {
   const [open, setOpen] = useState<number | null>(null)
   const r = turn.result
   const { body, disclaimer } = r ? splitAnswer(r) : { body: '', disclaimer: '' }
@@ -218,6 +218,11 @@ export function TurnView({ turn, number, onXray, nameOf }: { turn: Turn; number:
           <p className="mt-1 text-ink">{turn.error.message}</p>
           {turn.error.fix && <p className="mt-1.5 text-graphite">To fix it: <span className="typed text-ink">{turn.error.fix}</span></p>}
           <p className="mt-1.5 text-graphite">Nothing was retried in a less private mode.</p>
+          {onRetry && (
+            <button onClick={onRetry} className="press mt-3 h-10 rounded-[2px] bg-badger px-4 font-display text-sm font-bold text-white hover:bg-stamp">
+              Try this question again
+            </button>
+          )}
         </div>
       )}
       {r && (

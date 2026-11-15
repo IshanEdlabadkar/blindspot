@@ -65,7 +65,7 @@ servers=$(IFS=,; echo "${relays[*]}")
 wait_up "http://127.0.0.1:9080/v1/manifest" "recording relay" 40
 cat data/wiretap.out
 
-# make demo starts the key helper, the plaintext server and the UI; with WIRETAP_SERVERS set it starts
+# start_demo.sh starts the key helper, the plaintext server and the UI; with WIRETAP_SERVERS set it starts
 # no document servers of its own, and the UI talks to the servers above only through the relays.
 export BLIND_RAG_SERVERS="$servers" WIRETAP_SERVERS="$servers" BLIND_RAG_PLAIN_SERVER=http://127.0.0.1:9001
-make demo
+./scripts/start_demo.sh

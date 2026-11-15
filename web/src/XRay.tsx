@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { fmtBytes, searchWire, type Route, type ServerTrace, type Status } from './api'
 import { Burrow } from './Burrow'
 import { short, slipNo } from './Chat'
+import { Attacker } from './Attacker'
 import { libraryName, type Turn } from './turn'
 
 const HEX = '0123456789abcdef'
@@ -76,6 +77,32 @@ function Sec({ title, children, last }: { title?: string; children: React.ReactN
   )
 }
 
+/** Does the size of what leaves this laptop depend on what was asked? Compare every question in this session. */
+function SameSize({ turns }: { turns: Turn[] }) {
+  const rows = turns.filter((t) => t.trace).map((t) => ({ id: t.id, chars: t.question.length, bytes: t.trace!.upload_bytes }))
+  const same = rows.length > 1 && rows.every((r) => r.bytes === rows[0].bytes)
+  const spread = rows.length ? Math.max(...rows.map((r) => r.bytes)) - Math.min(...rows.map((r) => r.bytes)) : 0
+  return (
+    <div>
+      <p className="font-bold text-ink">Same size every time</p>
+      <p className="text-graphite">An observer on the network can see how many bytes you sent. Does that give the question away?</p>
+      <ul className="mt-2 space-y-0.5">
+        {rows.map((r) => (
+          <li key={r.id}><Line left={`${slipNo(r.id)}  (${r.chars} letters asked)`} right={`${fmtBytes(r.bytes)} sealed`} /></li>
+        ))}
+      </ul>
+      {rows.length < 2 && <p className="mt-2 text-graphite">Ask a second question, short or long, to compare.</p>}
+      {rows.length > 1 && (
+        <p className={`mt-2 ${same ? 'font-bold text-ink' : 'text-stamp'}`}>
+          {same
+            ? 'Every question left at exactly the same size, so its length tells an observer nothing.'
+            : `The sizes differ by ${fmtBytes(spread)}. That is a small leak: size could hint at the question.`}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function SecretWord({ since }: { since?: string }) {
   const [word, setWord] = useState('')
   const [res, setRes] = useState<{ words: string[]; routes: Route[] } | null>(null)
@@ -102,7 +129,7 @@ function SecretWord({ since }: { since?: string }) {
   )
 }
 
-export function XRay({ turn, number, status, onBack }: { turn: Turn; number: number; status: Status | null; onBack: () => void }) {
+export function XRay({ turn, turns, number, status, onBack }: { turn: Turn; turns: Turn[]; number: number; status: Status | null; onBack: () => void }) {
   const tr = turn.trace
   const servers: ServerTrace[] = tr?.servers ?? (tr ? [{ server: tr.server ?? '', corpus_version: '', num_chunks: tr.num_chunks ?? 0,
     requests: tr.requests ?? [], timings: tr.timings ?? {}, fetched: 10, used: turn.result?.citations.length ?? 0,
@@ -254,6 +281,10 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
           What the libraries can still tell: that a question was asked, when, from which address, and how many bytes.
           Sealing hides the words, not the fact that you asked.
         </p>
+      </div>
+      <div className="mt-8 grid gap-8 md:grid-cols-2 md:gap-x-10 lg:gap-x-14">
+        <div className="slip typed self-start px-6 pt-6 pb-5 text-[15px] leading-6 text-ink"><SameSize turns={turns} /></div>
+        <Attacker turn={turn} />
       </div>
     </main>
   )

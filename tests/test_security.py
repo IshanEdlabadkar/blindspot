@@ -46,3 +46,22 @@ def test_hosted_servers_are_pinned():
     for e in json.loads((root / "servers.remote.json").read_text()):
         backup = json.loads((root / "artifacts" / e["id"] / "manifest.json").read_text())
         assert e["pin"] == {"corpus_version": backup["corpus_version"], **backup["hashes"]}, e["id"]
+
+
+def test_server_traffic_has_uniform_minimal_headers():
+    from client import net
+    s = net.session()
+    assert dict(s.headers) == net.UNIFORM_HEADERS
+    assert "python-requests" not in s.headers["User-Agent"]
+    k = cc.Key({"scoring": {"seed": "00", "mode": "hint"}, "num_chunks": 1, "embedding": {"dim": 384}})
+    assert dict(k.http.headers) == net.UNIFORM_HEADERS   # the hint download to a server, too
+
+
+def test_web_ui_sends_a_strict_content_security_policy():
+    from fastapi.testclient import TestClient
+    from api.app import make_app
+    app = make_app(servers=["http://127.0.0.1:1"], status_get=lambda url: None)
+    r = TestClient(app).get("/api/status")
+    csp = r.headers["Content-Security-Policy"]
+    assert "script-src 'self'" in csp and "connect-src 'self'" in csp and "frame-ancestors 'none'" in csp
+    assert r.headers["X-Frame-Options"] == "DENY" and r.headers["Referrer-Policy"] == "no-referrer"

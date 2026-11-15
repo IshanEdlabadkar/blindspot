@@ -58,7 +58,8 @@ def default_plain_ask(url: str, question: str) -> dict:
 
 
 def default_status_get(url: str) -> dict:
-    r = requests.get(url + "/v1/manifest", timeout=8)
+    from client import net
+    r = net.get(url + "/v1/manifest", timeout=8)
     r.raise_for_status()
     return r.json()
 
@@ -75,6 +76,23 @@ def _sse(event: str, data) -> str:
 def make_app(servers=None, pipeline_factory=default_pipeline, plain_ask=default_plain_ask,
              plain_url=None, wire_log=None, status_get=default_status_get) -> FastAPI:
     app = FastAPI(title="Blind RAG API")
+
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        # The page shows passages from servers we don't control. This policy lets it load code only from
+        # this app and talk only to this API, so even an injected script couldn't send the question or
+        # the answer anywhere else. Styles allow inline (the UI animates with style attributes).
+        resp = await call_next(request)
+        resp.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; "
+            "font-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; "
+            "form-action 'self'; frame-ancestors 'none'")
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "DENY"
+        resp.headers["Referrer-Policy"] = "no-referrer"   # source links don't tell sites where you came from
+        resp.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        resp.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        return resp
     servers = servers or configured_servers()
     plain_url = plain_url or os.environ.get("BLIND_RAG_PLAIN_SERVER", "http://127.0.0.1:9001")
     wire_log = Path(wire_log or os.environ.get("BLIND_RAG_WIRE_LOG", ROOT / "data" / "wire" / "wire.jsonl"))

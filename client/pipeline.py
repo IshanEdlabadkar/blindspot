@@ -61,7 +61,8 @@ OLLAMA_TAGS = "http://localhost:11434/api/tags"
 
 def _get(url, timeout=5):
     try:
-        r = requests.get(url, timeout=timeout)
+        from client import net
+        r = net.get(url, timeout=timeout)
         return r if r.status_code == 200 else None
     except requests.RequestException:
         return None
@@ -109,7 +110,8 @@ class Pipeline:
         # A's real crypto_client declares FETCH_MODE = "download" (trivial PIR); the env var still wins.
         self.fetch_mode = (fetch_mode or os.environ.get("BLIND_RAG_FETCH")
                            or getattr(self.crypto, "FETCH_MODE", "pir"))
-        self.http = requests.Session()
+        from client import net
+        self.http = net.session()   # identical minimal headers from every asker
         self.manifest = None
         self.key = None            # session key: memory only, never written or sent
         self._store = None         # whole fetch store, download mode only

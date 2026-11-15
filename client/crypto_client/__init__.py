@@ -94,7 +94,8 @@ class Key:
         self.n = int(manifest["num_chunks"])
         self.d = int(manifest["embedding"]["dim"])
         self.handle: str | None = None
-        self.http = _HelperSession()
+        from client import net
+        self.http = net.session(_HelperSession)   # same minimal headers as the pipeline
         self.mode = SCORE_MODE or scoring.get("mode", "token")
         self._scoring = scoring
         self._pir = manifest.get("pir", {})

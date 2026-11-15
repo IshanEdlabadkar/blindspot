@@ -2,7 +2,7 @@
 
 Search a sensitive knowledge base without the server learning the question, the scores, or which documents were read.
 
-**Setup for everyone: [SETUP.md](SETUP.md).** Remote server (Render + Databricks): on the `deploy/render` branch. Contracts: `contracts.py` (C's branch) is the single source of truth.
+**Setup for everyone: [SETUP.md](SETUP.md).** Remote server: [DEPLOY.md](DEPLOY.md). Contracts: `contracts.py` (C's branch) is the single source of truth.
 
 | Person | Owns |
 | --- | --- |
@@ -21,7 +21,7 @@ Search a sensitive knowledge base without the server learning the question, the 
 - [x] `make measure`: latency, bytes, CPU, log check
 - [x] Hint-mode scoring: 3 KB up, ~6 ms per question; every spec performance target met
 - [x] Real PIR fetch (optional, `BLIND_RAG_FETCH=pir`): 10 private fetches per question, chunks byte-identical to trivial PIR
-- [x] Corpus loaded from a folder or URL, hash-checked and hot-swapped by `corpus_version`. Remote deployment (Render + Databricks) lives on the `deploy/render` branch.
+- [x] Remote deploy: Render runs code only; the corpus lives in the provider's storage (Databricks volume), hash-checked and hot-swapped by `corpus_version` (image not yet built; first Render build is its test)
 - [ ] Run `make measure` on the demo laptop (hours 13 to 16)
 
 ## Crypto design decisions

@@ -41,11 +41,12 @@ demo-compare:  ## same as make demo (which now always starts B's plaintext serve
 	PLAIN=1 ./scripts/start_demo.sh
 
 stop:          ## stop the server, helper, plaintext server and UI left running (do this after git pull)
-	-@for port in 8080 8081 8082 8090 8001; do pids=$$(lsof -ti tcp:$$port -sTCP:LISTEN 2>/dev/null); [ -n "$$pids" ] && kill $$pids 2>/dev/null; done; \
-	  pkill -f "[g]o run . -data"; pkill -f "[g]o run ./cmd/crypto-helper"; pkill -f "[s]treamlit run ui/app.py"; \
+	-@for port in 8080 8081 8082 8083 8090 8001 8501 8600 9001 9080 9081 9082 9083; do pids=$$(lsof -ti tcp:$$port -sTCP:LISTEN 2>/dev/null); [ -n "$$pids" ] && kill $$pids 2>/dev/null; done; \
+	  pkill -f "[g]o run . -data"; pkill -f "[g]o run ./cmd/crypto-helper"; pkill -f "[s]treamlit run ui/app.py"; pkill -f "[w]iretap.proxy"; pkill -f "[u]vicorn api.app"; \
 	  echo "stopped"
 
-preflight:     ## with make demo running: the 8-step smoke test before presenting (real crypto + real model)
+preflight:     ## with make demo running: every document server checked, then the 8-step smoke test (real crypto + real model)
+	python3 scripts/check_servers.py
 	./scripts/start_demo.sh --preflight
 
 corpus-expanded: ## build artifacts-expanded/: MedlinePlus + MedlinePlus Genetics + MyHealthfinder (needs internet, ~5 min)

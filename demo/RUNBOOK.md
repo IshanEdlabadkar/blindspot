@@ -21,15 +21,15 @@ cd ~/blindspot && make preflight
 
 It must end with **READY FOR THE DEMO**. A `FAIL` line names the fix. `SKIP` lines mean a model was switched off: not acceptable for the real demo.
 
-## Using the hosted server instead of a local one
+## Document servers: hosted first, local backup
 
-```bash
-BLIND_RAG_SERVER=https://blindspot-cz2t.onrender.com \
-BLIND_RAG_SERVER_LOG=https://blindspot-cz2t.onrender.com/v1/server_log \
-BLIND_RAG_FETCH=pir make demo
-```
+`make demo` (and `./wiretap/demo.sh`, `./web/demo.sh`) search all four hosted document servers in
+`servers.remote.json` (MedlinePlus, FMLA, MedlinePlus Genetics, MyHealthfinder; corpora on Databricks). They are
+woken together; if one has been asleep, the first request takes about a minute. A server that doesn't answer is
+replaced by a local server on its backup in `artifacts/<id>/`, and the script says so. If the venue network
+misbehaves: `LOCAL=1 make demo` runs all four locally. `make check-servers` checks all four in a few seconds.
 
-The key helper, the app and the language model still run on the laptop. If the hosted server has been asleep, the first request takes about a minute, and the first question downloads about 25 MB of public setup files once. If the venue network misbehaves, drop the three variables and run everything locally.
+The key helper, the app and the language model always run on the laptop.
 
 ## Warm up (do this every time)
 

@@ -74,8 +74,9 @@ def main():
                          "<server>/v1/server_log for a remote one)")
     ap.add_argument("--server-pid", type=int, default=None)
     ap.add_argument("--out", default=str(ROOT / "data" / "measurements.md"))
-    ap.add_argument("--fetch", choices=["download", "pir"], default="download",
-                    help="download = trivial PIR (default); pir = real PIR, k private fetches per question")
+    ap.add_argument("--fetch", choices=["download", "pir", "pir-single"], default="download",
+                    help="download = trivial PIR (default); pir = real PIR, all k selectors in one request; "
+                         "pir-single = real PIR, one request per chunk")
     a = ap.parse_args()
 
     from client import crypto_client as cc
@@ -136,6 +137,14 @@ def main():
         L = manifest["pir"]["record_bytes"]
         f_up = f_down = 0
         if a.fetch == "pir":
+            sels = cc.make_selectors(key, [int(j) for j in top], n)
+            fr = http.post(a.server + "/v1/fetch_batch", data=sels, timeout=60, headers={
+                "Content-Type": "application/octet-stream", "X-Corpus-Version": manifest["corpus_version"]})
+            fr.raise_for_status()
+            for j, rec in zip(top, cc.decrypt_records(key, fr.content)):
+                assert rec == store[int(j) * L:(int(j) + 1) * L], "PIR record mismatch"
+            f_up, f_down = len(sels), len(fr.content)
+        elif a.fetch == "pir-single":
             for j in top:
                 sel = cc.make_selector(key, int(j), n)
                 fr = http.post(a.server + "/v1/fetch", data=sel, timeout=60, headers={
@@ -185,8 +194,9 @@ def main():
         "| --- | --- | --- | --- |",
         f"| Encrypt on device | (not in spec) | {fmt_t(med['encrypt'])} | |",
         f"| Encrypted scoring round trip | < 2 s | {fmt_t(med['score_rt'])} | {'yes' if med['score_rt'] < 2 else 'no'} |",
-        (f"| Private fetch of k = 10 (real PIR, {k} fetches) | < 3 s | {fmt_t(med['decrypt_rank_fetch'])} per question, each record checked | "
-         if a.fetch == "pir" else
+        (f"| Private fetch of k = 10 (real PIR, {k} fetches{' in one request' if a.fetch == 'pir' else ''}) | < 3 s | "
+         f"{fmt_t(med['decrypt_rank_fetch'])} per question, each record checked | "
+         if a.fetch.startswith("pir") else
          f"| Private fetch of k = 10 (trivial PIR) | < 3 s | {fmt_t(med['decrypt_rank_fetch'])} per question, "
          f"plus {fmt_t(store_secs)} once for the {fmt_b(store_bytes)} store | ")
         + f"{'yes' if med['decrypt_rank_fetch'] < 3 else 'no'} |",
@@ -202,7 +212,7 @@ def main():
         f"One-time per corpus version: manifest {fmt_b(manifest_bytes)}, "
         + (f"scoring hint {fmt_b(hint_bytes)} (cached on disk after the first run), " if hint_bytes else "")
         + (f"fetch hint {fmt_b(manifest['pir'].get('hint_bytes', 0))} (real PIR; the {fmt_b(store_bytes)} store was "
-           "downloaded here only to check every fetched record). " if a.fetch == "pir" else f"fetch store {fmt_b(store_bytes)}. ")
+           "downloaded here only to check every fetched record). " if a.fetch.startswith("pir") else f"fetch store {fmt_b(store_bytes)}. ")
         + f"Setup took {fmt_t(setup_secs)} (key setup {fmt_t(keygen_secs)}).",
         "Rerank and answer generation (B's part) are not included.",
     ]

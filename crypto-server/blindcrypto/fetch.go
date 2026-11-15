@@ -93,17 +93,49 @@ func (f *FetchServer) Hint() *matrix.Matrix[Elem]                  { return f.s.
 func (f *FetchServer) Answer(q *pir.Query[Elem]) *pir.Answer[Elem] { return f.s.Answer(q) }
 
 // FetchClient is the device side. Safe for concurrent use; every Query uses a fresh secret.
+//
+// Preparing a secret (A*s + e and H*s, ~45 ms) does not depend on which record
+// is wanted, so a background goroutine keeps a small pool of prepared secrets.
+// Each is taken from the pool once and never reused.
 type FetchClient struct {
 	mu     sync.Mutex
 	c      *pir.Client[Elem]
 	info   *pir.DBInfo
 	n      uint64
 	recLen uint64
+	pool   chan *pir.Secret[Elem]
+	done   chan struct{}
 }
 
+// FetchPoolSize: two questions' worth of fetches at k = 10.
+const FetchPoolSize = 20
+
 func NewFetchClient(seed *rand.PRGKey, info *pir.DBInfo, hint *matrix.Matrix[Elem], n, recLen uint64) *FetchClient {
-	return &FetchClient{c: pir.NewClient[Elem](hint, seed, info), info: info, n: n, recLen: recLen}
+	fc := &FetchClient{c: pir.NewClient[Elem](hint, seed, info), info: info, n: n, recLen: recLen,
+		pool: make(chan *pir.Secret[Elem], FetchPoolSize), done: make(chan struct{})}
+	go fc.fill()
+	return fc
 }
+
+func (fc *FetchClient) prepare() *pir.Secret[Elem] {
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	return fc.c.PreprocessQuery() // fresh secret from crypto/rand-seeded PRG
+}
+
+func (fc *FetchClient) fill() {
+	for {
+		s := fc.prepare()
+		select {
+		case fc.pool <- s:
+		case <-fc.done:
+			return
+		}
+	}
+}
+
+// Close stops the background preparation (call when replacing the client).
+func (fc *FetchClient) Close() { close(fc.done) }
 
 // FetchKey is one fetch's secret state. Use once.
 type FetchKey struct {
@@ -117,9 +149,15 @@ func (fc *FetchClient) Query(index uint64) (*FetchKey, *pir.Query[Elem], error) 
 	if index >= fc.n {
 		return nil, nil, fmt.Errorf("index %d out of range (n=%d)", index, fc.n)
 	}
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
-	s := fc.c.PreprocessQuery()
+	var s *pir.Secret[Elem]
+	select {
+	case s = <-fc.pool: // prepared in the background, used exactly once
+	default:
+		s = fc.prepare()
+	}
+	// No lock: QueryPreprocessed reads only immutable client parameters and
+	// writes only this secret's own query vector. (The lock guards the shared
+	// PRG used by prepare, which the background filler holds for ~45 ms.)
 	q := fc.c.QueryPreprocessed(index, s)
 	// QueryPreprocessed adds to the secret's query in place; copy for the wire.
 	return &FetchKey{fc: fc, s: s, index: index}, &pir.Query[Elem]{Query: q.Query.Copy()}, nil

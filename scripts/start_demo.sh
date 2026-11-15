@@ -24,6 +24,7 @@ wait_for() {  # name url logfile
 extra=""
 [ "${BLIND_RAG_EMBED:-real}" = fake ] || extra="sentence_transformers"
 PY=$(./scripts/find_python.sh "$extra") || exit 1
+. ./scripts/privacy_env.sh
 echo "Using $("$PY" -c 'import sys; print(sys.executable)')"
 
 if [ "${1:-}" = "--preflight" ]; then shift; exec "$PY" demo/preflight.py "$@"; fi

@@ -37,6 +37,7 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -44,7 +45,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -125,7 +129,12 @@ type fetchPending struct {
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8090", "listen address (keep it on 127.0.0.1)")
+	tokenFile := flag.String("token-file", defaultTokenFile(), "where to write this run's session token (mode 0600)")
 	flag.Parse()
+	token, err := newSessionToken(*tokenFile)
+	if err != nil {
+		log.Fatalf("session token: %v", err)
+	}
 	h := &helper{infos: map[[2]uint64]*pir.DBInfo{}, hints: map[corpus]*blindcrypto.HintClient{},
 		keys: map[string]*pending{}, fetches: map[corpus]*blindcrypto.FetchClient{},
 		fkeys: map[string]*fetchPending{}}
@@ -144,8 +153,67 @@ func main() {
 	mux.HandleFunc("POST /fetch_decrypt", h.handleFetchDecrypt)
 	mux.HandleFunc("POST /fetch_batch_query", h.handleFetchBatchQuery)
 	mux.HandleFunc("POST /fetch_batch_decrypt", h.handleFetchBatchDecrypt)
-	log.Printf("crypto-helper on http://%s (keys in memory only)", *addr)
-	log.Fatal(http.ListenAndServe(*addr, mux))
+	log.Printf("crypto-helper on http://%s (keys in memory only; session token in %s)", *addr, *tokenFile)
+	srv := &http.Server{Addr: *addr, Handler: guard(mux, token), ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout: 120 * time.Second}
+	log.Fatal(srv.ListenAndServe())
+}
+
+// defaultTokenFile: $BLIND_RAG_HELPER_TOKEN_FILE, else <user cache dir>/blind-rag/helper-token.
+func defaultTokenFile() string {
+	if f := os.Getenv("BLIND_RAG_HELPER_TOKEN_FILE"); f != "" {
+		return f
+	}
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		dir = os.TempDir()
+	}
+	return filepath.Join(dir, "blind-rag", "helper-token")
+}
+
+// newSessionToken makes a fresh random token for this run and writes it where only this user
+// can read it. Our Python client reads it from there; other programs and web pages can't.
+func newSessionToken(path string) (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	tok := hex.EncodeToString(b)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return "", err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(tok), 0o600); err != nil {
+		return "", err
+	}
+	return tok, os.Rename(tmp, path)
+}
+
+// guard rejects anything that isn't our own client on this machine:
+//   - Host must be a loopback name, so a web page can't reach us through DNS rebinding;
+//   - browsers mark their requests (Origin, Sec-Fetch-Site); our client sends neither, so any
+//     request carrying them comes from a web page and is refused;
+//   - every call except /health needs this run's session token (X-Blind-RAG-Token).
+func guard(next http.Handler, token string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, err := net.SplitHostPort(r.Host)
+		if err != nil {
+			host = r.Host
+		}
+		if host != "127.0.0.1" && host != "localhost" && host != "::1" {
+			http.Error(w, "forbidden host", http.StatusForbidden)
+			return
+		}
+		if r.Header.Get("Origin") != "" || r.Header.Get("Sec-Fetch-Site") != "" {
+			http.Error(w, "browser requests are not allowed", http.StatusForbidden)
+			return
+		}
+		if r.URL.Path != "/health" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Blind-RAG-Token")), []byte(token)) != 1 {
+			http.Error(w, "missing or wrong session token (restarted helper? the client re-reads it)", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func parseCorpus(r *http.Request) (corpus, error) {

@@ -135,6 +135,11 @@ class Pipeline:
             if self.crypto_kind == "real" and not server_is_real:
                 raise PipelineError("manifest", f"{self.server} is the plaintext mock server, not the encrypted one.",
                                     "Stop the mock and start the real server: make demo")
+            from client import pins
+            mismatch = pins.check_manifest(self.server, m)
+            if mismatch:
+                raise PipelineError("manifest", f"{self.server} is not serving the corpus pinned for it ({mismatch}).",
+                                    "If a new corpus version was published on purpose: python3 scripts/check_servers.py --pin")
             if m.get("protocol") != c.PROTOCOL:
                 raise RuntimeError(f"unsupported protocol {m.get('protocol')!r}")
             e = m["embedding"]
@@ -271,6 +276,11 @@ class Pipeline:
             if self._store is None:
                 r = self.http.get(self.server + "/v1/fetch_store", timeout=300)
                 r.raise_for_status()
+                from client import pins
+                want = (m.get("hashes") or {}).get("fetch_store")
+                if want and pins.sha256(r.content) != want:   # the manifest itself is checked against the pin
+                    raise PipelineError("fetching", f"{self.server} sent a fetch store that doesn't match its manifest.",
+                                        "Don't trust this server's passages; check it with: make check-servers")
                 self._store = r.content
                 sent("/v1/fetch_store", 0, len(self._store))
             L = m["pir"]["record_bytes"]

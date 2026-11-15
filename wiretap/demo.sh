@@ -14,6 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p data
 PY=$(./scripts/find_python.sh) || exit 1
+. ./scripts/privacy_env.sh
 export PYTHON="$PY"
 pids=()
 cleanup() { for p in ${pids[@]+"${pids[@]}"}; do kill "$p" 2>/dev/null || true; done; }

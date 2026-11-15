@@ -48,3 +48,9 @@ func (s *Server[T]) HintAnswer(q *HintQuery) *HintAnswer {
 func (s *Server[T]) Answer(q *pir.Query[T]) *pir.Answer[T] {
   return s.pirServer.Answer(q)
 }
+
+// Hint returns the SimplePIR hint (DB * A). Added for Blind RAG's hint mode,
+// where clients download it once instead of sending a per-query token.
+func (s *Server[T]) Hint() *matrix.Matrix[T] {
+  return s.pirServer.Hint()
+}

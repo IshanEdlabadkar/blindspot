@@ -129,3 +129,69 @@ func post(url, version string, body []byte) (*http.Response, error) {
 	req.Header.Set("X-Corpus-Version", version)
 	return http.DefaultClient.Do(req)
 }
+
+func TestEndToEndHintModeHTTP(t *testing.T) {
+	n, d, L := 2101, 384, 2048
+	dir := t.TempDir()
+	table := writeTestCorpus(t, dir, n, d, L)
+	s, err := load(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.score.Free()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/manifest", s.logged("/v1/manifest", s.handleManifest))
+	mux.HandleFunc("GET /v1/score_hint", s.logged("/v1/score_hint", s.handleHint))
+	mux.HandleFunc("POST /v1/score", s.logged("/v1/score", s.handleScore))
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	resp, _ := http.Get(ts.URL + "/v1/manifest")
+	var man map[string]any
+	json.NewDecoder(resp.Body).Decode(&man)
+	sc := man["scoring"].(map[string]any)
+	if sc["mode"] != "hint" {
+		t.Fatalf("mode %v", sc["mode"])
+	}
+	resp, err = http.Get(sc["hint_url"].(string)) // absolute URL from the manifest
+	if err != nil {
+		t.Fatal(err)
+	}
+	hintBytes, _ := io.ReadAll(resp.Body)
+	if blindcrypto.HintSHA256(hintBytes) != sc["hint_sha256"] {
+		t.Fatal("hint hash mismatch")
+	}
+	sb, _ := hex.DecodeString(sc["seed"].(string))
+	var seed rand.PRGKey
+	copy(seed[:], sb)
+	info, _ := blindcrypto.ScoreDBInfo(uint64(n), uint64(d))
+	h, err := blindcrypto.DecodeHint(hintBytes, uint64(n), 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hc := blindcrypto.NewHintClient(&seed, info, h)
+	for _, qi := range []int{0, 777, 2100} {
+		k := hc.Prepare()
+		q := table[qi*d : (qi+1)*d]
+		enc, _ := k.Encrypt(q)
+		body := (&blindcrypto.ScoreRequest{Query: enc}).MarshalBinary()
+		resp, err := post(ts.URL+"/v1/score", "test.1", body)
+		if err != nil || resp.StatusCode != 200 {
+			t.Fatalf("score: %v", err)
+		}
+		sr, err := blindcrypto.UnmarshalScoreResponse(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := k.Decrypt(sr.Scores)
+		want := blindcrypto.PlainScores(table, q, uint64(n), uint64(d))
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("q%d row %d: %d vs %d", qi, i, got[i], want[i])
+			}
+		}
+		if qi == 0 {
+			t.Logf("hint %.1f MB once; per question upload %d B; all %d scores exact", float64(len(hintBytes))/1e6, len(body), n)
+		}
+	}
+}

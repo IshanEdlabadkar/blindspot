@@ -4,8 +4,10 @@
 //
 // Endpoints:
 //
-//	GET  /v1/manifest     manifest.json plus the public scoring seed
-//	POST /v1/score        encrypted query in, encrypted scores out (see blindcrypto/wire.go)
+//	GET  /v1/manifest     manifest.json plus public scoring parameters (seed, mode, hint URL)
+//	GET  /v1/score_hint   public scoring hint, downloaded once per corpus version (hint mode)
+//	POST /v1/score        encrypted query in, encrypted scores out (see blindcrypto/wire.go).
+//	                      A request with no token is hint mode; with a token, token mode.
 //	GET  /v1/fetch_store  the whole fetch store (trivial PIR: the client reads chunks locally)
 //
 // Logs one JSON line per request to -log (default <data>/server.log), the
@@ -29,13 +31,15 @@ import (
 	"time"
 
 	"github.com/IshanEdlabadkar/blindspot/crypto-server/blindcrypto"
+	"github.com/ahenzinger/underhood/underhood"
 )
 
 const maxScoreBody = 64 << 20 // token is ~33 MB
 
 type server struct {
 	version  string
-	manifest []byte
+	manifest map[string]any
+	hint     []byte
 	store    []byte
 	score    *blindcrypto.ScoreServer
 	mu       sync.Mutex // underhood's thread safety is undocumented; serialize
@@ -68,6 +72,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/manifest", s.logged("/v1/manifest", s.handleManifest))
+	mux.HandleFunc("GET /v1/score_hint", s.logged("/v1/score_hint", s.handleHint))
 	mux.HandleFunc("POST /v1/score", s.logged("/v1/score", s.handleScore))
 	mux.HandleFunc("GET /v1/fetch_store", s.logged("/v1/fetch_store", s.handleFetchStore))
 	log.Printf("serving corpus %s on http://%s", s.version, *addr)
@@ -124,7 +129,8 @@ func load(dir string, allowWrap bool) (*server, error) {
 	seed := blindcrypto.SeedFromTable(hash)
 	start := time.Now()
 	ss := blindcrypto.NewScoreServer(db, seed)
-	log.Printf("precomputed score table (%d x %d) in %v", n, d, time.Since(start))
+	hint := blindcrypto.EncodeHint(ss.Hint())
+	log.Printf("precomputed score table (%d x %d) and %.1f MB hint in %v", n, d, float64(len(hint))/1e6, time.Since(start))
 
 	// Publish what the client needs: the public seed and the fetch mode.
 	scoring, _ := m["scoring"].(map[string]any)
@@ -133,12 +139,19 @@ func load(dir string, allowWrap bool) (*server, error) {
 	}
 	scoring["seed"] = hex.EncodeToString(seed[:])
 	scoring["modulus"] = blindcrypto.P
+	scoring["library"] = "underhood (Tiptoe) + SimplePIR LHE"
+	scoring["params"] = fmt.Sprintf("logq=64 n=2048 p=2^17 d=%d", d)
+	scoring["mode"] = "hint" // clients may still send a token (token mode) instead
+	scoring["hint_path"] = "/v1/score_hint"
+	scoring["hint_bytes"] = len(hint)
+	scoring["hint_sha256"] = blindcrypto.HintSHA256(hint)
 	m["scoring"] = scoring
 	pirM["mode"] = "trivial"
-	out, _ := json.MarshalIndent(m, "", "  ")
+	pirM["library"] = "trivial PIR (whole store)"
+	pirM["params"] = "none"
 
 	return &server{
-		version: version, manifest: out, store: store, score: ss,
+		version: version, manifest: m, hint: hint, store: store, score: ss,
 		logOut: json.NewEncoder(io.Discard),
 	}, nil
 }
@@ -172,8 +185,31 @@ func checkScoreRange(table []int8, n, d uint64, allowWrap bool) error {
 }
 
 func (s *server) handleManifest(w http.ResponseWriter, r *http.Request) {
+	// hint_url is absolute, built from the address the client used, so the
+	// client needs no extra configuration to find it.
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	m := make(map[string]any, len(s.manifest))
+	for k, v := range s.manifest {
+		m[k] = v
+	}
+	sc := make(map[string]any)
+	for k, v := range s.manifest["scoring"].(map[string]any) {
+		sc[k] = v
+	}
+	sc["hint_url"] = scheme + "://" + r.Host + "/v1/score_hint"
+	m["scoring"] = sc
+	out, _ := json.MarshalIndent(m, "", "  ")
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(s.manifest)
+	w.Write(out)
+}
+
+func (s *server) handleHint(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("X-Corpus-Version", s.version)
+	w.Write(s.hint)
 }
 
 func (s *server) handleFetchStore(w http.ResponseWriter, r *http.Request) {
@@ -204,10 +240,11 @@ func (s *server) handleScore(w http.ResponseWriter, r *http.Request) {
 func (s *server) compute(req *blindcrypto.ScoreRequest) *blindcrypto.ScoreResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &blindcrypto.ScoreResponse{
-		TokenAnswer: s.score.HintAnswer(&req.Token),
-		Scores:      s.score.Answer(req.Query),
+	ta := &underhood.HintAnswer{} // hint mode: the client already has the hint
+	if len(req.Token) > 0 {
+		ta = s.score.HintAnswer(&req.Token) // token mode
 	}
+	return &blindcrypto.ScoreResponse{TokenAnswer: ta, Scores: s.score.Answer(req.Query)}
 }
 
 // countingWriter records status and response size for the log line.

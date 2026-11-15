@@ -140,6 +140,68 @@ header[data-testid="stHeader"] {background: transparent;}
 table.br-t {border-collapse: collapse; width: 100%; font-size: 14px; background: #fff; border: 1px solid #DDE1E8;}
 table.br-t th, table.br-t td {text-align: left; padding: 9px 12px; border-bottom: 1px solid #E6E9EF; vertical-align: top;}
 table.br-t th {font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: #4A5362;}
+
+/* ---- redesign: header, status pill, Locket, receipts ---- */
+.br-head {display: flex; align-items: center; gap: 12px;}
+.br-head .sub {font-size: 12px; color: #4A5362; margin-top: 2px;}
+.br-pillbar {display: flex; justify-content: flex-end;}
+.br-status {display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border-radius: 999px;
+            font-size: 13px; font-weight: 600; border: 1px solid;}
+.br-status .d {width: 8px; height: 8px; border-radius: 50%;}
+.br-status.ok {background: #E9F7EE; color: #0B5A2A; border-color: #CFE8D7;} .br-status.ok .d {background: #17803D;}
+.br-status.warn {background: #FDF1E0; color: #7A3A08; border-color: #F1D2A6;} .br-status.warn .d {background: #C2620B;}
+.br-status.bad {background: #FDECEA; color: #7A1810; border-color: #F3B8B1;} .br-status.bad .d {background: #B42318;}
+.br-problems {background: #FDECEA; border: 1px solid #F3B8B1; border-radius: 12px; padding: 12px 16px; margin: 10px 0 4px;
+              font-size: 14px; color: #7A1810; display: flex; flex-direction: column; gap: 6px;}
+.br-problems code {background: #fff; color: #12151C; padding: 2px 6px; border-radius: 4px; font-size: 12px;}
+.st-key-welcome {background: #fff; border: 1px solid #DDE1E8; border-radius: 18px; padding: 26px 28px 18px; margin: 18px 0 10px;}
+.br-welcome {display: flex; gap: 22px; align-items: center; flex-wrap: wrap;}
+.br-welcome h3 {margin: 0 0 6px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 22px;}
+.br-welcome p {margin: 0; font-size: 15px; line-height: 1.55; color: #2B313C; max-width: 520px;}
+.br-try {font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #4A5362; margin: 16px 0 2px;}
+.st-key-welcome .stButton button {justify-content: flex-start; text-align: left; min-height: 44px; border-radius: 10px;
+            background: #F6F7F9; border: 1px solid #DDE1E8; font-size: 14px;}
+.st-key-welcome .stButton button:hover {border-color: #1F4FC9; color: #1F4FC9;}
+.st-key-welcome .stButton button > div, .st-key-welcome .stButton button p {justify-content: flex-start; text-align: left; width: 100%;}
+.br-card2 {background: #fff; border: 1px solid #DDE1E8; border-radius: 16px; overflow: hidden;}
+.br-card2.declined {border-color: #E3C58F; background: #FFFBF2;}
+.br-card2 .hd {display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px;
+               padding: 11px 20px; border-bottom: 1px solid #EEF0F4; font-size: 12px; color: #4A5362;}
+.br-card2 .hd .b {font-weight: 600; letter-spacing: .06em; text-transform: uppercase;}
+.br-card2 .hd .b.ok {color: #0B5A2A;} .br-card2 .hd .b.warn {color: #9A4A0B;}
+.br-card2 .bd {padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 14px;}
+.br-srcs {display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px;}
+.br-card2 .ft {font-size: 12px; color: #4A5362; line-height: 1.5;}
+[data-testid="stForm"] {background: #fff; border: 1.5px solid #B9C0CC !important; border-radius: 16px; padding: 6px 6px 6px 12px !important;}
+[data-testid="stForm"] .stTextInput div[data-baseweb="input"], [data-testid="stForm"] .stTextInput div[data-baseweb="base-input"]
+   {border-color: transparent !important; background: transparent; min-height: 48px;}
+[data-testid="stForm"] .stTextInput input {background: #fff !important; min-height: 46px;}
+[data-testid="stForm"] div[data-baseweb="base-input"], [data-testid="stForm"] div[data-baseweb="input"] > div {background: #fff !important;}
+[data-testid="stForm"] .stFormSubmitButton button {height: 48px;}
+[data-testid="stForm"] [data-testid="stTextInputRootElement"], [data-testid="stForm"] [data-testid="stTextInputRootElement"] > div
+   {border-color: transparent !important; box-shadow: none !important;}
+.br-mirror-h {font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 700; font-size: 22px; margin: 6px 0 2px;}
+.br-mirror-sub {font-size: 14px; color: #4A5362; margin-bottom: 12px;}
+.br-mirror {display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 22px; margin-bottom: 14px;}
+.br-rc {background: #FFFEFB; border-radius: 4px; box-shadow: 0 14px 34px rgba(20, 24, 40, .14); padding: 22px 24px 24px;
+        font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13.5px; line-height: 1.75; color: #16140F;}
+.br-rc .who {font-family: Inter, system-ui, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .02em;
+             display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;}
+.br-rc .who span {font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px;}
+.br-rc.normal .who span {background: #FBE3DF; color: #8A1C12;} .br-rc.blind .who span {background: #E8EEFC; color: #163A96;}
+.br-rc.mock .who span {background: #FDE7C8; color: #7A3A08;}
+.br-rc .cut {border-top: 2px dashed #CFC8B8; margin: 12px 0;}
+.br-rc .row {display: flex; justify-content: space-between; gap: 14px;}
+.br-rc .row span:first-child {color: #6F6858;}
+.br-rc .k {color: #6F6858; margin-top: 8px;}
+.br-rc .hl {background: #FBE3DF; color: #8A1C12; padding: 6px 10px; margin-top: 4px; word-break: break-word;}
+.br-rc .bars {display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;}
+.br-rc .bars i {display: block; height: 16px; background: #16140F;}
+.br-rc .hex {color: #6F6858; word-break: break-all; font-size: 12px;}
+.br-rc .end {text-align: center; font-weight: 500; letter-spacing: .04em;}
+.br-rc.normal .end {color: #8A1C12;} .br-rc.blind .end {color: #163A96;} .br-rc.mock .end {color: #7A3A08;}
+.br-rc .empty {font-family: Inter, system-ui, sans-serif; color: #4F4A40; font-size: 14px; line-height: 1.55;}
+.br-rc .log {font-size: 12.5px;}
 </style>
 """
 
@@ -240,14 +302,28 @@ def answer_html(text):
     return re.sub(r"\[(\d+)\]", r"<sup>\1</sup>", out)
 
 
+def locket(px=40, wave=False):
+    """Locket, Blind RAG's own mascot: a padlock with a face. Original art, inline SVG."""
+    arm = ('<path d="M37 24 q3 -3 2 -7" fill="none" stroke="#1F4FC9" stroke-width="2.6" stroke-linecap="round"/>'
+           if wave else "")
+    return (f'<svg width="{px}" height="{round(px * 1.1)}" viewBox="0 0 40 44" role="img" '
+            f'aria-label="Locket, the Blind RAG mascot">'
+            '<path d="M11 18 V12 a9 9 0 0 1 18 0 V18" fill="none" stroke="#12151C" stroke-width="3.2" stroke-linecap="round"/>'
+            '<rect x="3" y="16" width="34" height="26" rx="10" fill="#1F4FC9"/>'
+            '<circle cx="14" cy="26" r="2.5" fill="#fff"/><circle cx="26" cy="26" r="2.5" fill="#fff"/>'
+            '<path d="M15 33 q5 4 10 0" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/>'
+            f'{arm}</svg>')
+
+
 def turn_html(t):
     q, result, trace = t["q"], t["result"], t["trace"]
-    badge, cls, detail = mode_text(trace["mode"] if trace else None)
-    chips = f'<div class="br-chips"><span class="br-mode {cls}">{esc(badge)}</span>'
-    if trace:
-        chips += (f'<span class="chip">{trace["num_chunks"]:,} chunks scored</span>'
-                  f'<span class="chip">{trace["total_seconds"]:.2f} s</span>')
-    chips += f'</div><div class="br-modeline">{esc(detail)}</div>'
+    mode = trace["mode"] if trace else None
+    badge, cls, detail = mode_text(mode)
+    if mode and mode["crypto"] == "real" and mode["answer"] == "real":
+        badge_txt = "Encrypted search · answered on this laptop"
+    else:
+        badge_txt = badge
+    right = (f'{trace["num_chunks"]:,} passages scored · {trace["total_seconds"]:.2f} s' if trace else "")
 
     answer = result["answer"]
     for d in ("This is general health information, not medical advice.", c.DISCLAIMER):
@@ -262,7 +338,8 @@ def turn_html(t):
     srcs = ""
     for i, cit in enumerate(result["citations"], 1):
         url = str(cit.get("url") or "")
-        link = (f'<a href="{esc(url)}" target="_blank" rel="noopener">{esc(url)}</a>'
+        host = urlparse(url).hostname or ""
+        link = (f'<a href="{esc(url)}" target="_blank" rel="noopener">{esc(host or url)}</a>'
                 if url.startswith(("http://", "https://")) else "")
         meta = []
         if cit.get("updated"):
@@ -272,67 +349,78 @@ def turn_html(t):
         # B's answer() verifies each cited sentence and returns the matching source sentence; use it.
         # Otherwise (stub answer) fall back to a word-overlap pointer.
         exc = "" if result["declined"] else (cit.get("excerpt") or supporting_excerpt(answer, i, cit.get("text", "")))
-        exc_html = (f'<div class="cap">Closest sentence in the source</div><blockquote>{esc(exc)}</blockquote>'
-                    if exc else "")
-        srcs += (f'<div class="br-src"><div class="ttl"><b>{i}</b><span>{esc(cit.get("title"))}</span></div>'
-                 f'<div class="meta">{link}{" · " if link and meta else ""}{" · ".join(meta)}</div>{exc_html}'
+        exc_html = f'<blockquote>{esc(exc)}</blockquote>' if exc else ""
+        srcs += (f'<div class="br-src"><div class="ttl"><b>{i}</b><span>{esc(cit.get("title"))}</span></div>{exc_html}'
+                 f'<div class="meta">{link}{" · " if link and meta else ""}{" · ".join(meta)}</div>'
                  f'<details><summary>Full passage</summary><div>{esc(cit.get("text"))}</div></details></div>')
     if result["declined"]:
         body = ('<div class="br-label">No reliable source found</div>'
                 '<p class="br-answer">The library did not contain a passage that answers this, so no answer was '
                 'written. These are the closest passages.</p>')
-        card = "br-card declined"
+        card = "br-card2 declined"
     else:
-        body = f'<div class="br-label">Answer</div><p class="br-answer">{answer_html(answer)}</p>'
-        card = "br-card"
-    return (f'<div class="br-turn"><div class="br-q">{esc(q)}</div>{chips}'
-            f'<div class="{card}">{urgent_html}{body}{srcs}'
-            f'<div class="br-note">{esc(c.DISCLAIMER)}</div></div></div>')
+        body = f'<p class="br-answer">{answer_html(answer)}</p>'
+        card = "br-card2"
+    return (f'<div class="br-turn"><div class="br-q">{esc(q)}</div>'
+            f'<div class="{card}"><div class="hd"><span class="b {cls}">{esc(badge_txt)}</span><span>{esc(right)}</span></div>'
+            f'<div class="bd">{urgent_html}{body}<div class="br-srcs">{srcs}</div>'
+            f'<div class="ft">{esc(c.DISCLAIMER)}<br>How this ran: {esc(detail)}</div></div></div></div>')
 
 
-def server_html(t, src):
-    trace, plain = t["trace"], t.get("plain")
+def _bars(text):
+    """Redaction bars roughly the shape of the words, so the receipt shows a question existed."""
+    return "".join(f'<i style="width:{min(140, 9 * len(w) + 10)}px"></i>' for w in text.split()[:9])
+
+
+def mirror_html(t, src):
+    """Two receipts: what a normal RAG server kept vs. what Blind RAG's server kept. Both from real logs."""
+    trace, plain, q = t["trace"], t.get("plain"), t["q"]
     real = trace["mode"]["crypto"] == "real"
+
+    # -- left: the normal server
+    if plain is None:
+        left = ('<div class="br-rc normal"><div class="who">A normal AI health service<span>Reads your question</span></div>'
+                '<div class="cut"></div><div class="empty">Tick <b>Also ask a normal server</b> under the question box '
+                'and ask again to see what a typical service stores. That really sends the question unencrypted '
+                'to the plaintext demo server.</div></div>')
+    elif plain.get("error"):
+        left = ('<div class="br-rc normal"><div class="who">A normal AI health service<span>Reads your question</span></div>'
+                f'<div class="cut"></div><div class="empty">{esc(plain["error"])}</div></div>')
+    else:
+        e = plain["entry"]
+        docs = "".join(f'<div>· {esc(x.get("title"))}</div>' for x in e.get("returned", [])[:4]) or "<div>(none)</div>"
+        left = ('<div class="br-rc normal"><div class="who">A normal AI health service<span>Reads your question</span></div>'
+                '<div class="cut"></div>'
+                f'<div class="row"><span>TIME</span><span>{esc(str(e.get("time", ""))[11:19])}</span></div>'
+                f'<div class="row"><span>FROM</span><span>{esc(e.get("client", ""))}</span></div>'
+                f'<div class="k">QUESTION</div><div class="hl">{esc(e.get("question", ""))}</div>'
+                f'<div class="k">DOCUMENTS READ</div>{docs}'
+                '<div class="cut"></div><div class="end">KEPT UNTIL DELETED, BREACHED OR SUBPOENAED</div></div>')
+
+    # -- right: Blind RAG's server, from its own log
     rows = question_log(src, trace)
-    lines = [f'{esc(str(r.get("ts", ""))[11:23])}  {esc(r.get("endpoint", ""))}  '
-             f'<i>{r.get("response_bytes", 0):,} B</i>  {r.get("latency_ms", "")} ms' for r in rows[:5]]
-    if len(rows) > 5:
-        lines.append(f'<span class="dim">… {len(rows) - 5} more lines, same four fields</span>')
-    log = "\n".join(lines) or f'<span class="dim">no log available at {esc(src)}</span>'
-    hx = trace["ciphertext_sample"]
-    hx = " ".join(hx[i:i + 32] for i in range(0, len(hx), 32))
-    head = ('<div class="tag">The Blind RAG server · sees only this</div>' if real else
-            '<div class="tag bad">Development mock · this server is NOT blind</div>')
-    qlabel = "question, as received (ciphertext)" if real else "question, as received (UNENCRYPTED embedding bytes)"
-    punch = ('<div class="punch">No question. No scores.<br>No record of what you read.</div>' if real else
-             '<div class="punch">Mock mode proves nothing about privacy.</div>')
-    blind_box = ('<div><div class="tag">Blind RAG\'s server logged</div>'
-                 f'<div class="lbl" style="margin-top:8px">everything it keeps</div><div class="box wrap">{log}</div></div>')
-    if plain is not None:
-        if plain.get("error"):
-            pbox = f'<div class="box plain wrap"><span class="dim">{esc(plain["error"])}</span></div>'
-        else:
-            e = plain["entry"]
-            returned = "\n".join(f'  - {esc(x.get("title"))}' for x in e.get("returned", [])[:5]) or "  (none)"
-            pbox = (f'<div class="box plain wrap">{esc(str(e.get("time", ""))[11:19])}  {esc(e.get("endpoint", ""))}\n'
-                    f'question: <em>{esc(e.get("question", ""))}</em>\n'
-                    f'returned:\n{returned}</div>')
-        blind_box = ('<div class="cmp"><div><div class="tag bad">A normal RAG server logged</div>'
-                     f'<div class="lbl" style="margin-top:8px">same question, read from it just now</div>{pbox}</div>'
-                     f'{blind_box}</div>')
-    cmp_html = ""
-    return f"""<div class="br-s">
-{head}
-<div><div class="lbl">{qlabel}</div><div class="box hex">{hx} …</div></div>
-<div class="nums">
-<div class="box"><div class="lbl">sent</div><div class="v">{fmt_bytes(trace["upload_bytes"])}</div></div>
-<div class="box"><div class="lbl">received</div><div class="v">{fmt_bytes(trace["download_bytes"])}</div></div>
-<div class="box"><div class="lbl">total</div><div class="v">{trace["total_seconds"]:.2f} s</div></div>
-</div>
-{blind_box}
-{cmp_html}
-{punch}
-</div>"""
+    lines = "".join(f'<div class="row log"><span>{esc(str(r.get("ts", ""))[11:19])} {esc(r.get("endpoint", ""))}</span>'
+                    f'<span>{r.get("response_bytes", 0):,} B · {r.get("latency_ms", "")} ms</span></div>' for r in rows[:6])
+    if len(rows) > 6:
+        lines += f'<div class="k">… {len(rows) - 6} more lines, same four fields</div>'
+    lines = lines or f'<div class="k">no log available at {esc(src)}</div>'
+    hx = trace["ciphertext_sample"][:64]
+    if real:
+        who = 'Blind RAG<span>Computes on a locked question</span>'
+        qrow = f'<div class="bars" role="img" aria-label="No question recorded">{_bars(q)}</div><div class="k">never received in readable form · arrived as</div><div class="hex">{esc(hx)}…</div>'
+        end, kind = "NOTHING HERE ANYONE COULD READ", "blind"
+    else:
+        who = 'Development mock<span>Not blind</span>'
+        qrow = f'<div class="k">arrived UNENCRYPTED (mock mode)</div><div class="hex">{esc(hx)}…</div>'
+        end, kind = "MOCK MODE PROVES NOTHING ABOUT PRIVACY", "mock"
+    right = (f'<div class="br-rc {kind}"><div class="who">{who}</div><div class="cut"></div>{lines}'
+             f'<div class="k">QUESTION</div>{qrow}<div class="cut"></div>'
+             f'<div class="row"><span>SENT</span><span>{fmt_bytes(trace["upload_bytes"])}</span></div>'
+             f'<div class="row"><span>RECEIVED</span><span>{fmt_bytes(trace["download_bytes"])}</span></div>'
+             f'<div class="cut"></div><div class="end">{end}</div></div>')
+    return ('<div class="br-mirror-h">What each server kept from your last question</div>'
+            '<div class="br-mirror-sub">Read from each server\'s own log just now. Same question, same library.</div>'
+            f'<div class="br-mirror">{left}{right}</div>')
 
 
 def ask_plain_server(url, question):
@@ -428,13 +516,9 @@ want_mock = os.environ["BLIND_RAG_CRYPTO"] != "real"
 want_stub = os.environ["BLIND_RAG_ANSWER"] != "real"
 
 # ---------------------------------------------------------------- header
-head_l, head_r = st.columns([3, 2], vertical_alignment="center")
-with head_r:
-    show_server = st.toggle("Show what the server saw", key="show_server")
-st.markdown(CSS.replace("MAXW", "1280" if show_server else "820"), unsafe_allow_html=True)
-with head_l:
-    st.markdown('<div class="br-brand">Blind RAG</div>'
-                '<div class="br-tag">Your device · holds the only key</div>', unsafe_allow_html=True)
+SUGGESTIONS = ["How is chlamydia treated and can I get it again?",
+               "Can high blood pressure while I'm pregnant hurt my baby?",
+               "What is LDL and why is it called the bad kind?"]
 
 if canned_mode:
     cur = None
@@ -442,104 +526,132 @@ else:
     cur = {"crypto": "mock" if want_mock else "real", "fetch": os.environ.get("BLIND_RAG_FETCH", "download"),
            "answer": "stub" if want_stub else "real", "embed": os.environ.get("BLIND_RAG_EMBED", "real"), "score": ""}
 badge, cls, detail = mode_text(cur, planned=True)
-st.markdown(f'<div style="margin-top:10px"><span class="br-mode {cls}">Next question runs as: {esc(badge)}</span>'
-            f'<div class="br-modeline">{esc(detail)}</div></div>', unsafe_allow_html=True)
-
+items = []
 if not canned_mode:
     items = cached_health(server, "mock" if want_mock else "real", "stub" if want_stub else "real")
     for extra_server in selected[1:]:   # one "Document server" row per additional selected server
         items += [i for i in cached_health(extra_server, "mock" if want_mock else "real", "stub")
                   if i["name"] == "Document server"]
-    st.markdown('<div class="br-health">' + "".join(
-        f'<span><span class="dot {"up" if h["ok"] else "down"}"></span><b>{esc(h["name"])}</b>: {esc(h["detail"])}'
-        + (f' &nbsp;fix: <code>{esc(h["fix"])}</code>' if h["fix"] else "") + "</span>" for h in items)
-        + "</div>", unsafe_allow_html=True)
+down = [h for h in items if not h["ok"]]
+if canned_mode:
+    pill = ("warn", "Canned · layout only, nothing is sent")
+elif down:
+    pill = ("bad", f"{len(down)} of {len(items)} systems down · see below")
+elif want_mock:
+    pill = ("warn", "Mock mode · NOT private")
+else:
+    pill = ("ok", f"Private mode · all {len(items)} systems ready")
+
+head_l, head_r = st.columns([3, 2], vertical_alignment="center")
+with head_r:
+    st.markdown(f'<div class="br-pillbar"><span class="br-status {pill[0]}"><span class="d"></span>{esc(pill[1])}</span></div>',
+                unsafe_allow_html=True)
+    show_server = st.toggle("Show what the server saw", key="show_server")
+st.markdown(CSS.replace("MAXW", "1180" if show_server else "880"), unsafe_allow_html=True)
+with head_l:
+    st.markdown(f'<div class="br-head">{locket(40)}<div><div class="br-brand">Blind RAG</div>'
+                '<div class="sub">Your laptop holds the only key</div></div></div>', unsafe_allow_html=True)
+
+if down:   # problems are never hidden: name each one and its fix
+    st.markdown('<div class="br-problems">' + "".join(
+        f'<div><b>{esc(h["name"])}</b>: {esc(h["detail"])}' + (f' · fix: <code>{esc(h["fix"])}</code>' if h["fix"] else "")
+        + "</div>" for h in down) + "</div>", unsafe_allow_html=True)
+with st.expander("System details"):
+    st.markdown(f'<span class="br-mode {cls}">Next question runs as: {esc(badge)}</span>'
+                f'<div class="br-modeline">{esc(detail)}</div>', unsafe_allow_html=True)
+    if items:
+        st.markdown('<div class="br-health">' + "".join(
+            f'<span><span class="dot {"up" if h["ok"] else "down"}"></span><b>{esc(h["name"])}</b>: {esc(h["detail"])}'
+            + (f' &nbsp;fix: <code>{esc(h["fix"])}</code>' if h["fix"] else "") + "</span>" for h in items)
+            + "</div>", unsafe_allow_html=True)
 
 tab_ask, tab_evidence, tab_who = st.tabs(["Ask", "Evidence", "Who sees what"])
 
 # ---------------------------------------------------------------- ask
 with tab_ask:
-    if show_server:
-        left, right = st.columns([11, 9], gap="large")
-    else:
-        left, right = st.container(), None
+    # With the toggle on, the two receipts go first: they are the point of the toggle.
+    mirror_box = st.container()
+    history_box = st.container()
+    status_box = st.container()
+    compare = False
+    if show_server and not canned_mode:
+        compare = st.checkbox("Also ask a normal server, for comparison",
+                              help="Off by default. When on, the question really is sent unencrypted to the "
+                                   "plaintext demo server, so its log can be shown next to Blind RAG's.")
+    with st.form("ask", clear_on_submit=True):
+        f1, f2 = st.columns([7, 2], vertical_alignment="center")
+        question = f1.text_input("Your question", placeholder="Ask a sensitive question",
+                                 label_visibility="collapsed")
+        go = f2.form_submit_button("Ask privately", type="primary")
+    pending = ss.pop("pending_q", None)
+    asked = question.strip() if go and question.strip() else pending
+    if asked:
+        question, ss.error = asked, None
+        try:
+            if canned_mode:
+                turn = {"q": question, "result": c.normalize_result(canned.ask(question)), "trace": None}
+            else:
+                with status_box.status("Locking your question and searching…", expanded=True) as status:
+                    def on_stage(name, secs):
+                        st.write(f"{STAGE_LABEL[name]} · {secs:.2f} s")
+                    try:
+                        result, trace = get_pipeline(selected).ask_traced(question, on_stage)
+                    except Exception:
+                        status.update(label="Stopped: no answer", state="error", expanded=False)
+                        raise
+                    turn = {"q": question, "result": result, "trace": trace}
+                    if compare:
+                        st.write("Sending the same question to the normal (plaintext) server…")
+                        turn["plain"] = ask_plain_server(plain_url, question)
+                    status.update(label=f"Done in {trace['total_seconds']:.2f} s", state="complete",
+                                  expanded=False)
+            ss.history.append(turn)
+        except PipelineError as e:
+            ss.error = {"stage": e.stage, "message": e.message, "fix": e.fix, "q": question}
+        except Exception as e:  # noqa: BLE001
+            ss.error = {"stage": "unexpected", "message": f"{type(e).__name__}: {e}", "fix": "", "q": question}
 
-    with left:
-        history_box = st.container()
-        status_box = st.container()
-        compare = False
-        if show_server and not canned_mode:
-            compare = st.checkbox("Demo contrast: also send the question to a normal (plaintext) RAG server",
-                                  help="Off by default. When on, the question really is sent in the clear to the "
-                                       "plaintext demo server so its log can be shown next to Blind RAG's.")
-        with st.form("ask", clear_on_submit=True):
-            f1, f2 = st.columns([7, 3], vertical_alignment="bottom")
-            question = f1.text_input("Your question", placeholder="Ask a sensitive question",
-                                     label_visibility="collapsed")
-            go = f2.form_submit_button("Ask privately", type="primary")
-        if go and question.strip():
-            question, ss.error = question.strip(), None
-            try:
-                if canned_mode:
-                    turn = {"q": question, "result": c.normalize_result(canned.ask(question)), "trace": None}
-                else:
-                    with status_box.status("Working…", expanded=True) as status:
-                        def on_stage(name, secs):
-                            st.write(f"{STAGE_LABEL[name]} · {secs:.2f} s")
-                        try:
-                            result, trace = get_pipeline(selected).ask_traced(question, on_stage)
-                        except Exception:
-                            status.update(label="Stopped: no answer", state="error", expanded=False)
-                            raise
-                        turn = {"q": question, "result": result, "trace": trace}
-                        if compare:
-                            st.write("Sending the same question to the plaintext server…")
-                            turn["plain"] = ask_plain_server(plain_url, question)
-                        status.update(label=f"Done in {trace['total_seconds']:.2f} s", state="complete",
-                                      expanded=False)
-                ss.history.append(turn)
-            except PipelineError as e:
-                ss.error = {"stage": e.stage, "message": e.message, "fix": e.fix, "q": question}
-            except Exception as e:  # noqa: BLE001
-                ss.error = {"stage": "unexpected", "message": f"{type(e).__name__}: {e}", "fix": "", "q": question}
-        with history_box:
-            if not ss.history and not ss.error:
-                st.markdown('<div class="br-empty">Ask a sensitive question. The server never sees it, '
-                            'the scores, or what you read.</div>', unsafe_allow_html=True)
-            st.markdown("".join(turn_html(t) for t in ss.history), unsafe_allow_html=True)
-            if ss.error:
-                e = ss.error
-                fix = f'<br>Fix: <code>{esc(e["fix"])}</code>' if e["fix"] else ""
-                st.markdown(f'<div class="br-err"><b>No answer for “{esc(e["q"])}” (failed at: {esc(e["stage"])})</b>'
-                            f'{esc(e["message"])}{fix}<br><span style="font-size:13px">Nothing was retried in a '
-                            f'weaker mode.</span></div>', unsafe_allow_html=True)
+    with history_box:
+        if not ss.history and not ss.error:
+            with st.container(key="welcome"):
+                st.markdown(f'<div class="br-welcome">{locket(92)}<div><h3>Hi, I\'m Locket.</h3>'
+                            '<p>I lock your question before it leaves this laptop. The server does the math on the '
+                            'lock and never sees inside, so it can\'t keep, leak or sell what you asked.</p></div></div>'
+                            '<div class="br-try">Try asking</div>', unsafe_allow_html=True)
+                for i, sq in enumerate(SUGGESTIONS):
+                    if st.button(sq, key=f"sugg{i}", width="stretch"):
+                        ss.pending_q = sq
+                        st.rerun()
+        st.markdown("".join(turn_html(t) for t in ss.history), unsafe_allow_html=True)
+        if ss.error:
+            e = ss.error
+            fix = f'<br>Fix: <code>{esc(e["fix"])}</code>' if e["fix"] else ""
+            st.markdown(f'<div class="br-err"><b>No answer for “{esc(e["q"])}” (failed at: {esc(e["stage"])})</b>'
+                        f'{esc(e["message"])}{fix}<br><span style="font-size:13px">Nothing was retried in a '
+                        f'weaker mode.</span></div>', unsafe_allow_html=True)
 
     last = next((t for t in reversed(ss.history) if t["trace"]), None)
-    if right is not None:
-        with right:
-            with st.container(key="server_pane"):
-                if last:
-                    st.markdown(server_html(last, log_source(server)), unsafe_allow_html=True)
-                else:
-                    st.markdown('<div class="br-s"><div class="tag">The server · sees only this</div>'
-                                '<div class="dim">Ask a question to see what crosses the network.</div></div>',
-                                unsafe_allow_html=True)
+    if show_server:
+        with mirror_box:
             if last:
+                st.markdown(mirror_html(last, log_source(server)), unsafe_allow_html=True)
                 q, trace = last["q"], last["trace"]
-                with st.expander("Attacker console: guess which question was asked"):
+                with st.expander("Attacker console: you hold the server's logs. Which question was it?"):
                     if trace["mock"]:
                         st.caption("Mock mode: this game only means something against the real encrypted server.")
                     rng = random.Random(hashlib.sha256(q.encode()).digest())
                     options = rng.sample([d for d in DECOYS if d != q], 4) + [q]
                     rng.shuffle(options)
-                    guess = st.radio("You hold the server's database and logs. Which was it?", options,
-                                     index=None, key=f"guess-{q}")
+                    guess = st.radio("Pick one", options, index=None, key=f"guess-{q}")
                     if st.button("Check guess") and guess:
                         if guess == q:
                             st.success("Correct, by luck: a 1 in 5 guess. Nothing on the server pointed to it.")
                         else:
                             st.error("Wrong. Nothing on the server distinguishes these five questions.")
                         st.write(f"The question was: **{q}**")
+            elif not canned_mode:
+                st.markdown('<div class="br-mirror-sub">Ask a question to see what each server kept.</div>',
+                            unsafe_allow_html=True)
 
 # ---------------------------------------------------------------- evidence
 with tab_evidence:

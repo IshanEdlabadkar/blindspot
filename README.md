@@ -6,11 +6,11 @@ Blind RAG pairs encrypted search (linearly homomorphic encryption) and private r
 
 Built at MadHacks 2026 over a public-domain subset of [MedlinePlus](https://medlineplus.gov/) health topics.
 
-| The asker sees a normal chat | One toggle shows everything the server saw |
+| The asker sees a simple chat | One toggle shows what each server kept |
 | --- | --- |
 | ![Chat view](docs/img/ui-default.png) | ![Server view](docs/img/ui-server-view.png) |
 
-*Screenshots are from an earlier build running on the development mock. The current app labels every answer with the mode that really ran, and adds Evidence and Who-sees-what tabs.*
+*Screenshots from the real encrypted server with the language model switched off, so the answer text there is a stand-in. The normal server's receipt is read from a plaintext test server. Locket is Blind RAG's own mascot.*
 
 ## Why
 

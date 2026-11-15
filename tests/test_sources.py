@@ -39,8 +39,34 @@ def test_fmla_parse_one_page_per_section(tmp_path):
     ])]
 
 
+def test_genetics_adapter_parses_c_fixture_with_a_date(tmp_path):
+    import json as _json
+    from tests.test_sources_extra import GENETICS_XML
+    p = tmp_path / "ghr-summaries.xml"
+    p.write_text(GENETICS_XML)
+    pages, date = sources.get("genetics").parse(p)
+    assert [pg["title"] for pg in pages] == ["Alzheimer disease"]
+    assert len(date) == 10 and date[4] == "-"
+
+
+def test_myhealthfinder_adapter_reads_a_cached_folder(tmp_path):
+    import json as _json
+    from tests.test_sources_extra import MHF_TOPIC
+    d = tmp_path / "myhealthfinder"
+    d.mkdir()
+    (d / "itemlist.json").write_text("{}")
+    (d / "topic-30530.json").write_text(_json.dumps(MHF_TOPIC))
+    pages, date = sources.get("myhealthfinder").parse(d)
+    assert [pg["title"] for pg in pages] == ["Get Enough Calcium"] and len(date) == 10
+
+
+def test_c_names_still_import_from_ingest_sources():
+    from ingest.sources import ATTRIBUTION, COLLECTORS, parse_genetics, parse_myhealthfinder_topic  # noqa: F401
+    assert set(COLLECTORS) == {"genetics", "myhealthfinder"} and "medlineplus" in ATTRIBUTION
+
+
 def test_registry_and_metadata():
-    for sid in ("medlineplus", "fmla"):
+    for sid in ("medlineplus", "fmla", "genetics", "myhealthfinder"):
         mod = sources.get(sid)
         assert mod.SOURCE_ID == sid
         for attr in ("SOURCE_NAME", "CORPUS_NAME", "ATTRIBUTION"):

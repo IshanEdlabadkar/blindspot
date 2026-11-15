@@ -20,6 +20,23 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 
 
+def latest_xml_url() -> str:
+    """MedlinePlus XML link (kept for ingest.build_multi)."""
+    return sources.get("medlineplus").latest_xml_url()
+
+
+def download(url: str, raw_dir: Path) -> Path:
+    """Download url into raw_dir once (kept for ingest.build_multi)."""
+    import requests
+    dest = Path(raw_dir) / url.rsplit("/", 1)[1]
+    if not dest.exists():
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        r = requests.get(url, timeout=300)
+        r.raise_for_status()
+        dest.write_bytes(r.content)
+    return dest
+
+
 def build_chunks(pages: list[dict]) -> list[dict]:
     chunks = []
     for page in pages:

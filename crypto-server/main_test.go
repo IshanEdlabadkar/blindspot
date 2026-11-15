@@ -361,5 +361,15 @@ func TestDatabricksStyleSource(t *testing.T) {
 	if s.cur.Load().version != "dbx.1" {
 		t.Fatal("wrong version")
 	}
+	// Paste mistakes in a dashboard are forgiven: bare token, quotes, whitespace.
+	for _, v := range []string{"dapi-test", "  Bearer dapi-test\n", `"Bearer dapi-test"`, "'dapi-test'"} {
+		src, _ := sourceFromFlags("", fake.URL+prefix, v)
+		if _, err := newServer(src, corpusOpts{}); err != nil {
+			t.Fatalf("auth value %q rejected: %v", v, err)
+		}
+		if strings.Contains(src.String(), "dapi-test") {
+			t.Fatal("source description leaks the token")
+		}
+	}
 	t.Logf("Databricks-style volume URL + bearer token: corpus %s loaded and verified", s.cur.Load().version)
 }

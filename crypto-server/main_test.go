@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/IshanEdlabadkar/blindspot/crypto-server/blindcrypto"
@@ -63,7 +65,6 @@ func TestEndToEndHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.score.Free()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/manifest", s.logged("/v1/manifest", s.handleManifest))
 	mux.HandleFunc("POST /v1/score", s.logged("/v1/score", s.handleScore))
@@ -138,7 +139,6 @@ func TestEndToEndHintModeHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.score.Free()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/manifest", s.logged("/v1/manifest", s.handleManifest))
 	mux.HandleFunc("GET /v1/score_hint", s.logged("/v1/score_hint", s.handleHint))
@@ -249,4 +249,117 @@ func TestFetchPIRHTTP(t *testing.T) {
 		}
 	}
 	t.Logf("real PIR over HTTP: 3 records exact; fetch hint %.1f MB", float64(len(hb))/1e6)
+}
+
+// addHashes writes the manifest's hashes, as B's ingestion pipeline does.
+func addHashes(t *testing.T, dir, version string) {
+	mb, _ := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	var m map[string]any
+	json.Unmarshal(mb, &m)
+	h := map[string]any{}
+	for key, name := range map[string]string{"score_table": "score_table.bin", "fetch_store": "fetch_store.bin"} {
+		b, _ := os.ReadFile(filepath.Join(dir, name))
+		sum := sha256.Sum256(b)
+		h[key] = "sha256:" + hex.EncodeToString(sum[:])
+	}
+	m["hashes"] = h
+	m["corpus_version"] = version
+	mb, _ = json.Marshal(m)
+	os.WriteFile(filepath.Join(dir, "manifest.json"), mb, 0o644)
+}
+
+func TestURLSourceVerifyAndHotReload(t *testing.T) {
+	dir := t.TempDir()
+	writeTestCorpus(t, dir, 300, 384, 2048)
+	addHashes(t, dir, "v1")
+	storage := httptest.NewServer(http.FileServer(http.Dir(dir))) // the provider's storage
+	defer storage.Close()
+
+	src, err := newURLSource(storage.URL+"/?sig=secret", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(src.String(), "secret") {
+		t.Fatal("source string leaks the token")
+	}
+	s, err := newServer(src, corpusOpts{realPIR: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(s.routes(false))
+	defer ts.Close()
+	if v := s.cur.Load().version; v != "v1" {
+		t.Fatalf("version %s", v)
+	}
+	if changed, err := s.reload(); changed || err != nil {
+		t.Fatalf("no-op reload: %v %v", changed, err)
+	}
+
+	// A half-finished upload: v2 manifest, but the store doesn't match its hash.
+	addHashes(t, dir, "v2")
+	f, _ := os.OpenFile(filepath.Join(dir, "fetch_store.bin"), os.O_WRONLY, 0)
+	f.WriteAt([]byte{0xff}, 5000)
+	f.Close()
+	if _, err := s.reload(); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("corrupt upload accepted: %v", err)
+	}
+	if s.cur.Load().version != "v1" {
+		t.Fatal("swapped to a corrupt corpus")
+	}
+
+	// Upload finishes: now v2 is valid and is swapped in.
+	writeTestCorpus(t, dir, 300, 384, 2048)
+	addHashes(t, dir, "v2")
+	if changed, err := s.reload(); !changed || err != nil {
+		t.Fatalf("reload to v2: %v %v", changed, err)
+	}
+	resp, _ := http.Get(ts.URL + "/v1/manifest")
+	var man map[string]any
+	json.NewDecoder(resp.Body).Decode(&man)
+	if man["corpus_version"] != "v2" {
+		t.Fatalf("manifest still %v", man["corpus_version"])
+	}
+	// A client still on v1 is told to reload.
+	resp, _ = post(ts.URL+"/v1/score", "v1", []byte{0, 0, 0, 0})
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("stale client got %d", resp.StatusCode)
+	}
+	t.Logf("URL source: corrupt upload rejected, v1 -> v2 swapped live, stale client gets 409")
+}
+
+// A stand-in for Databricks' Files API: GET /api/2.0/fs/files/Volumes/... with a bearer token.
+func TestDatabricksStyleSource(t *testing.T) {
+	dir := t.TempDir()
+	writeTestCorpus(t, dir, 200, 384, 2048)
+	addHashes(t, dir, "dbx.1")
+	const prefix = "/api/2.0/fs/files/Volumes/main/blindrag/corpus/current/"
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer dapi-test" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if !strings.HasPrefix(r.URL.Path, prefix) {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeFile(w, r, filepath.Join(dir, strings.TrimPrefix(r.URL.Path, prefix)))
+	}))
+	defer fake.Close()
+
+	if _, err := sourceFromFlags("", fake.URL+prefix, ""); err != nil {
+		t.Fatal(err)
+	}
+	noAuth, _ := sourceFromFlags("", fake.URL+prefix, "")
+	if _, err := newServer(noAuth, corpusOpts{}); err == nil || !strings.Contains(err.Error(), "401") {
+		t.Fatalf("missing token not reported: %v", err)
+	}
+	src, _ := sourceFromFlags("", fake.URL+prefix, "Bearer dapi-test")
+	s, err := newServer(src, corpusOpts{realPIR: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.cur.Load().version != "dbx.1" {
+		t.Fatal("wrong version")
+	}
+	t.Logf("Databricks-style volume URL + bearer token: corpus %s loaded and verified", s.cur.Load().version)
 }

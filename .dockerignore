@@ -1,8 +1,5 @@
 *
 !third_party
 !crypto-server
-!artifacts/manifest.json
-!artifacts/score_table.bin
-!artifacts/fetch_store.bin
 crypto-server/crypto-server
 crypto-server/crypto-helper

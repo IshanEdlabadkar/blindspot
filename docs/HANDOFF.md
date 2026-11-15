@@ -80,7 +80,7 @@ The **trace** returned next to the result is what the UI's server panel shows: `
 | Document server (A, Go) | `make server` | 8080 | Reads `artifacts/` by default (`make server DATA=data` for dummy tables). Logs to `data/server.log`. About 3 s startup. |
 | Crypto-helper (A, Go) | `make helper` | 8090 | Runs on the asker's device. Holds secret keys in memory only. Python talks to it over localhost. |
 | Ollama (B's dependency) | `brew services start ollama` | 11434 | Model `llama3.2:3b`. |
-| UI (C, Streamlit) | `make demo` or `python3.12 -m streamlit run ui/app.py` | 8501 | |
+| UI (C, React) | `make demo` | 8600 | |
 | Mock server (C, Python) | `python3.12 -m mock_server.server --data artifacts --port 8080` | 8080 | Plaintext. Same endpoints. **Not private.** |
 | Plaintext demo server (B) | `python -m baseline.server` | 8001 | The "normal RAG server" for demo step 1. Logs questions in the clear. Not wired into the UI yet. |
 

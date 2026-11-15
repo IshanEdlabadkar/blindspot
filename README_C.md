@@ -1,3 +1,5 @@
+> The Streamlit UI described below was removed; the app is now the React UI in `web/` (`make demo`). Kept as history.
+
 # Person C: client, UI and demo
 
 Everything here runs today on the plaintext mock. **The mock is not private. Never demo it as Blindspot.**

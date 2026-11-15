@@ -76,10 +76,9 @@ pip install -r requirements-c.txt
 make seal                          # one time, builds Microsoft SEAL (~5 min)
 brew install ollama && brew services start ollama && ollama pull llama3.2:3b
 make demo                          # the Vault web UI (React) on :8600, opens in your browser; needs FastAPI + Node 20.19+ (see web/README.md)
-make demo-streamlit                # the older Streamlit UI on :8501 (evidence tab, attacker console)
 ```
 
-`make demo` opens the app in your browser. Ask a question, tick the unsealed-copy box, then open the receipt (**what left this laptop**). The Streamlit UI (`make demo-streamlit`, or the **More evidence** link) has the measured results and the "Who sees what" tables.
+`make demo` opens the app in your browser. Ask a question, tick the unsealed-copy box, then open the receipt (**what left this laptop**). The **Chat** tab is the plain assistant; **Live demo** has the story, the side-by-side receipts, the scoreboard and the 100-people simulation.
 
 ### Without the crypto toolchain
 
@@ -87,7 +86,7 @@ The plaintext mock has the same endpoints and needs only Python. It is for devel
 
 ```bash
 python3 -m mock_server.server --data artifacts --port 8080
-BLIND_RAG_CRYPTO=mock BLIND_RAG_ANSWER=stub BLIND_RAG_EMBED=fake python3 -m streamlit run ui/app.py
+BLIND_RAG_CRYPTO=mock BLIND_RAG_ANSWER=stub BLIND_RAG_EMBED=fake BLIND_RAG_SERVERS=http://127.0.0.1:8080 python3 -m uvicorn api.app:app --port 8600
 ```
 
 The app runs the real encrypted path unless you ask for the mock like this, and it labels every answer with what actually ran. It never falls back to the mock by itself.
@@ -97,8 +96,6 @@ The app runs the real encrypted path unless you ask for the mock like this, and 
 | Command | What it does |
 | --- | --- |
 | `make demo` | Everything in one terminal with real crypto, React UI on :8600 (opens itself) |
-| `make demo-streamlit` | The same stack with only the Streamlit UI on :8501 |
-| `make demo-compare` | The same, plus a plaintext "normal RAG" server for the side-by-side log contrast |
 | `make preflight` | 8-step smoke test before presenting |
 | `make stop` | Stop any server or helper left running (do this after `git pull`) |
 | `make corpus-expanded` | Build a larger library with MedlinePlus Genetics and MyHealthfinder ([docs/corpus.md](docs/corpus.md)) |
@@ -119,7 +116,7 @@ The app runs the real encrypted path unless you ask for the mock like this, and 
 | `client/answer.py` | Local-model answer with citations and safe decline | B |
 | `baseline/`, `eval/` | Plaintext RAG for comparison, and the evaluation | B |
 | `client/pipeline.py` | The client flow: embed, encrypt, score, rank, fetch, answer | C |
-| `ui/` | Streamlit app with the server-view toggle and attacker console | C |
+| `web/` | The React app: Chat tab, Live demo tab, receipts, scoreboard, 100-people simulation | C |
 | `mock_server/`, `client/mock_crypto_client.py` | Plaintext stand-ins for development | C |
 | `contracts.py` | Shared formats: record layout, wire format, answer shape | all |
 

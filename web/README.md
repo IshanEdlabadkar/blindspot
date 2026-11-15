@@ -10,9 +10,9 @@ The demo front end: ask anything, get a cited answer written on this laptop, the
 LOCAL=1 ./web/demo.sh    # all local (servers.json), offline
 ```
 
-Open http://localhost:8600 . C's Streamlit UI keeps running on http://localhost:8501 as the fallback.
+Open http://localhost:8600 .
 
-Needs: Node 20+ (the first run builds `web/dist`), a Python with `streamlit numpy requests sentence-transformers
+Needs: Node 20+ (the first run builds `web/dist`), a Python with `numpy requests sentence-transformers
 fastapi uvicorn`, Ollama with `llama3.2:3b`, and A's crypto toolchain (`make seal`). On a Mac whose SEAL is
 installed outside `/usr/local`, export `CGO_CXXFLAGS`/`CGO_LDFLAGS` first.
 

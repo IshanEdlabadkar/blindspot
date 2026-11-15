@@ -1,5 +1,4 @@
 numpy
 requests
-streamlit
 sentence-transformers
 pytest

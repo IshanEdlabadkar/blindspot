@@ -111,5 +111,5 @@ if [ "${PLAIN:-1}" = 1 ]; then
   else "$PY" -m baseline.server > data/plain.out 2>&1 & pids+=($!)
        wait_for "plaintext demo server (:8001, warming the model)" http://127.0.0.1:8001/health data/plain.out; fi
 fi
-echo "Starting the UI..."
-"$PY" -m streamlit run ui/app.py "$@"
+echo "Backends ready: key helper :8090, normal server :8001, document servers."
+wait   # keep them running; Ctrl+C stops what this script started

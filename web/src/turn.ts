@@ -3,6 +3,7 @@ import type { ApiError, Plain, Proof, Result, Stage, Trace } from './api'
 export type Turn = {
   id: number
   question: string
+  compare?: boolean
   since?: string
   stages: Partial<Record<Stage, number>>
   result?: Result

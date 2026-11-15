@@ -47,7 +47,7 @@ export default function App() {
   const onAsk = useCallback(async (question: string) => {
     const id = nextId.current++
     setXray(null)
-    setTurns((ts) => [...ts, { id, question, stages: {}, phase: 'working' }])
+    setTurns((ts) => [...ts, { id, question, compare, stages: {}, phase: 'working' }])
     setTimeout(() => bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 50)
     try {
       await ask(question, compare, (e) => {

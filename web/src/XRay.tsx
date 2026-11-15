@@ -56,22 +56,23 @@ function Highlight({ text, words }: { text: string; words: string[] }) {
     : <Fragment key={i}>{part}</Fragment>)}</>
 }
 
-function RouteBlock({ r, words, logged, i }: { r: Route; words: string[]; logged?: string; i: number }) {
-  const leaked = r.found.length > 0
-  const name = libraryName(r.route)
+function Stamp({ read, i }: { read: boolean; i: number }) {
   return (
-    <div className="relative py-3">
-      <Line strong left={`${name}${leaked ? ' (unsealed)' : ''}`} right={fmtBytes(r.bytes)} />
-      <Line left={`  ${r.requests} request${r.requests === 1 ? '' : 's'}`} />
-      {leaked
-        ? <p className="mt-1 text-ink">It logged: “<Highlight text={logged ?? r.matches[0]?.context ?? ''} words={words} />”</p>
-        : <p className="hex mt-1 line-clamp-2 text-[13px] text-graphite">{r.sample_hex.slice(0, 96)}</p>}
-      <Line strong left="Your words found" right={`${r.found.length} of ${r.words}`} />
-      <span className={`stamp absolute top-10 right-1 text-[15px] ${leaked ? 'text-stamp' : 'text-sealed'}`}
-        style={{ ['--r' as string]: `${i % 2 ? 5 : -7}deg`, ['--d' as string]: `${0.25 + i * 0.18}s` }}>
-        {leaked ? 'Read' : 'Not read'}
-      </span>
-    </div>
+    <span className={`stamp shrink-0 text-[13px] ${read ? 'text-stamp' : 'text-sealed'}`}
+      style={{ ['--r' as string]: `${i % 2 ? 4 : -5}deg`, ['--d' as string]: `${0.3 + i * 0.15}s` }}>
+      {read ? 'Read' : 'Not read'}
+    </span>
+  )
+}
+
+/** One receipt section: a heading and its rows, ending in a tear line. Both receipts use the same seven, so they line up. */
+function Sec({ title, children, last }: { title?: string; children: React.ReactNode; last?: boolean }) {
+  return (
+    <section className="min-w-0">
+      {title && <p className="font-bold">{title}</p>}
+      {children}
+      {!last && <Cut />}
+    </section>
   )
 }
 
@@ -116,75 +117,143 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
   const when = turn.since && !Number.isNaN(Date.parse(turn.since)) ? new Date(turn.since) : new Date()
   const t = (v?: number, d = 2) => (v === undefined ? '...' : `${v.toFixed(d)} s`)
 
+  const plainRoute = routes.find((r) => r.route === 'plain')
+  const entry = turn.plain?.entry
+  const compared = Boolean(turn.compare || entry || plainRoute)
+  const stamp = (d: Date) => `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  const sealedTotal = blind.reduce((n, r) => n + r.bytes, 0) || servers.reduce((n, x) => n + upOf(x), 0)
+  const waiting = <p className="text-graphite">Searching the recording...</p>
+  const off = <p>Recording is off. Start the demo with <span className="font-bold">./web/demo.sh</span> to print this part.</p>
+  const proofPart = (body: React.ReactNode) => !turn.proof ? waiting : !turn.proof.recording ? off : body
+  const paper = 'receipt typed w-full px-6 pt-7 pb-12 text-[15px] leading-6 text-ink sm:px-8 md:row-span-7 md:grid md:grid-rows-subgrid'
+
   return (
-    <main className="relative z-[1] mx-auto grid max-w-[1120px] gap-10 px-5 pt-6 pb-24 md:grid-cols-[1fr_480px] md:gap-16">
-      <div className="md:sticky md:top-8 md:self-start">
-        <button onClick={onBack} className="text-[15px] text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">
-          Back to the conversation
-        </button>
-        <h2 className="mt-8 max-w-[14ch] text-[36px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[48px]">
-          What left this laptop
-        </h2>
-        <p className="mt-4 max-w-[46ch] text-[17px] leading-7 text-graphite">
-          A recorder sat between this app and every library and kept each byte that went out. This receipt is what it saw,
-          and what it found when it searched those bytes for the words in your question.
-        </p>
-        <p className="mt-4 max-w-[46ch] text-[15px] leading-6 text-graphite">
+    <main className="relative z-[1] mx-auto max-w-[1120px] px-5 pt-6 pb-24">
+      <div className="flex items-end justify-between gap-6">
+        <div>
+          <button onClick={onBack} className="text-[15px] text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">
+            Back to the conversation
+          </button>
+          <h2 className="mt-6 text-[36px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[48px]">What left this laptop</h2>
+          <p className="mt-4 max-w-[62ch] text-[17px] leading-7 text-graphite">
+            A recorder sat between this app and everything it talks to, and kept each byte that went out.
+            {compared ? ' The same question went two ways. Read the receipts across: each row is the same step.' : ' This receipt is what it saw.'}
+          </p>
+        </div>
+        <div className="hidden shrink-0 md:block"><Burrow size={88} mood="idle" /></div>
+      </div>
+
+      <div className="mt-10 flex flex-col gap-8 md:grid md:grid-cols-2 md:grid-rows-[repeat(7,auto)] md:gap-x-10 md:gap-y-0 lg:gap-x-14">
+        <div className={paper}>
+          <Sec>
+            <p className="text-center font-display text-[20px] font-black">Blind RAG</p>
+            <p className="text-center text-graphite">Sealed, receipt {slipNo(number)}</p>
+            <p className="text-center text-graphite">{stamp(when)}</p>
+          </Sec>
+          <Sec title="Your question">
+            <p>{turn.question}</p>
+            <p className="mt-1 text-graphite">Read only on this laptop.</p>
+          </Sec>
+          <Sec title="As it was sent">
+            <p className="hex text-[14px] text-sealed"><Scramble from={turn.question} to={cipher} run={Boolean(cipher)} /></p>
+          </Sec>
+          <Sec title={`Sent to ${servers.length} ${servers.length === 1 ? 'library' : 'libraries'}`}>
+            {servers.map((x) => (
+              <div key={x.server}>
+                <Line left={nameOf(x.server)} right={`${fmtBytes(upOf(x))} sealed`} />
+                <p className="text-graphite">{`  scored ${x.num_chunks.toLocaleString()}, sent back ${x.fetched}`}</p>
+              </div>
+            ))}
+          </Sec>
+          <Sec title="What they wrote down">
+            <p>Nothing they can read. Each library saw sealed bytes, scored every passage without knowing which mattered, and sent back the same number every time.</p>
+          </Sec>
+          <Sec title="Your words found">
+            {proofPart(<>
+              <p className="text-graphite">{words.join(', ')}</p>
+              <div className="mt-2 space-y-3">
+                {blind.map((r, i) => (
+                  <div key={r.route} className="flex items-center justify-between gap-3">
+                    <span className="min-w-0">{libraryName(r.route)}</span>
+                    <span className="flex items-center gap-3"><Stamp read={r.found.length > 0} i={i} /><span className="font-bold">{r.found.length} of {r.words}</span></span>
+                  </div>
+                ))}
+              </div>
+              {blind.length > 0 && blind.every((r) => r.found.length === 0) && (
+                <p className="mt-2 text-graphite">Odds of one appearing by luck in that much random data: about {Math.max(...blind.map((r) => r.chance_by_luck)).toExponential(0)}.</p>
+              )}
+            </>)}
+          </Sec>
+          <Sec last>
+            <Line strong left="Total sent" right={`${fmtBytes(sealedTotal)} sealed`} />
+            <Line left="Read on this laptop" right={t(s.embedding)} />
+            <Line left="Sealed" right={t(s.encrypting)} />
+            <Line left="Searched without reading" right={t(s.scoring)} />
+            <Line left="Answer written here" right={t(s.answering, 1)} />
+            <p className="mt-4 text-center text-graphite">Thank you for asking privately.</p>
+          </Sec>
+        </div>
+
+        {compared ? (
+          <div className={paper}>
+            <Sec>
+              <p className="text-center font-display text-[20px] font-black">A normal AI service</p>
+              <p className="text-center text-graphite">Unsealed copy, receipt {slipNo(number)}</p>
+              <p className="text-center text-graphite">{entry && !Number.isNaN(Date.parse(entry.time)) ? stamp(new Date(entry.time)) : stamp(when)}</p>
+            </Sec>
+            <Sec title="Your question">
+              <p>{turn.question}</p>
+              <p className="mt-1 text-stamp">Read in full by the service.</p>
+            </Sec>
+            <Sec title="As it was sent">
+              <p className="text-[14px]"><Highlight text={turn.question} words={words} /></p>
+            </Sec>
+            <Sec title="Sent to 1 service">
+              <Line left="A normal AI service" right={plainRoute ? `${fmtBytes(plainRoute.bytes)} plain` : '...'} />
+              <p className="text-graphite">  as readable text</p>
+            </Sec>
+            <Sec title="What it wrote down">
+              {turn.plain?.error && <p>It couldn't be reached this time: <span className="text-graphite">{turn.plain.error}</span></p>}
+              {!turn.plain && <p className="text-graphite">Waiting for its log...</p>}
+              {entry && (
+                <dl className="grid grid-cols-[4.5em_1fr] text-[14px]">
+                  <dt className="text-graphite">time</dt><dd>{!Number.isNaN(Date.parse(entry.time)) ? new Date(entry.time).toLocaleTimeString() : entry.time}</dd>
+                  <dt className="text-graphite">from</dt><dd>{entry.client}</dd>
+                  <dt className="text-graphite">asked</dt><dd className="font-bold">“<Highlight text={entry.question} words={words} />”</dd>
+                  {entry.returned?.length > 0 && <><dt className="text-graphite">sent</dt><dd>{[...new Set(entry.returned.map((x) => x.title))].join('; ')}</dd></>}
+                </dl>
+              )}
+            </Sec>
+            <Sec title="Your words found">
+              {proofPart(plainRoute ? <>
+                <p className="text-graphite">{words.join(', ')}</p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className="min-w-0">A normal AI service</span>
+                  <span className="flex items-center gap-3"><Stamp read={plainRoute.found.length > 0} i={1} /><span className="font-bold">{plainRoute.found.length} of {plainRoute.words}</span></span>
+                </div>
+                {plainRoute.found.length > 0 && <p className="mt-2 text-graphite">Every one of them, in the clear.</p>}
+              </> : <p className="text-graphite">Its traffic wasn't recorded.</p>)}
+            </Sec>
+            <Sec last>
+              <Line strong left="Total sent" right={plainRoute ? `${fmtBytes(plainRoute.bytes)} plain` : '...'} />
+              <p className="mt-1 text-graphite">Smaller, because nothing was sealed. It is also the only one that can read it, and it kept it.</p>
+            </Sec>
+          </div>
+        ) : (
+          <div className="slip self-start px-6 pt-6 pb-5 text-[15px] leading-6 md:row-span-7">
+            <p className="font-display font-black text-ink">No second receipt for this question</p>
+            <p className="mt-2 text-ink">To print one, tick “Also send an unsealed copy to a normal AI service” on the call slip before you hand it in.
+              The same question then goes to a normal service too, and its receipt prints here, row for row.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-10 grid gap-8 md:grid-cols-2 md:gap-x-10 lg:gap-x-14">
+        {turn.proof?.recording && <div className="slip typed self-start px-6 pt-6 pb-5 text-[15px] leading-6 text-ink"><SecretWord since={turn.since} /></div>}
+        <p className="max-w-[52ch] self-center text-[15px] leading-6 text-graphite">
           What the libraries can still tell: that a question was asked, when, from which address, and how many bytes.
           Sealing hides the words, not the fact that you asked.
         </p>
-        <Burrow size={96} mood="idle" className="mt-10 hidden md:inline-block" />
-      </div>
-
-      <div className="receipt typed mx-auto w-full max-w-[480px] px-6 pt-7 pb-12 text-[15px] leading-6 text-ink sm:px-8">
-        <p className="text-center font-display text-[20px] font-black">Blind RAG</p>
-        <p className="text-center text-graphite">Traffic receipt, {slipNo(number)}</p>
-        <p className="text-center text-graphite">{when.toLocaleDateString()} {when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-        <Cut />
-        <p className="font-bold">Your question</p>
-        <p>{turn.question}</p>
-        <p className="mt-1 text-graphite">Read only on this laptop.</p>
-        <p className="mt-3 font-bold">As it was sent</p>
-        <p className="hex text-[14px] text-sealed"><Scramble from={turn.question} to={cipher} run={Boolean(cipher)} /></p>
-        <Cut />
-        <Line left="Read on this laptop" right={t(s.embedding)} />
-        <Line left="Sealed" right={t(s.encrypting)} />
-        <Line left="Searched without reading" right={t(s.scoring)} />
-        <Line left="Passages fetched" right={t(s.fetching)} />
-        <Line left="Answer written here" right={t(s.answering, 1)} />
-        <Cut />
-        {servers.map((x) => (
-          <div key={x.server} className="mb-2">
-            <Line strong left={nameOf(x.server)} right={`${fmtBytes(upOf(x))} sealed`} />
-            <Line left={`  scored ${x.num_chunks.toLocaleString()} passages`} right={`sent ${x.fetched}`} />
-          </div>
-        ))}
-        <Cut />
-        {!turn.proof && <p className="text-graphite">Searching the recording...</p>}
-        {turn.proof && !turn.proof.recording && (
-          <p>Recording is off. Start the demo with <span className="font-bold">./web/demo.sh</span> to print this part.</p>
-        )}
-        {turn.proof && turn.proof.recording && (
-          <>
-            <p className="font-bold">Words searched for</p>
-            <p>{words.join(', ')}</p>
-            <div className="mt-2 divide-y divide-dashed divide-graphite/40">
-              {routes.map((r, i) => <RouteBlock key={r.route} r={r} i={i} words={words}
-                logged={r.route === 'plain' ? turn.plain?.entry?.question : undefined} />)}
-            </div>
-            {blind.length > 0 && blind.every((r) => r.found.length === 0) && (
-              <>
-                <Cut />
-                <p className="font-bold">None of your words reached {blind.length === 1 ? 'the library' : `any of the ${blind.length} libraries`}.</p>
-                <p className="text-graphite">Odds of one appearing by luck in that much random data: about {Math.max(...blind.map((r) => r.chance_by_luck)).toExponential(0)}.</p>
-              </>
-            )}
-            <Cut />
-            <SecretWord since={turn.since} />
-          </>
-        )}
-        <Cut />
-        <p className="text-center text-graphite">Thank you for asking privately.</p>
       </div>
     </main>
   )

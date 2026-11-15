@@ -34,3 +34,14 @@ cd web && npm run dev                     # Vite on :5173, proxies /api to :8600
 | `../api/app.py` | Thin FastAPI wrapper over C's pipeline, B's wiretap search and the plaintext server |
 
 Design notes: `docs/superpowers/specs/2026-11-15-web-ui-design.md`. Colours and type are tokens in `src/index.css`.
+
+## Node.js on WSL or Linux
+
+The page is built with Vite 8, which needs Node.js 20.19 or newer **installed inside WSL** (a Windows npm on the
+PATH fails with "UNC paths are not supported"). Without sudo:
+
+```
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.nvm/nvm.sh && nvm install 22
+which npm      # should be under ~/.nvm, not /mnt/c
+```

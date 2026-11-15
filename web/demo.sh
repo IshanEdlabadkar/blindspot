@@ -69,6 +69,14 @@ wait_up http://127.0.0.1:8090/health "key helper" 240
 wait_up http://127.0.0.1:8001/health "plaintext demo server" 240
 
 if [ ! -f web/dist/index.html ] || [ -n "$(find web/src web/index.html -newer web/dist/index.html 2>/dev/null | head -1)" ]; then
+  # Needs Linux Node.js 20.19+ (Vite 8). Under WSL, a Windows npm on the PATH (/mnt/c/...) fails on \\wsl$ paths.
+  NPM=$(command -v npm || true)
+  case "$NPM" in
+    "") echo "ERROR: npm not found. Install Node.js 22 (WSL/Linux: see web/README.md)"; exit 1 ;;
+    /mnt/*) echo "ERROR: this is the Windows npm ($NPM); install Node.js inside WSL (see web/README.md)"; exit 1 ;;
+  esac
+  node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>20||(a===20&&b>=19)?0:1)' \
+    || { echo "ERROR: Node.js $(node -v) is too old for the web UI build; need 20.19+ (see web/README.md)"; exit 1; }
   echo "Building the web UI..."; (cd web && npm install --silent && npm run build --silent) >/dev/null
 fi
 echo

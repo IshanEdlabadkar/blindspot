@@ -15,6 +15,13 @@ server:        ## document server on $(DATA)/ at http://127.0.0.1:8080 (log: dat
 helper:        ## asker-side key holder at http://127.0.0.1:8090 (needed for BLIND_RAG_CRYPTO=real)
 	cd crypto-server && go run ./cmd/crypto-helper
 
+.PHONY: bench bench-quick
+bench:         ## with make demo running: accuracy + speed + per-question trace for every eval question -> eval/results/bench/<run>/report.html
+	python3 -m eval.bench $(ARGS)
+
+bench-quick:   ## same, retrieval only (no rerank/model): crypto speed + right page in top-k, ~1 s per question
+	python3 -m eval.bench --answer none $(ARGS)
+
 .PHONY: measure
 measure:       ## with server + helper running: latency, bytes, CPU, log check -> data/measurements.md
 	python3 scripts/measure.py

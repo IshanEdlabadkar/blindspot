@@ -26,7 +26,7 @@ All three people's work is merged on `person-c-client-ui`. `main` only has B's w
 
 | Person | Owns | Branch |
 | --- | --- | --- |
-| A: crypto | `crypto-server/`, `client/crypto_client/`, `third_party/`, `Makefile`, `SETUP.md`, `scripts/` (except `start_demo.sh`) | `person-a/crypto` |
+| A: crypto | `crypto-server/`, `client/crypto_client/`, `third_party/`, `Makefile`, `SETUP.md`, `DEPLOY.md`, `scripts/` (except `start_demo.sh`) | `person-a/crypto` |
 | B: ML and content | `ingest/`, `common/`, `artifacts/`, `baseline/`, `client/answer.py`, `eval/`, `docs/contracts.md`, `pyproject.toml` | `B-ml-and-content` |
 | C: client, UI, demo | `ui/`, `client/pipeline.py`, `client/embed.py`, `client/mock_crypto_client.py`, `client/answer_stub.py`, `client/canned.py`, `mock_server/`, `tools/`, `contracts.py`, `scripts/start_demo.sh`, `README.md`, `README_C.md`, this file | `person-c-client-ui` |
 
@@ -107,7 +107,7 @@ Read by C's code:
 
 `make demo` sets `BLIND_RAG_CRYPTO=real` and `BLIND_RAG_ANSWER=real` (the second can be overridden).
 
-Read by A's code: `BLIND_RAG_HELPER` (helper URL), `BLIND_RAG_SCORE_MODE` (`hint` or `token`), `BLIND_RAG_PREPARE` (`0` turns off background key preparation), `BLIND_RAG_HINT_CACHE` (default `~/.cache/blind-rag`), and on the server `BLIND_RAG_TOKEN_MODE`, `BLIND_RAG_PIR`, `BLIND_RAG_PUBLIC_LOG`, `PORT`. See `SETUP.md`, and `DEPLOY.md` on the `deploy/render` branch.
+Read by A's code: `BLIND_RAG_HELPER` (helper URL), `BLIND_RAG_SCORE_MODE` (`hint` or `token`), `BLIND_RAG_PREPARE` (`0` turns off background key preparation), `BLIND_RAG_HINT_CACHE` (default `~/.cache/blind-rag`), and on the server `BLIND_RAG_TOKEN_MODE`, `BLIND_RAG_PIR`, `BLIND_RAG_PUBLIC_LOG`, `PORT`. See `SETUP.md` and `DEPLOY.md`.
 
 ## 8. Setup and running
 
@@ -217,7 +217,7 @@ Record a backup video of every step.
 | --- | --- |
 | Install anything | `SETUP.md` |
 | Crypto status, parameters, design decisions | `docs/crypto.md`, `client/crypto_client/__init__.py` docstring |
-| Remote deployment | `DEPLOY.md` on the `deploy/render` branch |
+| Remote deployment | `DEPLOY.md` |
 | File and answer formats in prose | `docs/contracts.md` |
 | C's run commands and checklist | `README_C.md` |
 | Presenting: script, prompts, runbook | `demo/` |

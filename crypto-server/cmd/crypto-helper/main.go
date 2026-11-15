@@ -24,6 +24,10 @@
 //	POST /fetch_hint?F            body: hint from /v1/fetch_hint -> loads it
 //	POST /fetch_query?F&index=<i> -> body for /v1/fetch, header X-Handle (fresh key)
 //	POST /fetch_decrypt?handle=   body: /v1/fetch response -> the record's bytes; wipes the key
+//	POST /fetch_batch_query?F&indexes=3,17,...  -> body for /v1/fetch_batch, header X-Handle
+//	                              (one fresh key per selector)
+//	POST /fetch_batch_decrypt?handle=  body: /v1/fetch_batch response ->
+//	                              u32 count, then count x (u32 len, record bytes); wipes the keys
 //	GET  /health
 //
 // Every question gets a fresh secret key: reusing one would leak. Unused keys
@@ -31,6 +35,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
@@ -41,6 +46,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -113,6 +119,7 @@ type helper struct {
 
 type fetchPending struct {
 	key     *blindcrypto.FetchKey
+	keys    []*blindcrypto.FetchKey // batch
 	created time.Time
 }
 
@@ -135,6 +142,8 @@ func main() {
 	mux.HandleFunc("POST /fetch_hint", h.handleFetchHintLoad)
 	mux.HandleFunc("POST /fetch_query", h.handleFetchQuery)
 	mux.HandleFunc("POST /fetch_decrypt", h.handleFetchDecrypt)
+	mux.HandleFunc("POST /fetch_batch_query", h.handleFetchBatchQuery)
+	mux.HandleFunc("POST /fetch_batch_decrypt", h.handleFetchBatchDecrypt)
 	log.Printf("crypto-helper on http://%s (keys in memory only)", *addr)
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
@@ -416,6 +425,9 @@ func (h *helper) handleFetchHintLoad(w http.ResponseWriter, r *http.Request) {
 	seed := c.seed
 	fc := blindcrypto.NewFetchClient(&seed, info, hint, c.n, c.d)
 	h.mu.Lock()
+	if old := h.fetches[c]; old != nil {
+		old.Close()
+	}
 	h.fetches[c] = fc
 	h.mu.Unlock()
 	log.Printf("loaded fetch hint for n=%d rec=%d (%.1f MB)", c.n, c.d, float64(len(body))/1e6)
@@ -470,6 +482,77 @@ func (h *helper) handleFetchDecrypt(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(rec)
+}
+
+func (h *helper) handleFetchBatchQuery(w http.ResponseWriter, r *http.Request) {
+	c, err := parseFetchCorpus(r)
+	if err != nil {
+		http.Error(w, "need seed, n, rec, indexes", http.StatusBadRequest)
+		return
+	}
+	parts := strings.Split(r.URL.Query().Get("indexes"), ",")
+	if len(parts) == 0 || len(parts) > blindcrypto.MaxFetchBatch {
+		http.Error(w, "need 1 to 64 indexes", http.StatusBadRequest)
+		return
+	}
+	fc := h.fetchClient(c)
+	if fc == nil {
+		http.Error(w, "fetch hint not loaded; POST /fetch_hint first", http.StatusConflict)
+		return
+	}
+	keys := make([]*blindcrypto.FetchKey, len(parts))
+	qs := make([]*pir.Query[blindcrypto.Elem], len(parts))
+	for i, p := range parts {
+		idx, err := strconv.ParseUint(strings.TrimSpace(p), 10, 64)
+		if err != nil {
+			http.Error(w, "bad index", http.StatusBadRequest)
+			return
+		}
+		if keys[i], qs[i], err = fc.Query(idx); err != nil { // fresh secret each
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	id := newHandle()
+	h.mu.Lock()
+	h.fkeys[id] = &fetchPending{keys: keys, created: time.Now()}
+	h.mu.Unlock()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("X-Handle", id)
+	w.Write(blindcrypto.MarshalFetchBatch(qs))
+}
+
+func (h *helper) handleFetchBatchDecrypt(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("handle")
+	h.mu.Lock()
+	p := h.fkeys[id]
+	delete(h.fkeys, id) // one use only
+	h.mu.Unlock()
+	if p == nil || p.keys == nil {
+		http.Error(w, "unknown or expired handle", http.StatusNotFound)
+		return
+	}
+	as, err := blindcrypto.UnmarshalAnswers(io.LimitReader(r.Body, 1<<28))
+	if err != nil || len(as) != len(p.keys) {
+		http.Error(w, "bad fetch_batch response", http.StatusBadRequest)
+		return
+	}
+	var out bytes.Buffer
+	var hdr [4]byte
+	binary.LittleEndian.PutUint32(hdr[:], uint32(len(as)))
+	out.Write(hdr[:])
+	for i, a := range as {
+		rec, err := p.keys[i].Decrypt(a)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		binary.LittleEndian.PutUint32(hdr[:], uint32(len(rec)))
+		out.Write(hdr[:])
+		out.Write(rec)
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(out.Bytes())
 }
 
 func (h *helper) expireLoop() {

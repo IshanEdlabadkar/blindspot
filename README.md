@@ -10,7 +10,7 @@ Built at MadHacks 2026 over a public-domain subset of [MedlinePlus](https://medl
 | --- | --- |
 | ![Chat view](docs/img/ui-default.png) | ![Server view](docs/img/ui-server-view.png) |
 
-*Screenshots from the real encrypted server with the language model switched off, so the answer text there is a stand-in. The normal server's receipt is read from a plaintext test server. Locket is Blind RAG's own mascot.*
+*Screenshots from the real encrypted server with the language model switched off, so the answer text there is a stand-in. The normal server's receipt is read from a plaintext test server. Burrow the badger is Blind RAG's own original mascot.*
 
 ## Why
 

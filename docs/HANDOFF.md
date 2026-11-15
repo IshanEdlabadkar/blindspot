@@ -157,11 +157,11 @@ Run the Python tests and `make integration` after every merge from A or B.
 
 ## 11. The UI
 
-`ui/app.py`, one Streamlit file, rendered mostly as custom HTML and CSS (classes prefixed `br-`). The layout follows directions G and D on the team's design canvas: a clean chat with **Locket** (Blind RAG's own padlock mascot, inline SVG in `locket()`), and a two-receipt comparison when the server toggle is on.
+`ui/app.py`, one Streamlit file, rendered mostly as custom HTML and CSS (classes prefixed `br-`). The layout follows directions G and D on the team's design canvas: a conversation with **Burrow** (Blind RAG's own original badger character, inline SVG in `locket()`; name in `MASCOT`), who greets the user and delivers each answer as a chat message, and a two-receipt comparison when the server toggle is on.
 
 - **Real by default.** The UI sets `BLIND_RAG_CRYPTO=real` and `BLIND_RAG_ANSWER=real` unless you set them. The mock must be asked for.
 - **Status pill** in the header: green when every system is up, amber in mock or canned mode, red when something is down (problems are then listed with their fixes, never hidden). Full mode text and health rows are in **System details**.
-- **Welcome card** with Locket and three suggested questions (clicking one asks it).
+- **Welcome message** from Burrow and three suggested questions (clicking one asks it).
 - **Mode badge.** In System details: what the next question will run as. On every answer: what really ran, read from the trace (`REAL ENCRYPTED SEARCH`, `MOCK · NOT PRIVATE` or `CANNED`), plus scoring mode, fetch mode (download-all is labelled "not PIR"), and whether a real model and real embedding were used.
 - **Health strip.** Document server, key helper and local model, each with a fix command when down (`client.pipeline.health`, cached 8 s).
 - **Ask tab.** Chat turns with an answer card. Each source shows title, link, date, similarity, the closest sentence from the source (`client/evidence.py`, a word-overlap pointer, verbatim) and the full passage. Declines get an amber "No reliable source found" card.

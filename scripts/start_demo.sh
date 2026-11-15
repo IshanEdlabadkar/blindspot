@@ -15,6 +15,22 @@ wait_for() {  # name url logfile
   echo "ERROR: $1 did not start. Last lines of $3:"; tail -n 15 "$3" || true; exit 1
 }
 
+# Pick a Python that actually has the packages (Homebrew can repoint python3 at a bare install).
+need="streamlit, numpy, requests"
+[ "${BLIND_RAG_EMBED:-real}" = fake ] || need="$need, sentence_transformers"
+PY=""
+for cand in "${PYTHON:-}" python3.12 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
+            /opt/homebrew/opt/python@3.12/bin/python3.12 python3 python; do
+  [ -n "$cand" ] || continue
+  if "$cand" -c "import $need" >/dev/null 2>&1; then PY="$cand"; break; fi
+done
+if [ -z "$PY" ]; then
+  echo "ERROR: no Python found with: $need"
+  echo "Fix:   python3.12 -m pip install streamlit numpy requests sentence-transformers"
+  exit 1
+fi
+echo "Using $("$PY" -c 'import sys; print(sys.executable)')"
+
 echo "Building crypto binaries..."
 (cd crypto-server && go build -o crypto-server . && go build -o crypto-helper ./cmd/crypto-helper)
 
@@ -32,4 +48,4 @@ if [ "$BLIND_RAG_ANSWER" = real ] && ! up http://127.0.0.1:11434/api/tags; then
   echo "WARNING: Ollama is not answering on :11434. Run: brew services start ollama"
 fi
 echo "Starting the UI..."
-python3 -m streamlit run ui/app.py "$@"
+"$PY" -m streamlit run ui/app.py "$@"

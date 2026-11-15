@@ -17,6 +17,10 @@ Every passage is shipped to every asker's device, so only text we may copy and r
 
 ## Build it (on a machine with internet, e.g. the demo Mac)
 
+> **Alternative, not what the demo uses.** The demo serves each corpus from its own document server (four hosted
+> servers in `servers.remote.json`, backups in `artifacts/<id>/`), which is what multi-server search and the
+> privacy story are about. `corpus-expanded` instead builds one combined corpus for a single server; it still works.
+
 ```bash
 make corpus-expanded            # writes artifacts-expanded/ (~5 min: downloads, then embeds every chunk)
 ```

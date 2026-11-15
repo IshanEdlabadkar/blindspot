@@ -60,3 +60,15 @@ else:  # fetch_mode == "pir"
 ```
 
 Measured against Render (real PIR, k = 10): one request per chunk took ~1.2 s per question, almost all network round trips. Batched, it's one round trip.
+
+## Searching several document servers
+
+The user chooses which servers to search (sidebar: "Search these document servers"; configure the list with `BLIND_RAG_SERVERS=https://a,https://b`, or add one in the sidebar). One selected server works exactly as before. With several, `client/multi.py` (`MultiPipeline`):
+
+- sends the same encrypted question to **every selected server** in parallel, and fetches **exactly k = 10 from each** (batched PIR or download), so no server learns how relevant it was;
+- merges the S x 10 chunks on the device by score and gives the best 10 to the answer step (rerank, checks, citations);
+- requires every selected server to use the same embedding model, revision, dimension, query prefix and quantization scale (read from the manifests); a mismatched server is refused with a clear message.
+
+Unselected servers receive nothing. Each selected server learns only that a question was asked. Someone watching every server could see which ones were selected (the UI says so).
+
+Tested by splitting the corpus into two servers (even/odd chunks): on 12 questions, in both download and batched-PIR modes, the two-server merged top 10 is identical to one server holding the whole corpus.

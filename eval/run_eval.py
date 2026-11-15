@@ -45,12 +45,18 @@ def run_retrieval(questions: list[dict]) -> list[dict]:
     """Per question: rank of the right page (float, int8), the int8 top-10 ids (the ranking the encrypted
     path must reproduce exactly), and whether the right page reaches the model's sources."""
     idx = default_index()
+    # The float comparison (quantization cost) needs B's local data/embeddings_f32.npy, which is not in
+    # git. Without it, report int8 only; the answer evaluation uses the int8 ranking either way.
+    modes = ("float", "int8") if idx.float_vecs is not None else ("int8",)
+    if idx.float_vecs is None:
+        print("note: data/embeddings_f32.npy not found (made by ingest/build.py); skipping the float comparison")
     rows = []
     for q in questions:
         qvec = embed_query_float(q["question"])
         gold = q["source_url"]
         row = {"id": q["id"], "question": q["question"], "gold": gold}
-        for mode in ("float", "int8"):
+        row["float_rank"] = row["float_top1"] = None
+        for mode in modes:
             hits = idx.search_vec(qvec, max(KS), mode)
             urls = [c["url"] for c in idx.chunks(hits)]
             row[f"{mode}_rank"] = first_rank(urls, gold) if gold else None
@@ -173,6 +179,9 @@ def main():
     print(f"Recall over {len(pos)} answerable questions")
     print("mode   " + "  ".join(f"@{k:<4}" for k in KS))
     for mode in ("float", "int8"):
+        if mode == "float" and all(r["float_top1"] is None for r in rows):
+            print("float  (skipped: no data/embeddings_f32.npy)")
+            continue
         rec = recall_table([r[f"{mode}_rank"] for r in pos])
         print(f"{mode:6} " + "  ".join(f"{rec[k]:.2f} " for k in KS))
     for key, label in (("evidence_top5", "search order"), ("evidence_rerank5", "after rerank")):

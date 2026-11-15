@@ -1,7 +1,7 @@
 # Run from the repo root. Crypto targets need Go + SEAL (see SETUP.md).
 # DATA: folder with manifest.json, score_table.bin, fetch_store.bin (B writes artifacts/).
 DATA ?= artifacts
-.PHONY: seal test server helper integration
+.PHONY: seal test server helper integration demo
 
 seal:          ## one-time: build and install Microsoft SEAL 4.1.1
 	./scripts/install_seal.sh
@@ -17,3 +17,6 @@ helper:        ## asker-side key holder at http://127.0.0.1:8090 (needed for BLI
 
 integration:   ## after merging A + C: real crypto vs mock, same top-k (~1 min)
 	python3 scripts/integration_check.py
+
+demo:          ## everything in one terminal: server + helper + UI with real crypto (Ctrl+C stops all)
+	./scripts/start_demo.sh

@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useId, useRef, useState } from 'react'
 import type { Citation, Plain, Status } from './api'
 import { Burrow } from './Burrow'
 import { Beats, SearchDemo } from './Story'
@@ -9,11 +9,12 @@ export const short = (name: string) => name.replace(/ \(.*\)$/, '').replace(/^Fe
 export const slipNo = (n: number) => `No. ${String(n).padStart(4, '0')}`
 
 /** The call slip: where a question is written and handed in. */
-export function Composer({ onAsk, busy, compare, setCompare, status, number, compact, autoFocus, disabled }: {
-  onAsk: (q: string) => void; busy: boolean; compare: boolean; setCompare: (v: boolean) => void
+export function Composer({ onAsk, busy, compare, setCompare, status, number, compact, autoFocus, disabled, plain }: {
+  onAsk: (q: string) => void; busy: boolean; compare: boolean; setCompare: (v: boolean) => void; plain?: boolean
   status: Status | null; number: number; compact?: boolean; autoFocus?: boolean; disabled?: Set<string>
 }) {
   const [q, setQ] = useState('')
+  const qid = useId()
   const box = useRef<HTMLTextAreaElement>(null)
   const submit = () => {
     const t = q.trim()
@@ -26,8 +27,8 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
       <div className="flex items-baseline justify-between font-display text-[15px] font-black text-ink">
         <span>Call slip</span><span className="typed text-[15px] font-normal text-graphite">{slipNo(number)}</span>
       </div>
-      <label htmlFor="q" className="typed mt-2 block text-[14px] leading-6 text-graphite">Your question</label>
-      <textarea id="q" ref={box} rows={compact ? 1 : 3} value={q} autoFocus={autoFocus}
+      <label htmlFor={qid} className="typed mt-2 block text-[14px] leading-6 text-graphite">Your question</label>
+      <textarea id={qid} data-composer ref={box} rows={compact ? 1 : 3} value={q} autoFocus={autoFocus}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() } }}
         placeholder="Write it the way you'd say it"
@@ -47,10 +48,14 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
         </div>
       )}
       <div className={`flex flex-wrap items-end justify-between gap-x-6 gap-y-3 ${compact ? 'mt-3' : 'mt-4'}`}>
-        <label className="flex max-w-[44ch] cursor-pointer items-start gap-2.5 text-[14px] leading-5 text-graphite select-none">
-          <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="mt-0.5 size-4 accent-[#1E1C1A]" />
-          Also send an unsealed copy to a normal AI service, to compare what each one keeps
-        </label>
+        {plain ? (
+          <p className="typed max-w-[40ch] text-[13px] leading-5 text-graphite">Sealed on this laptop before it leaves. The libraries never read it.</p>
+        ) : (
+          <label className="flex max-w-[44ch] cursor-pointer items-start gap-2.5 text-[14px] leading-5 text-graphite select-none">
+            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="mt-0.5 size-4 accent-[#1E1C1A]" />
+            Also send an unsealed copy to a normal AI service, to compare what each one keeps
+          </label>
+        )}
         <button type="submit" aria-disabled={busy || undefined}
           className={`press h-11 shrink-0 rounded-[2px] px-5 font-display text-[15px] font-bold text-white ${busy ? 'cursor-wait bg-graphite' : 'bg-badger hover:bg-stamp'}`}>
           {busy ? 'Searching' : 'Hand it in'}
@@ -64,18 +69,22 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
  *  Set to false for the product order: the call slip in the first viewport, the story below it. */
 const STORY_FIRST = true
 
-export function Landing({ status, examples, onAsk, children }: { status: Status | null; examples: string[]; onAsk: (q: string) => void; children: React.ReactNode }) {
+export function Landing({ status, examples, onAsk, children, product }: { status: Status | null; examples: string[]; onAsk: (q: string) => void; children: React.ReactNode; product?: boolean }) {
   const libs = (status?.servers ?? []).filter((s) => s.ok).map((s) => short(s.name))
   const total = (status?.servers ?? []).filter((s) => s.ok).reduce((n, s) => n + (s.num_chunks ?? 0), 0)
   const toSlip = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
-    setTimeout(() => document.getElementById('q')?.focus({ preventScroll: true }), 500)
+    setTimeout(() => document.querySelectorAll<HTMLElement>('[data-composer]').forEach((el) => { if (el.offsetParent) el.focus({ preventScroll: true }) }), 500)
   }
   const sealedList = libs.length > 1 ? `${libs.slice(0, -1).join(', ')} and ${libs[libs.length - 1]}` : libs[0]
   const hero = (
-    <main id="ask" className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-10 px-5 pt-4 pb-12 md:grid-cols-[1fr_520px] md:gap-x-14">
+    <main className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-10 px-5 pt-4 pb-12 md:grid-cols-[1fr_520px] md:gap-x-14">
       <div className="md:self-center">
-        {STORY_FIRST ? (
+        {product ? (
+          <h1 className="max-w-[14ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[58px]">
+            Ask something private.
+          </h1>
+        ) : STORY_FIRST ? (
           <h2 className="max-w-[14ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[58px]">
             Blindspot can't leak your question. It never sees it.
           </h2>
@@ -120,6 +129,7 @@ export function Landing({ status, examples, onAsk, children }: { status: Status 
     </main>
   )
 
+  if (product) return hero
   if (STORY_FIRST) return <><div id="why"><Beats /></div>{hero}</>
   return (
     <>
@@ -248,7 +258,7 @@ function CarbonCopy({ plain, onXray, libraries }: { plain?: Plain; onXray: () =>
   )
 }
 
-export function TurnView({ turn, number, onXray, onRetry, nameOf }: { turn: Turn; number: number; onXray: () => void; onRetry?: () => void; nameOf: (url?: string) => string | undefined }) {
+export function TurnView({ turn, number, onXray, onRetry, nameOf, plain }: { turn: Turn; number: number; onXray: () => void; onRetry?: () => void; nameOf: (url?: string) => string | undefined; plain?: boolean }) {
   const [open, setOpen] = useState<number | null>(null)
   const r = turn.result
   const { body, disclaimer } = r ? splitAnswer(r) : { body: '', disclaimer: '' }
@@ -291,9 +301,13 @@ export function TurnView({ turn, number, onXray, onRetry, nameOf }: { turn: Turn
           )}
           <div className="mt-7 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
             <p className="typed text-[13px] text-graphite">{disclaimer || 'General information from the connected libraries, not professional advice.'}</p>
-            <button onClick={onXray} className="press typed text-[15px] font-bold text-badger underline underline-offset-4 hover:text-stamp">
-              {turn.proof ? 'Print the receipt: what left this laptop' : 'Checking what left this laptop…'}
-            </button>
+            {plain ? (
+              <span className="typed text-[13px] font-bold text-sealed">Sealed: the libraries never saw this question</span>
+            ) : (
+              <button onClick={onXray} className="press typed text-[15px] font-bold text-badger underline underline-offset-4 hover:text-stamp">
+                {turn.proof ? 'Print the receipt: what left this laptop' : 'Checking what left this laptop…'}
+              </button>
+            )}
           </div>
         </motion.div>
       )}

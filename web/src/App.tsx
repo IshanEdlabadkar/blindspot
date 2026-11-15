@@ -1,13 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ask, getStatus, type Status } from './api'
+import { useCallback, useEffect, useState } from 'react'
+import { getStatus, type Status } from './api'
 import { Burrow } from './Burrow'
-import { Composer, Landing, TurnView } from './Chat'
 import { Libraries } from './Libraries'
-import { DeskObjects } from './DeskObjects'
-import { Simulation } from './Simulation'
-import type { Turn } from './turn'
-import { XRay } from './XRay'
-
+import { Workspace } from './Workspace'
 function Health({ status }: { status: Status | null }) {
   if (!status) return <span className="text-sm text-graphite">Connecting</span>
   const up = status.servers.filter((s) => s.ok).length
@@ -24,13 +19,12 @@ function Health({ status }: { status: Status | null }) {
   )
 }
 
+type Mode = 'chat' | 'demo'
+
 export default function App() {
   const [status, setStatus] = useState<Status | null>(null)
-  const [turns, setTurns] = useState<Turn[]>([])
-  const [compare, setCompare] = useState(true)
-  const [xray, setXray] = useState<number | null>(null)
-  const [view, setView] = useState<'ask' | 'sim'>('ask')
-  const [home, setHome] = useState(false)
+  const [mode, setModeRaw] = useState<Mode>(() => (location.hash === '#demo' ? 'demo' : 'chat'))
+  const [homeTick, setHomeTick] = useState(0)
   const [disabled, setDisabledRaw] = useState<Set<string>>(() => {
     try { return new Set<string>(JSON.parse(localStorage.getItem('blindspot.disabled') ?? '[]')) } catch { return new Set<string>() }
   })
@@ -38,96 +32,33 @@ export default function App() {
     setDisabledRaw(s)
     try { localStorage.setItem('blindspot.disabled', JSON.stringify([...s])) } catch { /* private mode */ }
   }
+  const setMode = (m: Mode) => { setModeRaw(m); history.replaceState(null, '', m === 'demo' ? '#demo' : location.pathname); window.scrollTo({ top: 0 }) }
   const refresh = useCallback(() => { void getStatus().then(setStatus).catch(() => setStatus(null)) }, [])
-  const nextId = useRef(1)
-  const bottom = useRef<HTMLDivElement>(null)
-  const busy = turns.some((t) => t.phase === 'working' || t.phase === 'answered')
-
   useEffect(() => {
     refresh()
     const t = setInterval(refresh, 5000)
     return () => clearInterval(t)
   }, [refresh])
 
-  useEffect(() => { window.scrollTo({ top: 0 }) }, [xray, view, home])
-  // The libraries a question goes to: the ticked ones that are reachable (all of the ticked ones if none are, so the error says why).
-  const ticked = (status?.servers ?? []).filter((s) => !disabled.has(s.url))
-  const searched = (ticked.some((s) => s.ok) ? ticked.filter((s) => s.ok) : ticked).map((s) => s.url)
-  const examples = ticked.flatMap((s) => (s.examples ?? []).slice(0, 1)).slice(0, 3)
-  const nameOf = (url?: string) => status?.servers.find((s) => s.url === url)?.name.replace(/ \(.*\)$/, '')
-
-  const update = (id: number, f: (t: Turn) => Turn) => setTurns((ts) => ts.map((t) => (t.id === id ? f(t) : t)))
-
-  const onAsk = useCallback(async (question: string) => {
-    const id = nextId.current++
-    setXray(null)
-    setHome(false)
-    setTurns((ts) => [...ts, { id, question, compare, stages: {}, phase: 'working' }])
-    setTimeout(() => bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 50)
-    try {
-      await ask(question, compare, searched, (e) => {
-        if (e.type === 'start') update(id, (t) => ({ ...t, since: e.data.since }))
-        else if (e.type === 'stage') update(id, (t) => ({ ...t, stages: { ...t.stages, [e.data.name]: e.data.seconds } }))
-        else if (e.type === 'answer') update(id, (t) => ({ ...t, result: e.data.result, trace: e.data.trace, phase: 'answered' }))
-        else if (e.type === 'plain') update(id, (t) => ({ ...t, plain: e.data }))
-        else if (e.type === 'proof') update(id, (t) => ({ ...t, proof: e.data }))
-        else if (e.type === 'done') update(id, (t) => ({ ...t, phase: 'done' }))
-        else if (e.type === 'error') update(id, (t) => ({ ...t, error: e.data, phase: 'error' }))
-      })
-    } catch (err) {
-      update(id, (t) => ({ ...t, phase: 'error', error: { stage: 'connection', message: String(err), fix: 'Start the API: ./web/demo.sh' } }))
-    }
-  }, [compare, searched.join(',')])
-
-  const xrayTurn = turns.find((t) => t.id === xray)
-  const lastTrace = [...turns].reverse().find((t) => t.trace)?.trace
-  const composer = (compact: boolean) => (
-    <Composer onAsk={onAsk} busy={busy} compare={compare} setCompare={setCompare} status={status}
-      number={nextId.current} compact={compact} autoFocus={false} disabled={disabled} />
-  )
-
   return (
     <div className="desk relative min-h-dvh">
-      <DeskObjects calm={view === 'sim' || xray !== null} viewKey={view === 'sim' ? 'sim' : xrayTurn ? `xray-${xrayTurn.id}` : turns.length && !home ? 'chat' : 'landing'}
-        version={turns.map((t) => `${t.phase}${t.proof ? 'p' : ''}`).join(',')} />
       <header className="relative z-30 mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-4 whitespace-nowrap sm:px-5">
-        <button aria-label="Blindspot, back to the home page" onClick={() => { setXray(null); setView('ask'); setHome(true) }} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
+        <button aria-label="Blindspot, back to the start" onClick={() => setHomeTick((n) => n + 1)} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
           <Burrow size={32} mood="peek" /> <span className="hidden sm:inline">Blindspot</span>
         </button>
-        <nav aria-label="Views" className="flex items-center gap-4 sm:gap-7">
-          {([['ask', 'Ask'], ['sim', '100 people']] as const).map(([k, label]) => (
-            <button key={k} onClick={() => { setView(k); if (k === 'ask') setHome(false) }} aria-current={view === k ? 'page' : undefined}
-              className={`font-display text-[15px] font-bold underline-offset-[10px] ${view === k ? 'text-ink underline decoration-badger decoration-[3px]' : 'text-graphite hover:text-ink'}`}>
-              {label}
-            </button>
+        <div role="tablist" aria-label="Mode" className="inline-flex overflow-hidden rounded-[2px] border-2 border-ink font-display text-[14px] font-bold">
+          {([['chat', 'Chat'], ['demo', 'Live demo']] as const).map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
+              className={`h-9 px-4 sm:px-5 ${mode === k ? 'bg-ink text-card' : 'text-ink hover:bg-ink/10'}`}>{label}</button>
           ))}
-        </nav>
+        </div>
         <div className="flex items-center gap-3 sm:gap-5">
           <Libraries status={status} disabled={disabled} setDisabled={setDisabled} refresh={refresh} />
           <Health status={status} />
         </div>
       </header>
-
-      <div className={view === 'sim' ? 'hidden' : ''}>
-        {xrayTurn ? (
-          <XRay turn={xrayTurn} number={xrayTurn.id} status={status} onBack={() => setXray(null)} />
-        ) : turns.length === 0 || home ? (
-          <Landing status={status} examples={examples} onAsk={onAsk}>{composer(false)}</Landing>
-        ) : (
-          <>
-            <main className="relative z-[1] mx-auto max-w-[760px] px-5 pb-64">
-              {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} onXray={() => setXray(t.id)} onRetry={t.phase === 'error' && !busy ? () => void onAsk(t.question) : undefined} />)}
-              <div ref={bottom} />
-            </main>
-            <div data-fixed className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4">
-              <div className="mx-auto max-w-[760px] px-5">{composer(true)}</div>
-            </div>
-          </>
-        )}
-      </div>
-      <div className={view === 'sim' ? '' : 'hidden'}>
-        <Simulation examples={status?.servers.flatMap((s) => s.examples ?? [])} lastQuestion={turns.length ? turns[turns.length - 1].question : undefined} trace={lastTrace} />
-      </div>
+      <div className={mode === 'chat' ? '' : 'hidden'}><Workspace mode="chat" status={status} disabled={disabled} homeTick={homeTick} /></div>
+      <div className={mode === 'demo' ? '' : 'hidden'}><Workspace mode="demo" status={status} disabled={disabled} homeTick={homeTick} /></div>
     </div>
   )
 }

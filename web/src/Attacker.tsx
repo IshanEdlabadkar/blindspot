@@ -23,9 +23,9 @@ function seeded(text: string) {
   }
 }
 
-export function options(question: string): string[] {
+export function options(question: string, extra: string[] = []): string[] {
   const rnd = seeded(question)
-  const pool = DECOYS.filter((d) => d !== question)
+  const pool = [...new Set([...extra, ...DECOYS])].filter((d) => d !== question)
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]] }
   const five = [...pool.slice(0, 4), question]
   for (let i = five.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [five[i], five[j]] = [five[j], five[i]] }
@@ -33,8 +33,8 @@ export function options(question: string): string[] {
 }
 
 /** The attacker holds everything the library kept. Can they tell which of five questions was asked? */
-export function Attacker({ turn }: { turn: Turn }) {
-  const opts = useMemo(() => options(turn.question), [turn.question])
+export function Attacker({ turn, pool }: { turn: Turn; pool?: string[] }) {
+  const opts = useMemo(() => options(turn.question, pool), [turn.question, pool])
   const [pick, setPick] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
   const right = pick === turn.question

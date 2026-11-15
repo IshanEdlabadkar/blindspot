@@ -1,4 +1,4 @@
-// Blind RAG document server. Computes only on encrypted data; holds no keys.
+// Blindspot document server. Computes only on encrypted data; holds no keys.
 //
 // The corpus (manifest.json, score_table.bin, fetch_store.bin) comes from the
 // provider's own storage, never from this program or its image:

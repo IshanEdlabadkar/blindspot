@@ -20,6 +20,8 @@ up() { curl -fsS -o /dev/null --max-time "${2:-3}" "$1" 2>/dev/null; }
 wait_up() { for _ in $(seq 1 "${3:-120}"); do up "$1" && return 0; sleep 0.5; done; echo "ERROR: $2 did not start"; return 1; }
 
 LIST=servers.remote.json; [ "${LOCAL:-0}" = 1 ] && LIST=servers.json
+# Libraries added or removed in the app last time are forgotten at each start (KEEP_LIBRARIES=1 keeps them).
+[ "${KEEP_LIBRARIES:-0}" = 1 ] || rm -f data/user_servers.json 2>/dev/null || true
 ENTRIES=()   # macOS bash 3.2 has no mapfile
 while IFS= read -r line; do ENTRIES+=("$line"); done < <("$PY" -c 'import json,sys; [print(s["id"], s["url"]) for s in json.load(open(sys.argv[1]))]' "$LIST")
 echo "Document servers from $LIST:"
@@ -81,7 +83,7 @@ if [ ! -f web/dist/index.html ] || [ -n "$(find web/src web/index.html -newer we
   echo "Building the web UI..."; (cd web && npm install --silent && npm run build --silent) >/dev/null
 fi
 echo
-echo "  Blind RAG is ready:  http://localhost:8600     (more evidence + attacker console: http://localhost:8501)"
+echo "  Blindspot is ready:  http://localhost:8600     (more evidence + attacker console: http://localhost:8501)"
 echo
 # Open the app in the browser once the API answers (NO_OPEN=1 skips this).
 if [ "${NO_OPEN:-0}" != 1 ]; then

@@ -1,4 +1,4 @@
-# Render Blueprint for the Blind RAG document server. See DEPLOY.md.
+# Render Blueprint for the Blindspot document server. See DEPLOY.md.
 services:
   - type: web
     name: blind-rag-server

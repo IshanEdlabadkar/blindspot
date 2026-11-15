@@ -1,6 +1,6 @@
 # Person C: client, UI and demo
 
-Everything here runs today on the plaintext mock. **The mock is not private. Never demo it as Blind RAG.**
+Everything here runs today on the plaintext mock. **The mock is not private. Never demo it as Blindspot.**
 
 ## Run it (3 terminals)
 

@@ -1,11 +1,11 @@
-# Blind RAG quality scorecard (part B)
+# Blindspot quality scorecard (part B)
 
 Commit `5a2db00` · corpus `2026-11-14.2` (2101 MedlinePlus chunks) · 96 questions (79 answerable) · embedding `BAAI/bge-small-en-v1.5` · reranker `cross-encoder/ms-marco-MiniLM-L6-v2` · answers `llama3.2:3b` on-device
 
 | Area | Metric | Value |
 |---|---|---|
 | Retrieval | Right page in top 5 (int8) | 67/79 (85%) |
-| Retrieval | Right page in top 10 (int8, what Blind RAG fetches) | 72/79 (91%) |
+| Retrieval | Right page in top 10 (int8, what Blindspot fetches) | 72/79 (91%) |
 | Retrieval | Right page in top 10 (float, no quantization) | 73/79 (92%) |
 | Evidence | Right page among the model's 5 sources, search order | 67/79 (85%) |
 | Evidence | Right page among the model's 5 sources, after local rerank | 68/79 (86%) |

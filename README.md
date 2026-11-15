@@ -1,20 +1,20 @@
-# Blind RAG
+# Blindspot
 
 **Ask a sensitive question and get a sourced answer, while the server never learns the question, the relevance scores, or which documents you read.**
 
-Blind RAG pairs encrypted search (linearly homomorphic encryption) and private retrieval with a language model that runs on your own device. The server computes on locked data it cannot open. A breach, an insider or a court order can only recover what the server has, and it never had your question.
+Blindspot pairs encrypted search (linearly homomorphic encryption) and private retrieval with a language model that runs on your own device. The server computes on locked data it cannot open. A breach, an insider or a court order can only recover what the server has, and it never had your question.
 
-Built at MadHacks 2026 over a public-domain subset of [MedlinePlus](https://medlineplus.gov/) health topics.
+Built at MadHacks 2026. The demo searches four public-domain document servers (MedlinePlus, MedlinePlus Genetics, MyHealthfinder and the federal FMLA regulations), but Blindspot works with any document server: in the app, open **Libraries** to choose which ones a question goes to, add one by its address, or remove one.
 
 | The asker sees a simple chat | One toggle shows what each server kept |
 | --- | --- |
 | ![Chat view](docs/img/ui-default.png) | ![Server view](docs/img/ui-server-view.png) |
 
-*Screenshots from the real encrypted server with the language model switched off, so the answer text there is a stand-in. The normal server's receipt is read from a plaintext test server. Burrow the badger is Blind RAG's own original mascot.*
+*Screenshots from the real encrypted server with the language model switched off, so the answer text there is a stand-in. The normal server's receipt is read from a plaintext test server. Burrow the badger is Blindspot's own original mascot.*
 
 ## Why
 
-People bring their most private questions to AI and health sites, and every one is stored in readable form. Privacy policies, deletion settings and "anonymized" logs are promises that breaches, subpoenas and policy changes can override. Blind RAG replaces the promise with math: a server cannot leak, sell or hand over a question it never had.
+People bring their most private questions to AI and health sites, and every one is stored in readable form. Privacy policies, deletion settings and "anonymized" logs are promises that breaches, subpoenas and policy changes can override. Blindspot replaces the promise with math: a server cannot leak, sell or hand over a question it never had.
 
 ## How it works
 
@@ -64,7 +64,7 @@ The server still sees that a query happened, when, from which IP address, and ho
 | Crypto compute per question | About 6 ms | [SETUP.md](SETUP.md), measured by A |
 | Local answer generation | About 3 to 6 s warm | B's eval run |
 
-The retrieval and answer figures come from the plaintext baseline. Encryption adds no error, so the int8 ranking is the ranking Blind RAG produces. Full end-to-end numbers on the demo laptop come from `make measure`.
+The retrieval and answer figures come from the plaintext baseline. Encryption adds no error, so the int8 ranking is the ranking Blindspot produces. Full end-to-end numbers on the demo laptop come from `make measure`.
 
 ## Quick start
 
@@ -138,7 +138,7 @@ More detail: [crypto status and design decisions](docs/crypto.md), [setup](SETUP
 
 ## Built on
 
-Blind RAG does not introduce a new cryptographic technique. It turns published private-search research into a working end-to-end product.
+Blindspot does not introduce a new cryptographic technique. It turns published private-search research into a working end-to-end product.
 
 - [Tiptoe](https://github.com/ahenzinger/underhood) (`underhood`) for encrypted scoring, and [SimplePIR](https://github.com/henrycg/simplepir) for private fetch
 - [Microsoft SEAL](https://github.com/microsoft/SEAL)

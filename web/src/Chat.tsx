@@ -2,21 +2,16 @@ import { motion } from 'motion/react'
 import { Fragment, useRef, useState } from 'react'
 import type { Citation, Plain, Status } from './api'
 import { Burrow } from './Burrow'
+import { Beats, SearchDemo } from './Story'
 import { STAGES, splitAnswer, type Turn } from './turn'
-
-const SUGGESTIONS = [
-  'How is chlamydia treated, and can I get it again?',
-  'Can I take FMLA leave for a pregnancy complication?',
-  'Is Huntington disease passed down from my parents?',
-]
 
 export const short = (name: string) => name.replace(/ \(.*\)$/, '').replace(/^Federal /, '')
 export const slipNo = (n: number) => `No. ${String(n).padStart(4, '0')}`
 
 /** The call slip: where a question is written and handed in. */
-export function Composer({ onAsk, busy, compare, setCompare, status, number, compact, autoFocus }: {
+export function Composer({ onAsk, busy, compare, setCompare, status, number, compact, autoFocus, disabled }: {
   onAsk: (q: string) => void; busy: boolean; compare: boolean; setCompare: (v: boolean) => void
-  status: Status | null; number: number; compact?: boolean; autoFocus?: boolean
+  status: Status | null; number: number; compact?: boolean; autoFocus?: boolean; disabled?: Set<string>
 }) {
   const [q, setQ] = useState('')
   const box = useRef<HTMLTextAreaElement>(null)
@@ -42,8 +37,8 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
           <p className="typed text-[14px] leading-6 text-graphite">Send sealed to</p>
           <ul className="mt-1 grid gap-x-6 text-[15px] leading-7 sm:grid-cols-2">
             {libs.map((s) => (
-              <li key={s.url} className={`flex items-baseline gap-2 ${s.ok ? 'text-ink' : 'text-graphite line-through'}`}>
-                <span aria-hidden className="typed">{s.ok ? '[x]' : '[ ]'}</span>
+              <li key={s.url} className={`flex items-baseline gap-2 ${s.ok && !disabled?.has(s.url) ? 'text-ink' : 'text-graphite line-through'}`}>
+                <span aria-hidden className="typed">{s.ok && !disabled?.has(s.url) ? '[x]' : '[ ]'}</span>
                 <span>{short(s.name)}</span>
                 {s.num_chunks != null && <span className="typed text-[13px] text-graphite">{s.num_chunks.toLocaleString()}</span>}
               </li>
@@ -65,36 +60,44 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
   )
 }
 
-export function Landing({ status, onAsk, children }: { status: Status | null; onAsk: (q: string) => void; children: React.ReactNode }) {
-  const libs = (status?.servers ?? []).map((s) => short(s.name))
-  const total = (status?.servers ?? []).reduce((n, s) => n + (s.num_chunks ?? 0), 0)
+export function Landing({ status, examples, onAsk, children }: { status: Status | null; examples: string[]; onAsk: (q: string) => void; children: React.ReactNode }) {
+  const libs = (status?.servers ?? []).filter((s) => s.ok).map((s) => short(s.name))
+  const total = (status?.servers ?? []).filter((s) => s.ok).reduce((n, s) => n + (s.num_chunks ?? 0), 0)
+  const skip = () => {
+    document.getElementById('ask')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setTimeout(() => document.getElementById('q')?.focus({ preventScroll: true }), 500)
+  }
   return (
-    <main className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-8 px-5 pt-6 pb-16 md:grid-cols-[1fr_540px] md:gap-x-16">
-      <div className="md:self-end">
-        <h1 className="max-w-[16ch] text-[40px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[56px]">
-          Ask the library something private.
-        </h1>
-        <p className="mt-5 max-w-[48ch] text-[17px] leading-7 text-graphite">
-          Your question is sealed on this laptop before it goes anywhere.
-          {libs.length > 0 && <> {libs.slice(0, -1).join(', ')} and {libs[libs.length - 1]} search all {total.toLocaleString()} of their passages for it without being able to read it.</>}
-          {' '}The answer is written here, from what they send back.
-        </p>
-      </div>
-      <div className="relative md:col-start-2 md:row-span-2 md:row-start-1 md:self-center">
-        <div className="md:rotate-[-1.2deg]">{children}</div>
-        <div className="absolute -top-[84px] right-6 hidden md:block"><Burrow size={92} mood="idle" /></div>
-      </div>
-      <div className="md:self-start">
-        <p className="text-[14px] text-graphite">Or try one of these</p>
-        <ul className="mt-2 space-y-1.5">
-          {SUGGESTIONS.map((s) => (
-            <li key={s}>
-              <button onClick={() => onAsk(s)} className="text-left text-[16px] leading-6 text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">{s}</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </main>
+    <>
+      <Beats onSkip={skip} />
+      <main id="ask" className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] scroll-mt-4 content-center gap-y-8 px-5 pt-6 pb-16 md:grid-cols-[1fr_540px] md:gap-x-16">
+        <div className="md:self-end">
+          <h2 className="max-w-[16ch] font-display text-[40px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[52px]">
+            Blindspot can't leak your question. It never sees it.
+          </h2>
+          <p className="mt-5 max-w-[48ch] text-[17px] leading-7 text-graphite">
+            Your question is sealed on this laptop before it goes anywhere.
+            {libs.length > 0 && <> {libs.length > 1 ? `${libs.slice(0, -1).join(', ')} and ${libs[libs.length - 1]}` : libs[0]} search all {total.toLocaleString()} of their passages for it without being able to read it.</>}
+            {' '}The answer is written here, from what they send back.
+          </p>
+          <div className="mt-8"><SearchDemo mode="sealed" /></div>
+        </div>
+        <div className="relative md:col-start-2 md:row-span-2 md:row-start-1 md:self-center">
+          <div className="md:rotate-[-1.2deg]">{children}</div>
+          <div className="absolute -top-[84px] right-6 hidden md:block"><Burrow size={92} mood="idle" /></div>
+        </div>
+        <div className="md:self-start">
+          {examples.length > 0 && <p className="text-[14px] text-graphite">Or try one of these</p>}
+          <ul className="mt-2 space-y-1.5">
+            {examples.map((s) => (
+              <li key={s}>
+                <button onClick={() => onAsk(s)} className="text-left text-[16px] leading-6 text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">{s}</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </main>
+    </>
   )
 }
 
@@ -247,7 +250,7 @@ export function TurnView({ turn, number, onXray, onRetry, nameOf }: { turn: Turn
             </p>
           )}
           <div className="mt-7 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-            <p className="typed text-[13px] text-graphite">{disclaimer || 'General information, not medical or legal advice.'}</p>
+            <p className="typed text-[13px] text-graphite">{disclaimer || 'General information from the connected libraries, not professional advice.'}</p>
             <button onClick={onXray} className="press typed text-[15px] font-bold text-badger underline underline-offset-4 hover:text-stamp">
               {turn.proof ? 'Print the receipt: what left this laptop' : 'Checking what left this laptop…'}
             </button>

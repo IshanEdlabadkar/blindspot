@@ -22,7 +22,7 @@ const OBJECTS: Record<string, Draw> = {
     <svg viewBox="0 0 150 20">
       <rect x="18" y="3" width="118" height="14" fill="#E9B949" stroke={INK} strokeWidth="1.2" />
       <line x1="18" y1="10" x2="136" y2="10" stroke="#C99A2E" strokeWidth=".8" />
-      <text x="34" y="9" fontFamily="Courier Prime" fontSize="5.5" fill="#5A3E1B">BLIND RAG LIBRARY  No. 2</text>
+      <text x="34" y="9" fontFamily="Courier Prime" fontSize="5.5" fill="#5A3E1B">BLINDSPOT LIBRARY  No. 2</text>
       <rect x="136" y="3" width="6" height="14" fill="#A7ADB3" stroke={INK} strokeWidth="1.2" />
       <rect x="142" y="3" width="7" height="14" rx="2" fill="#E58A8A" stroke={INK} strokeWidth="1.2" />
       <path d="M18 3 L2 10 L18 17 Z" fill="#E8C9A0" stroke={INK} strokeWidth="1.2" strokeLinejoin="round" />

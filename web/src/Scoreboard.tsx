@@ -9,7 +9,7 @@ type Card = {
 
 const pct = (n: number, d: number) => (d > 0 ? Math.round((100 * n) / d) : 0)
 
-/** One metric, two bars: a normal AI service against Blind RAG. */
+/** One metric, two bars: a normal AI service against Blindspot. */
 function Row({ label, normal, blind, note, unit = '%', lowerIsBetter }: {
   label: string; normal: number; blind: number; note?: string; unit?: string; lowerIsBetter?: boolean
 }) {
@@ -26,11 +26,11 @@ function Row({ label, normal, blind, note, unit = '%', lowerIsBetter }: {
       <div>
         <p className="font-bold text-ink">{label}</p>
         {note && <p className="text-[13px] leading-5 text-graphite">{note}</p>}
-        {better && <p className="mt-0.5 text-[13px] font-bold text-sealed">Blind RAG is better here</p>}
+        {better && <p className="mt-0.5 text-[13px] font-bold text-sealed">Blindspot is better</p>}
       </div>
       <div className="space-y-1.5 self-center">
         {bar(normal, 'bg-badger', 'Normal AI service')}
-        {bar(blind, 'bg-sealed', 'Blind RAG')}
+        {bar(blind, 'bg-sealed', 'Blindspot')}
       </div>
     </div>
   )
@@ -40,12 +40,27 @@ function Legend() {
   return (
     <p className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-graphite">
       <span><span aria-hidden className="mr-1.5 inline-block h-2.5 w-5 bg-badger align-middle" />Normal AI service</span>
-      <span><span aria-hidden className="mr-1.5 inline-block h-2.5 w-5 bg-sealed align-middle" />Blind RAG</span>
+      <span><span aria-hidden className="mr-1.5 inline-block h-2.5 w-5 bg-sealed align-middle" />Blindspot</span>
     </p>
   )
 }
 
-/** Shown under the two receipts: the numbers behind them. */
+/** A headline number: normal service on the left in red, Blindspot on the right in blue. */
+function Tile({ label, normal, blind, sub }: { label: string; normal: string; blind: string; sub?: string }) {
+  return (
+    <div className="slip px-5 pt-6 pb-4">
+      <p className="font-display text-[14px] leading-5 font-bold text-ink">{label}</p>
+      <div className="mt-2 flex items-end gap-4 font-display font-black tabular-nums">
+        <div><p className="text-[34px] leading-9 text-badger">{normal}</p><p className="typed text-[12px] leading-4 font-normal text-graphite">normal AI</p></div>
+        <span aria-hidden className="pb-2 text-[22px] text-graphite">&rarr;</span>
+        <div><p className="text-[34px] leading-9 text-sealed">{blind}</p><p className="typed text-[12px] leading-4 font-normal text-graphite">Blindspot</p></div>
+      </div>
+      {sub && <p className="mt-2 text-[12.5px] leading-[18px] text-graphite">{sub}</p>}
+    </div>
+  )
+}
+
+/** The numbers behind the receipts, shown above them so a judge sees the verdict first. */
 export function Scoreboard({ proof }: { proof?: Proof }) {
   const [card, setCard] = useState<Card | null>(null)
   useEffect(() => {
@@ -69,71 +84,61 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
   const blind = (proof?.routes ?? []).filter((r) => r.route !== 'plain')
   const blindFound = blind.reduce((n, r) => n + r.found.length, 0)
   const blindWords = blind.reduce((n, r) => n + r.words, 0)
+  const wire = proof?.recording && plain ? { normal: pct(plain.found.length, plain.words), blind: pct(blindFound, blindWords), n: plain.found.length, w: plain.words, bf: blindFound, bw: blindWords } : null
+  const q = card && card.answerable ? card : null
+  const top10n = q ? pct(q.top10_float ?? 0, q.retrieval_n ?? 0) : 0
+  const top10b = q ? pct(q.top10_int8 ?? 0, q.retrieval_n ?? 0) : 0
 
   return (
-    <div className="mx-auto mt-16 max-w-[900px]">
-      <h2 className="text-[30px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[40px]">Same answers. Nothing to sell.</h2>
-      <p className="mt-3 max-w-[62ch] text-[17px] leading-7 text-graphite">
-        On the questions we tested, Blind RAG answers as well as a normal AI service. What a library can learn about the people asking is a different story.
+    <section className="mt-10" aria-label="Scoreboard">
+      <h3 className="text-[28px] leading-[1.1] font-black tracking-[-0.02em] text-ink sm:text-[34px]">Same answers. Nothing to sell.</h3>
+      <p className="mt-2 max-w-[64ch] text-[16px] leading-6 text-graphite">
+        Blindspot answered as well as a normal AI service on our test questions. What the library learns about the person asking is where they differ.
       </p>
 
-      <section className="receipt typed mt-10 px-6 pt-6 pb-4 text-[15px] leading-6 text-ink sm:px-8" aria-label="Answer quality">
-        <h3 className="font-display text-[20px] font-black">Answer quality</h3>
-        <p className="text-graphite">
-          {card?.answerable ?? 79} answerable and {card?.should_decline ?? 17} questions that should be declined, same library.
-          Blind RAG uses the same ranking and the same answer step.
-        </p>
-        <div className="mt-2"><Legend /></div>
-        {card && card.answerable ? (
-          <div className="mt-3">
-            <Row label="Right source in the top 10" normal={pct(card.top10_float ?? 0, card.retrieval_n ?? 0)} blind={pct(card.top10_int8 ?? 0, card.retrieval_n ?? 0)}
-              note="Blind RAG searches rounded 8-bit numbers; the only cost is one question" />
-            <Row label="Answerable questions answered" normal={pct(card.answered ?? 0, card.answerable)} blind={pct(card.answered ?? 0, card.answerable)} />
-            <Row label="Answers citing the expected source" normal={pct(card.cited ?? 0, card.answerable)} blind={pct(card.cited ?? 0, card.answerable)} />
-            <Row label="Off-topic or unsafe questions declined" normal={pct(card.declined ?? 0, card.should_decline ?? 0)} blind={pct(card.declined ?? 0, card.should_decline ?? 0)} />
-            <Row label="Wrong answers when it should decline" normal={pct(card.wrong ?? 0, card.should_decline ?? 0)} blind={pct(card.wrong ?? 0, card.should_decline ?? 0)} lowerIsBetter />
-          </div>
-        ) : <p className="mt-3 text-graphite">Quality figures are not available (eval/results is missing).</p>}
-        <p className="mt-3 border-t border-dashed border-graphite/40 pt-3 text-[13px] leading-5 text-graphite">
-          Measured on the plaintext evaluation. The encrypted ranking matches the plaintext int8 ranking on every question checked, so Blind RAG's figures are the int8 ones;
-          a full encrypted run is <span className="font-bold">make bench</span>. Questions were written by the team, not clinicians, so one question moves a figure by about 1.3 points.
-        </p>
-      </section>
+      <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <Tile label="Right source in the top 10" normal={q ? `${top10n}%` : '...'} blind={q ? `${top10b}%` : '...'} sub="Same ranking, rounded to 8-bit numbers" />
+        <Tile label="Questions answered" normal={q ? `${pct(q.answered ?? 0, q.answerable ?? 0)}%` : '...'} blind={q ? `${pct(q.answered ?? 0, q.answerable ?? 0)}%` : '...'} sub="Same answer step, on this laptop" />
+        <Tile label="Patrons a library can profile" normal={`${pct(sim.profiled, sim.n)}%`} blind="0%" sub={`${sim.n} simulated patrons`} />
+        <Tile label="Your words visible on the wire" normal={wire ? `${wire.normal}%` : '...'} blind={wire ? `${wire.blind}%` : '...'}
+          sub={wire ? `${wire.n} of ${wire.w} words in the clear, ${wire.bf} of ${wire.bw} sealed` : 'Tick the unsealed-copy box and ask to measure this'} />
+      </div>
 
-      <section className="receipt typed mt-10 px-6 pt-6 pb-4 text-[15px] leading-6 text-ink sm:px-8" aria-label="Targeted ads">
-        <h3 className="font-display text-[20px] font-black">What a library can sell: targeted ads</h3>
-        <p className="text-graphite">
-          {sim.n} made-up patrons asked {sim.questions} questions (the <span className="font-bold">100 people</span> tab). A typical library reads them and files
-          each patron under a topic; ads follow. Blind RAG never sees a question.
-        </p>
-        <div className="mt-2"><Legend /></div>
-        <div className="mt-3">
-          <Row label="Patrons with a profile on file" normal={pct(sim.profiled, sim.n)} blind={0} />
-          <Row label="Patrons with a sensitive label (health, legal, money)" normal={pct(sim.labelled, sim.n)} blind={0} note="The label ads are aimed from" />
-          <Row label="Patrons named from their own words" normal={pct(sim.named, sim.n)} blind={0} note="A name or address typed into a question" />
-          <Row label="Ad targets a library could sell" normal={sim.adTargets} blind={0} unit="" note="One per patron and ad, from the labels above" />
-        </div>
-        <p className="mt-3 border-t border-dashed border-graphite/40 pt-3 text-[13px] leading-5 text-graphite">
-          The patrons, questions and labels are simulated, and the labelling is a simple keyword rule standing in for real ad tech.
-          Neither library can stop a request being logged; Blind RAG's log holds time and address, not the question.
-        </p>
-      </section>
-
-      <section className="receipt typed mt-10 px-6 pt-6 pb-4 text-[15px] leading-6 text-ink sm:px-8" aria-label="On the wire">
-        <h3 className="font-display text-[20px] font-black">On the wire: your own last question</h3>
-        <p className="text-graphite">The recorder searched everything that left this laptop for the words of your question. This one is measured live.</p>
-        {proof?.recording && plain ? (
-          <>
-            <div className="mt-2"><Legend /></div>
-            <div className="mt-3">
-              <Row label="Words of your question found in the traffic" normal={pct(plain.found.length, plain.words)} blind={pct(blindFound, blindWords)}
-                note={`${plain.found.length} of ${plain.words} words in the clear, against ${blindFound} of ${blindWords} when sealed`} />
+      <div className="mt-5 grid gap-5 md:grid-cols-2">
+        <div className="receipt typed px-6 pt-5 pb-3 text-[15px] leading-6 text-ink" aria-label="Answer quality">
+          <h4 className="font-display text-[18px] font-black">Answer quality</h4>
+          <p className="text-[13px] leading-5 text-graphite">{card?.answerable ?? 79} answerable and {card?.should_decline ?? 17} should-decline test questions</p>
+          <div className="mt-1"><Legend /></div>
+          {q ? (
+            <div className="mt-2">
+              <Row label="Right source in the top 10" normal={top10n} blind={top10b} />
+              <Row label="Answerable questions answered" normal={pct(q.answered ?? 0, q.answerable ?? 0)} blind={pct(q.answered ?? 0, q.answerable ?? 0)} />
+              <Row label="Answers citing the expected source" normal={pct(q.cited ?? 0, q.answerable ?? 0)} blind={pct(q.cited ?? 0, q.answerable ?? 0)} />
+              <Row label="Out-of-scope questions declined" normal={pct(q.declined ?? 0, q.should_decline ?? 0)} blind={pct(q.declined ?? 0, q.should_decline ?? 0)} />
+              <Row label="Wrong answers when it should decline" normal={pct(q.wrong ?? 0, q.should_decline ?? 0)} blind={pct(q.wrong ?? 0, q.should_decline ?? 0)} lowerIsBetter />
             </div>
-          </>
-        ) : (
-          <p className="mt-3 text-graphite">Tick the unsealed-copy box on the call slip and ask again to measure this.</p>
-        )}
-      </section>
-    </div>
+          ) : <p className="mt-2 text-graphite">Quality figures are not available (eval/results is missing).</p>}
+          <p className="mt-2 border-t border-dashed border-graphite/40 pt-2 text-[12.5px] leading-[18px] text-graphite">
+            Plaintext evaluation. Blindspot's encrypted ranking matched the plaintext int8 ranking on every question checked, so its figures are the int8 ones. A full encrypted run is <span className="font-bold">make bench</span>.
+            The questions were written by the team, so one question moves a figure by about 1.3 points.
+          </p>
+        </div>
+
+        <div className="receipt typed px-6 pt-5 pb-3 text-[15px] leading-6 text-ink" aria-label="Targeted ads">
+          <h4 className="font-display text-[18px] font-black">What a library can sell: targeted ads</h4>
+          <p className="text-[13px] leading-5 text-graphite">{sim.n} made-up patrons asked {sim.questions} questions (see the <span className="font-bold">100 people</span> tab)</p>
+          <div className="mt-1"><Legend /></div>
+          <div className="mt-2">
+            <Row label="Patrons with a profile on file" normal={pct(sim.profiled, sim.n)} blind={0} />
+            <Row label="Patrons with a sensitive label" normal={pct(sim.labelled, sim.n)} blind={0} note="The label ads are aimed from" />
+            <Row label="Patrons named from their own words" normal={pct(sim.named, sim.n)} blind={0} note="A name or address typed into a question" />
+            <Row label="Ad targets a library could sell" normal={sim.adTargets} blind={0} unit="" note="One per patron and ad" />
+          </div>
+          <p className="mt-2 border-t border-dashed border-graphite/40 pt-2 text-[12.5px] leading-[18px] text-graphite">
+            Simulated: the labels come from a simple keyword rule standing in for real ad tech. Both libraries still log that a request happened, when, and from which address.
+          </p>
+        </div>
+      </div>
+    </section>
   )
 }

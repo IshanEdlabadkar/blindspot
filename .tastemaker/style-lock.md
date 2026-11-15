@@ -1,4 +1,4 @@
-# Style lock: Blind RAG web UI ("Card catalog")
+# Style lock: Blindspot web UI ("Card catalog")
 
 Locked 2026-11-15, replacing the dark "Burrow cross-section" direction, which the user rejected as looking AI-generated.
 Reuse these tokens for every screen; change only on an explicit request.

@@ -8,7 +8,7 @@ export function Burrow({ mood = 'idle', size = 112, className = '' }: {
   const anim = mood === 'dig' ? 'dig .5s ease-in-out infinite' : mood === 'idle' ? 'bob 3.4s ease-in-out infinite' : undefined
   return (
     <div className={`relative inline-block ${className}`} style={{ width: size, height: size * 1.03 }}>
-      <img src={burrowSvg} alt="Burrow, the Blind RAG badger" width={size} height={Math.round(size * 1.03)}
+      <img src={burrowSvg} alt="Burrow, the Blindspot badger" width={size} height={Math.round(size * 1.03)}
         draggable={false} className="select-none" style={{ animation: anim, transformOrigin: '50% 85%' }} />
       {mood === 'dig' && Array.from({ length: 8 }, (_, i) => (
         <span key={i} aria-hidden className="absolute rounded-full"

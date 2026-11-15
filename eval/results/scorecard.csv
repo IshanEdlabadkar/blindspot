@@ -1,6 +1,6 @@
 area,metric,value
 Retrieval,Right page in top 5 (int8),67/79 (85%)
-Retrieval,"Right page in top 10 (int8, what Blind RAG fetches)",72/79 (91%)
+Retrieval,"Right page in top 10 (int8, what Blindspot fetches)",72/79 (91%)
 Retrieval,"Right page in top 10 (float, no quantization)",73/79 (92%)
 Evidence,"Right page among the model's 5 sources, search order",67/79 (85%)
 Evidence,"Right page among the model's 5 sources, after local rerank",68/79 (86%)

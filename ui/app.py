@@ -1,4 +1,4 @@
-"""Blind RAG client UI.
+"""Blindspot client UI.
 
     make demo                      # real crypto + local model (what judges see)
     streamlit run ui/app.py        # same, if server and helper are already running
@@ -58,7 +58,7 @@ STAGE_LABEL = {"embedding": "Reading your question on this laptop", "encrypting"
                "scoring": "The server is searching without reading it", "fetching": "Fetching the best passages privately",
                "answering": "Writing your answer on this laptop"}
 
-st.set_page_config(page_title="Blind RAG", page_icon=":badger:", layout="wide",
+st.set_page_config(page_title="Blindspot", page_icon=":badger:", layout="wide",
                    initial_sidebar_state="collapsed")
 ss = st.session_state
 ss.setdefault("history", [])     # list of {"q", "result", "trace", "plain"}
@@ -523,10 +523,10 @@ def answer_html(text):
 
 
 def locket(px=40, wave=False):
-    """Burrow, Blind RAG's own mascot: a cartoon badger in a red scarf with a padlock charm. Original art, inline SVG."""
+    """Burrow, Blindspot's own mascot: a cartoon badger in a red scarf with a padlock charm. Original art, inline SVG."""
     o = "#1F1B1C"   # outline
     return (f'<svg width="{px}" height="{px}" viewBox="0 0 200 206" role="img" '
-            f'aria-label="{MASCOT}, the Blind RAG badger" stroke-linejoin="round" stroke-linecap="round">'
+            f'aria-label="{MASCOT}, the Blindspot badger" stroke-linejoin="round" stroke-linecap="round">'
             # scarf, tail and padlock charm (behind the chin)
             f'<path d="M124 176 C134 175 144 171 151 166 L162 196 L151 192 L145 203 L135 190 Z" fill="#A8040A" stroke="{o}" stroke-width="5"/>'
             f'<path d="M46 150 C64 172 136 172 154 150 L160 172 C138 196 62 196 40 172 Z" fill="#C5050C" stroke="{o}" stroke-width="5"/>'
@@ -631,7 +631,7 @@ def _bars(text):
 
 
 def mirror_html(t, src):
-    """Two receipts: what a normal RAG server kept vs. what Blind RAG's server kept. Both from real logs."""
+    """Two receipts: what a normal RAG server kept vs. what Blindspot's server kept. Both from real logs."""
     trace, plain, q = t["trace"], t.get("plain"), t["q"]
     real = trace["mode"]["crypto"] == "real"
 
@@ -656,7 +656,7 @@ def mirror_html(t, src):
                 f'<div class="k">DOCUMENTS READ</div>{docs}'
                 '<div class="cut"></div><div class="end">KEPT UNTIL DELETED, BREACHED OR SUBPOENAED</div></div>')
 
-    # -- right: Blind RAG's server, from its own log
+    # -- right: Blindspot's server, from its own log
     rows = question_log(src, trace)
     lines = "".join(f'<div class="row log"><span>{esc(local_hms(r.get("ts", "")))} {esc(r.get("endpoint", ""))}</span>'
                     f'<span>{r.get("latency_ms", "")} ms</span></div>' for r in rows[:6])
@@ -665,7 +665,7 @@ def mirror_html(t, src):
     lines = lines or f'<div class="k">no log available at {esc(src)}</div>'
     hx = trace["ciphertext_sample"][:64]
     if real:
-        who = 'Blind RAG<span>Computes on a locked question</span>'
+        who = 'Blindspot<span>Computes on a locked question</span>'
         qrow = f'<div class="bars" role="img" aria-label="No question recorded">{_bars(q)}</div><div class="k">never received in readable form · arrived as</div><div class="hex">{esc(hx)}…</div>'
         end, kind = "NOTHING HERE ANYONE COULD READ", "blind"
     else:
@@ -701,7 +701,7 @@ def wire_panel(turn):
     for h in sorted(hits, key=lambda h: h["route"] == "plain"):
         n = len(h["found"])
         plain = h["route"] == "plain"
-        label = "A normal AI health service" if plain else f"Blind RAG · {h['route']} server"
+        label = "A normal AI health service" if plain else f"Blindspot · {h['route']} server"
         sent = f"{h['requests']} requests"
         if n == 0:
             body = esc(h["sample_hex"][:96] or "(no request body)") + " …"
@@ -728,7 +728,7 @@ def wire_panel(turn):
         out = ""
         for h in found:
             hit = bool(h["found"])
-            who = "normal AI health service" if h["route"] == "plain" else f"Blind RAG · {h['route']}"
+            who = "normal AI health service" if h["route"] == "plain" else f"Blindspot · {h['route']}"
             out += (f'<div class="br-wire {"bad" if hit else "ok"} slim"><div class="top"><b>{esc(who)}</b>'
                     f'<span>searched</span><em>{"found" if hit else "not found"}</em></div></div>')
         st.markdown(out, unsafe_allow_html=True)
@@ -823,7 +823,7 @@ SUGGESTIONS = ["How is chlamydia treated and can I get it again?",
 with st.container(key="topbar"):
     bar_l, bar_m, bar_r = st.columns([4, 11, 6], vertical_alignment="center")
     with bar_l:
-        st.markdown(f'<div class="br-head">{locket(44)}<div><div class="br-brand">Blind RAG</div></div></div>',
+        st.markdown(f'<div class="br-head">{locket(44)}<div><div class="br-brand">Blindspot</div></div></div>',
                     unsafe_allow_html=True)
     with bar_m:
         view = st.segmented_control("View", VIEWS, key="view", label_visibility="collapsed") or ss.last_view
@@ -1013,7 +1013,7 @@ if view == "Chat":
 if view == "Live demo":
     st.markdown('<div class="br-h" style="font-size:26px">Same question, two servers</div>'
                 '<div class="br-sub">Ask once. See what a normal AI health service keeps next to what the '
-                'Blind RAG server keeps, read from each server\'s own log.</div>', unsafe_allow_html=True)
+                'Blindspot server keeps, read from each server\'s own log.</div>', unsafe_allow_html=True)
     system_details()
     with st.container():
         typed = st.chat_input("Ask a sensitive question to compare both servers", key="demo_in")
@@ -1021,7 +1021,7 @@ if view == "Live demo":
     if not canned_mode:
         compare = st.toggle("Also send it to a normal server", value=True, key="compare",
                             help="When on, the question really is sent unencrypted to the plaintext demo server, "
-                                 "so its log can be shown next to Blind RAG's.")
+                                 "so its log can be shown next to Blindspot's.")
     status_box = st.container()
     pending = ss.pop("pending_q", None)
     asked = typed.strip() if typed and typed.strip() else pending
@@ -1035,7 +1035,7 @@ if view == "Live demo":
         st.markdown(mirror_html(last, log_source(server)), unsafe_allow_html=True)
         with st.container(key="attacker"):
             st.markdown('<div class="br-atk-h">Attacker console: you hold the server\'s logs</div>'
-                        '<div class="br-atk-s">Everything the Blind RAG server kept is in the receipt above. '
+                        '<div class="br-atk-s">Everything the Blindspot server kept is in the receipt above. '
                         'Which of these five questions was asked?</div>', unsafe_allow_html=True)
             if trace["mock"]:
                 st.caption("Mock mode: this game only means something against the real encrypted server.")
@@ -1081,7 +1081,7 @@ if view == "Evidence":
         n0 = ret0["n"]
         rows0 = [
             ("Right source in the top 10", f'{ret0["float"][10]}/{n0}', f'{ret0["int8"][10]}/{n0}',
-             "Blind RAG scores 8-bit numbers; the normal service uses full floats"),
+             "Blindspot scores 8-bit numbers; the normal service uses full floats"),
             ("Answerable questions answered", f'{ans0["answered"]}/{ans0["answerable"]}', f'{ans0["answered"]}/{ans0["answerable"]}',
              "Same retrieval, same local answer step"),
             ("Answers citing the expected source", f'{ans0["gold_cited"]}/{ans0["answerable"]}', f'{ans0["gold_cited"]}/{ans0["answerable"]}', "Same"),
@@ -1092,14 +1092,14 @@ if view == "Evidence":
             ("Words from your question found in the traffic", "Found in the clear", "Not found", "Searched live on the wire in the Live demo tab"),
         ]
         body0 = "".join(f"<tr><td>{esc(a)}</td><td>{esc(b)}</td><td><b>{esc(c_)}</b></td><td>{esc(d)}</td></tr>" for a, b, c_, d in rows0)
-        st.markdown('<div class="br-h">Blind RAG vs a normal AI service</div><div class="br-sub">Same questions, same library. '
+        st.markdown('<div class="br-h">Blindspot vs a normal AI service</div><div class="br-sub">Same questions, same library. '
                     'Quality is the plaintext evaluation (<code>' + esc(ans0["path"]) + '</code>): the encrypted ranking matches the '
                     'plaintext int8 ranking, so privacy does not cost answer quality. End-to-end encrypted runs: <code>make bench</code>.</div>'
-                    '<table class="br-t"><tr><th>Measure</th><th>Normal AI service</th><th>Blind RAG</th><th>Note</th></tr>'
+                    '<table class="br-t"><tr><th>Measure</th><th>Normal AI service</th><th>Blindspot</th><th>Note</th></tr>'
                     + body0 + "</table>", unsafe_allow_html=True)
 
     st.markdown('<div class="br-h">Retrieval and answer quality</div><div class="br-sub">Plaintext baseline over the '
-                'same chunks. Encryption adds no error, so the int8 ranking is the ranking Blind RAG produces.</div>',
+                'same chunks. Encryption adds no error, so the int8 ranking is the ranking Blindspot produces.</div>',
                 unsafe_allow_html=True)
     ret, ans = load_retrieval(), load_answers()
     cards = ""

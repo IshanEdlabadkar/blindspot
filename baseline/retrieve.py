@@ -1,4 +1,4 @@
-"""Plaintext top-k over the same tables Blind RAG uses. int8 mode ranks exactly as Blind RAG will.
+"""Plaintext top-k over the same tables Blindspot uses. int8 mode ranks exactly as Blindspot will.
 
 PlainIndex covers one source (one document server). MultiIndex fans out over several, following the
 multi-source privacy rules: every source is always queried and always returns exactly k chunks.

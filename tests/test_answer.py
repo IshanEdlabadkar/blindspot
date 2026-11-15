@@ -1,4 +1,25 @@
+from client import answer as answer_mod
 from client.answer import DECLINE_MESSAGE, DISCLAIMER, answer
+
+
+def test_ollama_request_keeps_model_loaded_and_caps_length(monkeypatch):
+    sent = {}
+
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"response": " ok "}
+
+    def fake_post(url, json, timeout):
+        sent.update(json)
+        return Resp()
+
+    monkeypatch.setattr(answer_mod.requests, "post", fake_post)
+    assert answer_mod.ollama_generate("p") == "ok"
+    assert sent["keep_alive"] == "30m"
+    assert sent["options"] == {"temperature": 0, "num_predict": 256}
 
 CHUNKS = [{"id": i, "title": f"T{i}", "url": f"u{i}", "updated": "d", "text": f"fact {i}",
            "score": 0.8 - i * 0.01} for i in range(10)]

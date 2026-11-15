@@ -160,3 +160,21 @@ def test_supporting_excerpt_is_verbatim_from_source():
     ans = "Inhalers get medicine into your lungs quickly [1]. Something else [2]."
     assert supporting_excerpt(ans, 1, src) == "Inhalers deliver medicine to the lungs quickly."
     assert supporting_excerpt("zzz qqq", 1, src) == ""
+
+
+def test_batched_fetch_used_when_client_supports_it_and_404_falls_back(server):
+    """A crypto client with make_selectors tries /v1/fetch_batch; the mock server has none (404),
+    so the pipeline falls back to one-by-one fetches and still returns the right records."""
+    url, _, _ = server
+    import client.mock_crypto_client as mock
+    calls = []
+    batch = types.SimpleNamespace(
+        IS_MOCK=True, keygen=mock.keygen, encrypt_query=mock.encrypt_query, decrypt_scores=mock.decrypt_scores,
+        make_selector=mock.make_selector, decrypt_record=mock.decrypt_record,
+        make_selectors=lambda key, idx, n: calls.append(list(idx)) or b"".join(mock.make_selector(key, i, n) for i in idx),
+        decrypt_records=lambda key, blob: [])
+    a, _ = Pipeline(server=url, fetch_mode="pir").ask_traced("knee pain on stairs")
+    b, tr = Pipeline(server=url, crypto=batch, fetch_mode="pir").ask_traced("knee pain on stairs")
+    assert len(calls) == 1 and len(calls[0]) == c.TOP_K           # the batch was attempted, with exactly k
+    assert a == b                                                   # fallback fetched the same records
+    assert sum(r["endpoint"] == "/v1/fetch" for r in tr["requests"]) == c.TOP_K

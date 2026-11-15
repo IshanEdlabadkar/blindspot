@@ -21,6 +21,16 @@ cd ~/blindspot && make preflight
 
 It must end with **READY FOR THE DEMO**. A `FAIL` line names the fix. `SKIP` lines mean a model was switched off: not acceptable for the real demo.
 
+## Using the hosted server instead of a local one
+
+```bash
+BLIND_RAG_SERVER=https://blindspot-cz2t.onrender.com \
+BLIND_RAG_SERVER_LOG=https://blindspot-cz2t.onrender.com/v1/server_log \
+BLIND_RAG_FETCH=pir make demo
+```
+
+The key helper, the app and the language model still run on the laptop. If the hosted server has been asleep, the first request takes about a minute, and the first question downloads about 25 MB of public setup files once. If the venue network misbehaves, drop the three variables and run everything locally.
+
 ## Warm up (do this every time)
 
 1. Ask *How is chlamydia treated and can I get it again?* once. The first question downloads the public scoring hint (17 MB) and loads the language model, so it is the slow one.

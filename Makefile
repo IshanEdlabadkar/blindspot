@@ -15,7 +15,10 @@ server:        ## document server on $(DATA)/ at http://127.0.0.1:8080 (log: dat
 helper:        ## asker-side key holder at http://127.0.0.1:8090 (needed for BLIND_RAG_CRYPTO=real)
 	cd crypto-server && go run ./cmd/crypto-helper
 
-.PHONY: bench bench-quick
+.PHONY: bench bench-quick check-servers
+check-servers: ## every hosted server (servers.remote.json): reachable, right corpus, matches repo backup, log has only 4 fields
+	python3 scripts/check_servers.py $(ARGS)
+
 bench:         ## with make demo running: accuracy + speed + per-question trace for every eval question -> eval/results/bench/<run>/report.html
 	python3 -m eval.bench $(ARGS)
 

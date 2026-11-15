@@ -1,0 +1,17 @@
+# Render Blueprint for the Blind RAG document server. See DEPLOY.md.
+services:
+  - type: web
+    name: blind-rag-server
+    runtime: docker
+    plan: 0.5c-512mb          # hint mode needs ~100 MB; the free plan sleeps when idle
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /v1/manifest
+    autoDeployTrigger: commit
+    envVars:
+      - key: BLIND_RAG_TOKEN_MODE
+        value: "0"            # hint mode only: fits in 512 MB
+      - key: BLIND_RAG_PUBLIC_LOG
+        value: "1"            # GET /v1/server_log for the UI's server panel

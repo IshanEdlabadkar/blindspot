@@ -76,25 +76,43 @@ func NewScoreDB(table []int8, n, d uint64) (*pir.Database[Elem], error) {
 	return db, nil
 }
 
-// ScoreServer holds the table and precomputed hint. Call Free when done.
+// ScoreServer holds the table and precomputed state. Call Free when done.
+// With token mode off it skips underhood's token-answer precomputation,
+// which is most of the memory (~650 MB vs ~100 MB at 2,101 chunks).
 type ScoreServer struct {
 	DB   *pir.Database[Elem]
 	Seed *rand.PRGKey
-	srv  *underhood.Server[Elem]
+	srv  *underhood.Server[Elem] // nil when token mode is off
+	pirS *pir.Server[Elem]       // used when token mode is off
 }
 
 func NewScoreServer(db *pir.Database[Elem], seed *rand.PRGKey) *ScoreServer {
 	return &ScoreServer{DB: db, Seed: seed, srv: underhood.NewServer(db, seed)}
 }
 
-func (s *ScoreServer) Free() { s.srv.Free() }
+// NewScoreServerHintOnly serves hint mode only.
+func NewScoreServerHintOnly(db *pir.Database[Elem], seed *rand.PRGKey) *ScoreServer {
+	return &ScoreServer{DB: db, Seed: seed, pirS: pir.NewServerSeed(db, seed)}
+}
 
+func (s *ScoreServer) TokenMode() bool { return s.srv != nil }
+
+func (s *ScoreServer) Free() {
+	if s.srv != nil {
+		s.srv.Free()
+	}
+}
+
+// HintAnswer answers a token-mode token. Panics if token mode is off; check TokenMode.
 func (s *ScoreServer) HintAnswer(q *underhood.HintQuery) *underhood.HintAnswer {
 	return s.srv.HintAnswer(q)
 }
 
 func (s *ScoreServer) Answer(q *pir.Query[Elem]) *pir.Answer[Elem] {
-	return s.srv.Answer(q)
+	if s.srv != nil {
+		return s.srv.Answer(q)
+	}
+	return s.pirS.Answer(q)
 }
 
 // ScoreClient is the device side. The secret lives only in this struct.

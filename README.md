@@ -2,7 +2,7 @@
 
 Search a sensitive knowledge base without the server learning the question, the scores, or which documents were read.
 
-**Setup for everyone: [SETUP.md](SETUP.md).** Contracts: `contracts.py` (C's branch) is the single source of truth.
+**Setup for everyone: [SETUP.md](SETUP.md).** Remote server: [DEPLOY.md](DEPLOY.md). Contracts: `contracts.py` (C's branch) is the single source of truth.
 
 | Person | Owns |
 | --- | --- |
@@ -20,6 +20,7 @@ Search a sensitive knowledge base without the server learning the question, the 
 - [x] Background key preparation: encrypt 1.2 s -> 0.05 s
 - [x] `make measure`: latency, bytes, CPU, log check
 - [x] Hint-mode scoring: 3 KB up, ~6 ms per question; every spec performance target met
+- [x] Remote deploy: Dockerfile + Render blueprint (image not yet built; first Render build is its test)
 - [ ] Run `make measure` on the demo laptop (hours 13 to 16)
 
 ## Crypto design decisions

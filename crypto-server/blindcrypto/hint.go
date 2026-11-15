@@ -114,4 +114,9 @@ func (k *HintKey) Decrypt(a *pir.Answer[Elem]) []int64 {
 }
 
 // Hint exposes the server's full hint (for EncodeHint).
-func (s *ScoreServer) Hint() *matrix.Matrix[Elem] { return s.srv.Hint() }
+func (s *ScoreServer) Hint() *matrix.Matrix[Elem] {
+	if s.srv != nil {
+		return s.srv.Hint()
+	}
+	return s.pirS.Hint()
+}

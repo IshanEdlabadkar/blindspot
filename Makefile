@@ -49,6 +49,6 @@ preflight:     ## with make demo running: every document server checked, then th
 	python3 scripts/check_servers.py
 	./scripts/start_demo.sh --preflight
 
-corpus-expanded: ## build artifacts-expanded/: MedlinePlus + MedlinePlus Genetics + MyHealthfinder (needs internet, ~5 min)
+corpus-expanded: ## alternative, not the demo setup: ONE combined corpus (MedlinePlus + Genetics + MyHealthfinder) for a single server
 	$$(./scripts/find_python.sh sentence_transformers) -m ingest.build_multi --out artifacts-expanded
 	@echo "Serve it with:  make stop && make demo DATA=artifacts-expanded"

@@ -32,6 +32,14 @@ local_server() {  # id port -> starts a local document server on artifacts/<id>
   wait_up "http://127.0.0.1:$2/v1/manifest" "local $1 server"
 }
 
+# Wake every hosted server at once (a sleeping free Render service takes up to ~1 min), then check each.
+for e in "${ENTRIES[@]}"; do
+  url=${e#* }
+  [[ $url == http://127.0.0.1:* || $url == http://localhost:* ]] || { curl -s -o /dev/null --max-time 90 "$url/v1/manifest" & }
+done
+echo "  waking the hosted servers together (up to ~1 min if they were asleep)..."
+wait
+
 routes=(--route "plain:9001=http://127.0.0.1:8001")
 relays=()
 i=0
@@ -40,8 +48,8 @@ for e in "${ENTRIES[@]}"; do
   if [[ $url == http://127.0.0.1:* || $url == http://localhost:* ]]; then
     up "$url/v1/manifest" || local_server "$id" "${url##*:}"
   else
-    printf "  waking %s ... " "$id"
-    ok=0; for _ in $(seq 1 12); do up "$url/v1/manifest" 15 && { ok=1; break; }; sleep 3; done
+    printf "  %s ... " "$id"
+    ok=0; for _ in 1 2 3; do up "$url/v1/manifest" 15 && { ok=1; break; }; sleep 2; done
     if [ $ok = 1 ]; then echo "hosted"; else
       url="http://127.0.0.1:$((8080 + i))"; echo "asleep, using local backup on $url"; local_server "$id" "${url##*:}"; fi
   fi

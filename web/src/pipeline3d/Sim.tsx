@@ -90,7 +90,7 @@ export default function Sim({ run, onClose, inline }: { run: SimRun; onClose?: (
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, inline ? 1.5 : 2))
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -544,11 +544,16 @@ export default function Sim({ run, onClose, inline }: { run: SimRun; onClose?: (
 
     const clock = new THREE.Clock()
     let raf = 0, elapsed = 0
+    let sf = -1   // the scroll position the scene is showing: it eases toward the real one, so wheel ticks never jerk the camera
     const camPos = V(0, 0, 0), camLook = V(0, 0, 0)
     const frame = () => {
-      elapsed += Math.min(clock.getDelta(), 0.1)
+      const dt = Math.min(clock.getDelta(), 0.1)
+      elapsed += dt
       if (!onScreen) { raf = requestAnimationFrame(frame); return }   // nothing to draw while it is scrolled out of view
-      const f = Math.min(Math.max(progress() / STEP(), 0), beats.length - 0.001)
+      const target = Math.min(Math.max(progress() / STEP(), 0), beats.length - 0.001)
+      if (sf < 0 || reduce) sf = target
+      else { sf += (target - sf) * (1 - Math.exp(-dt * 7)); if (Math.abs(target - sf) < 0.0008) sf = target }
+      const f = sf
       const n = Math.floor(f), local = f - n
       if (n !== cur) enter(n)
       const t = seg(local, 0.06, 0.55) * beats[n].dur

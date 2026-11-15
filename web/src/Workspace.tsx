@@ -104,17 +104,19 @@ export function Workspace({ mode, status, disabled, toggle, homeTick }: { mode: 
               <div ref={bottom} />
             </main>
             {simRun && (
-              <section ref={simBox} id="sim3d" aria-label="Watch it run in 3D" className="relative z-[1] scroll-mt-4 pb-40">
-                <Reveal className="mx-auto max-w-[760px] px-5 pb-10">
+              <section ref={simBox} id="sim3d" aria-label="Watch it run in 3D" className="relative z-[1] scroll-mt-4 pb-32">
+                <Reveal className="mx-auto max-w-[760px] px-5 pb-6">
                   <p className="typed text-[13px] text-graphite">Your last question, step by step</p>
                   <h2 className="mt-1 max-w-[16ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[60px]">Now watch it run.</h2>
                   <p className="mt-3 max-w-[50ch] text-[17px] leading-7 text-graphite">A 3D model of that one question, built from what really happened. Keep scrolling.</p>
                 </Reveal>
+                <div aria-hidden className="h-28 bg-gradient-to-b from-transparent to-[#ECEBE7]" />
                 {simNear && (
                   <Suspense fallback={<div className="grid h-[60dvh] place-items-center bg-[#ECEBE7] font-display text-ink">Setting up the desk…</div>}>
                     <Sim run={simRun} inline />
                   </Suspense>
                 )}
+                <div aria-hidden className="h-28 bg-gradient-to-b from-[#ECEBE7] to-transparent" />
               </section>
             )}
             <div data-fixed className={`fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4 transition-opacity duration-500 ${simIn ? 'pointer-events-none opacity-0' : ''}`}>

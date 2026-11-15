@@ -1,21 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ask, getStatus, type Status } from './api'
-import { Composer, EmptyState, TurnView } from './Chat'
+import { Burrow } from './Burrow'
+import { Composer, Landing, TurnView } from './Chat'
 import type { Turn } from './turn'
 import { XRay } from './XRay'
 
-function Lock() {
-  return (
-    <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
-      <rect width="32" height="32" rx="8" fill="#161B22" />
-      <path d="M11 14v-3a5 5 0 0 1 10 0v3" fill="none" stroke="#7FD1C4" strokeWidth="2.4" strokeLinecap="round" />
-      <rect x="8" y="14" width="16" height="11" rx="3" fill="#7FD1C4" />
-    </svg>
-  )
-}
-
 function Health({ status }: { status: Status | null }) {
-  if (!status) return <span className="text-sm text-dim">Connecting</span>
+  if (!status) return <span className="text-sm text-graphite">Connecting</span>
   const up = status.servers.filter((s) => s.ok).length
   const ok = up === status.servers.length && status.helper && status.model
   const issues = [
@@ -23,9 +14,9 @@ function Health({ status }: { status: Status | null }) {
     !status.helper && 'key helper off', !status.model && 'local model off',
   ].filter(Boolean).join(', ')
   return (
-    <span className={`flex items-center gap-2 text-sm ${ok ? 'text-fog' : 'text-amber'}`} title={issues || 'All systems ready'}>
-      <span className={`size-2 rounded-full ${ok ? 'bg-seal' : 'bg-amber'}`} />
-      {up} {up === 1 ? 'library' : 'libraries'} connected{issues ? `, ${issues}` : ''}
+    <span className={`text-sm ${ok ? 'text-graphite' : 'font-medium text-stamp'}`} title={issues || 'All systems ready'}>
+      <span className="hidden sm:inline">{up} of {status.servers.length} libraries open{issues ? `, ${issues}` : ''}</span>
+      <span className="sm:hidden">{up} of {status.servers.length} open{issues ? ', check' : ''}</span>
     </span>
   )
 }
@@ -73,34 +64,34 @@ export default function App() {
   }, [compare])
 
   const xrayTurn = turns.find((t) => t.id === xray)
+  const composer = (compact: boolean) => (
+    <Composer onAsk={onAsk} busy={busy} compare={compare} setCompare={setCompare} status={status}
+      number={nextId.current} compact={compact} autoFocus={!compact} />
+  )
 
   return (
-    <div className="min-h-dvh">
-      <header className="sticky top-0 z-10 border-b border-seam/70 bg-night/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-[1080px] items-center justify-between px-5">
-          <button onClick={() => setXray(null)} className="flex items-center gap-2.5 text-[16px] font-semibold tracking-tight">
-            <Lock /> Blind RAG
-          </button>
-          <Health status={status} />
-        </div>
+    <div className="desk min-h-dvh">
+      <header className="mx-auto flex h-16 max-w-[1120px] items-center justify-between px-5">
+        <button onClick={() => setXray(null)} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
+          <Burrow size={32} mood="peek" /> Blind RAG
+        </button>
+        <Health status={status} />
       </header>
 
       {xrayTurn ? (
-        <XRay turn={xrayTurn} status={status} onBack={() => setXray(null)} />
+        <XRay turn={xrayTurn} number={xrayTurn.id} status={status} onBack={() => setXray(null)} />
       ) : turns.length === 0 ? (
-        <EmptyState status={status} onAsk={onAsk}>
-          <Composer onAsk={onAsk} busy={busy} compare={compare} setCompare={setCompare} autoFocus />
-        </EmptyState>
+        <Landing status={status} onAsk={onAsk}>{composer(false)}</Landing>
       ) : (
-        <main className="mx-auto max-w-[720px] px-5 pt-6 pb-48">
-          {turns.map((t) => <TurnView key={t.id} turn={t} nameOf={nameOf} onXray={() => setXray(t.id)} />)}
-          <div ref={bottom} />
-          <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-night via-night/95 to-transparent pt-10 pb-5">
-            <div className="mx-auto max-w-[720px] px-5">
-              <Composer onAsk={onAsk} busy={busy} compare={compare} setCompare={setCompare} />
-            </div>
+        <>
+          <main className="mx-auto max-w-[760px] px-5 pb-64">
+            {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} onXray={() => setXray(t.id)} />)}
+            <div ref={bottom} />
+          </main>
+          <div className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4">
+            <div className="mx-auto max-w-[760px] px-5">{composer(true)}</div>
           </div>
-        </main>
+        </>
       )}
     </div>
   )

@@ -1,0 +1,42 @@
+{
+  "builds": [
+    {
+      "date": "2026-11-15",
+      "project": "blindspot",
+      "surfaces": [
+        "hero",
+        "app-shell",
+        "data-view"
+      ],
+      "macrostructure": "illustrated-world-cross-section",
+      "archetypes": [
+        "scene-hero",
+        "chat-with-ground-strip",
+        "depth-timeline-xray",
+        "highlighter-proof"
+      ],
+      "palette": "badger-on-soil",
+      "type": "red-hat",
+      "motion": "motion-react",
+      "outcome": "rejected: looked AI generated"
+    },
+    {
+      "date": "2026-11-15",
+      "project": "blindspot",
+      "surfaces": [
+        "landing",
+        "app-shell",
+        "data-view"
+      ],
+      "macrostructure": "physical-objects-on-desk",
+      "archetypes": [
+        "call-slip-composer",
+        "catalog-card-answer",
+        "stamped-receipt-proof"
+      ],
+      "palette": "blotter-cardstock-stamp-red",
+      "type": "courier-prime+red-hat",
+      "motion": "motion-react"
+    }
+  ]
+}

@@ -1,41 +1,103 @@
-@import "@fontsource/ibm-plex-sans/400.css";
-@import "@fontsource/ibm-plex-sans/500.css";
-@import "@fontsource/ibm-plex-sans/600.css";
-@import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
+/* tastemaker build: concept=library-card-catalog surfaces=landing,app-shell,data-view palette=blotter-cardstock-stamp-red (contrast checked: see .tastemaker/style-lock.md) type=courier-prime+red-hat motion=motion-react */
+@import "@fontsource/courier-prime/400.css";
+@import "@fontsource/courier-prime/700.css";
+@import "@fontsource/red-hat-display/700.css";
+@import "@fontsource/red-hat-display/900.css";
+@import "@fontsource/red-hat-text/400.css";
+@import "@fontsource/red-hat-text/500.css";
 @import "tailwindcss";
 
-/* Vault tokens. seal = locked/safe/actions. leak is used ONLY where words escaped. */
 @theme {
-  --color-night: #0E1116;
-  --color-slate: #161B22;
-  --color-lift: #1C232C;
-  --color-seam: #262E38;
-  --color-paper: #E6EAEE;
-  --color-fog: #8B97A4;
-  --color-dim: #7D8995; /* 5.3:1 on night: readable on a projector, passes WCAG AA for small text */
-  --color-seal: #7FD1C4;
-  --color-seal-deep: #2E5F58;
-  --color-leak: #FF6B6B;
-  --color-leak-deep: #4A1F22;
-  --color-amber: #F2C46D;
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-blotter: #CDD3CB;
+  --color-blotter-dark: #B9C0B7;
+  --color-card: #FFFDF8;
+  --color-slip: #F3EEDC;
+  --color-ink: #1E1C1A;
+  --color-graphite: #57524B;
+  --color-rule: #A9C0DA;
+  --color-badger: #C5050C;
+  --color-stamp: #B10E16;
+  --color-sealed: #23408E;
+  --color-highlighter: #FFE14D;
+  --font-type: "Courier Prime", ui-monospace, monospace;
+  --font-display: "Red Hat Display", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Red Hat Text", ui-sans-serif, system-ui, sans-serif;
+  --shadow-paper: 0 1px 0 rgba(0,0,0,.06), 0 2px 3px rgba(40,44,38,.18), 0 10px 18px -12px rgba(40,44,38,.35);
 }
 
-:root { color-scheme: dark; }
-html, body { background: var(--color-night); color: var(--color-paper); }
-body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-::selection { background: var(--color-seal-deep); color: var(--color-paper); }
+:root { color-scheme: light; }
+html, body { background: var(--color-blotter); color: var(--color-ink); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+h1, h2 { font-family: var(--font-display); }
+::selection { background: var(--color-highlighter); color: var(--color-ink); }
+:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
 
-:focus-visible { outline: 2px solid var(--color-seal); outline-offset: 3px; border-radius: 6px; }
+/* The desk: a felt blotter with a faint fibre. */
+.desk {
+  background-color: var(--color-blotter);
+  background-image: radial-gradient(rgba(30,28,26,.05) 1px, transparent 1.4px);
+  background-size: 5px 5px;
+}
+
+/* A library catalog card: red head rule, ruled blue lines, a punched rod hole. */
+.catalog {
+  position: relative; background-color: var(--color-card); box-shadow: var(--shadow-paper);
+  background-image: linear-gradient(var(--color-badger), var(--color-badger)),
+    repeating-linear-gradient(transparent 0 27px, var(--color-rule) 27px 28px);
+  background-size: 100% 2px, 100% 100%; background-position: 0 44px, 0 52px; background-repeat: no-repeat, repeat-y;
+}
+.catalog::after {
+  content: ""; position: absolute; left: 50%; bottom: 10px; width: 18px; height: 18px; margin-left: -9px;
+  border-radius: 999px; background: var(--color-blotter); box-shadow: inset 0 1px 2px rgba(0,0,0,.25);
+}
+.typed { font-family: var(--font-type); line-height: 28px; }
+
+/* Call slip: thinner stock, perforated top edge. */
+.slip {
+  background-color: var(--color-slip); box-shadow: var(--shadow-paper);
+  -webkit-mask: radial-gradient(circle 4px at 8px 0, transparent 98%, #000) 0 0 / 16px 100% repeat-x;
+          mask: radial-gradient(circle 4px at 8px 0, transparent 98%, #000) 0 0 / 16px 100% repeat-x;
+}
+
+/* Receipt: a narrow till roll with a torn bottom edge. */
+.receipt {
+  background: var(--color-card); box-shadow: var(--shadow-paper);
+  -webkit-mask: linear-gradient(#000, #000) top / 100% calc(100% - 10px) no-repeat,
+    conic-gradient(from -45deg at bottom, transparent, #000 1deg 89deg, transparent 90deg) bottom / 16px 10px repeat-x;
+          mask: linear-gradient(#000, #000) top / 100% calc(100% - 10px) no-repeat,
+    conic-gradient(from -45deg at bottom, transparent, #000 1deg 89deg, transparent 90deg) bottom / 16px 10px repeat-x;
+}
+
+/* A rubber stamp: uneven ink, slightly rotated, lands with a thud. */
+.stamp {
+  display: inline-block; border: 3px solid currentColor; padding: 4px 12px 2px; border-radius: 4px;
+  font-family: var(--font-display); font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
+  mix-blend-mode: multiply; opacity: .88;
+  -webkit-mask: radial-gradient(rgba(0,0,0,.55) 1px, #000 1.6px) 0 0 / 3px 3px;
+          mask: radial-gradient(rgba(0,0,0,.55) 1px, #000 1.6px) 0 0 / 3px 3px;
+  animation: thud .22s cubic-bezier(.2,.9,.3,1.2) both; animation-delay: var(--d, 0s);
+}
+@keyframes thud { from { transform: scale(1.7) rotate(var(--r, -6deg)); opacity: 0; } to { transform: scale(1) rotate(var(--r, -6deg)); opacity: .88; } }
+
+/* Highlighter: drawn across the leaked words like a real pen. */
+.mark {
+  background-image: linear-gradient(transparent 12%, var(--color-highlighter) 12%, var(--color-highlighter) 88%, transparent 88%);
+  background-size: 0% 100%; background-repeat: no-repeat; padding: 0 .12em; color: inherit;
+  animation: mark-in .45s cubic-bezier(.3,.7,.2,1) forwards; animation-delay: var(--d, 0s);
+}
+@keyframes mark-in { to { background-size: 100% 100%; } }
+
+.hex { font-family: var(--font-type); word-break: break-all; }
+.press { transition: transform .12s ease-out, background-color .12s ease-out; }
+.press:active { transform: translateY(1px); }
+
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes dig { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg) translateY(2px); } }
+@keyframes clod { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 12% { opacity: 1; }
+  100% { transform: translate(var(--dx), -36px) scale(.6); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+    transition-duration: 0.01ms !important; }
+  .mark { background-size: 100% 100%; }
 }
-
-.hex { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0.02em; word-break: break-all; }
-.caret::after { content: ""; display: inline-block; width: 0.55ch; height: 1.05em; margin-left: 2px;
-  vertical-align: -0.15em; background: var(--color-seal); animation: blink 1.1s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }

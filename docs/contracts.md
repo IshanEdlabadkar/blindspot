@@ -139,3 +139,26 @@ One line per request: timestamp, endpoint, response size in bytes, latency in ms
 ## 8. Where the tables live
 
 `data/` is git-ignored for working files. Release tables (`score_table.bin`, `fetch_store.bin`, `manifest.json`, `chunks.jsonl`, about 12 MB in total) are committed to `artifacts/` so A and C get them with `git pull`. Until then, everyone uses the dummy tables from `tools/make_dummy_tables.py`.
+
+## 9. Multiple document servers (added 2026-11-14)
+
+Design: `docs/superpowers/specs/2026-11-14-multi-source-design.md`. Each source is its own document server, built from `artifacts/<source_id>/` (same four files as section 8). Built today: `artifacts/medlineplus/` (byte-identical to the root tables) and `artifacts/fmla/` (29 CFR Part 825, 310 chunks). The root `artifacts/` stays as-is until A and C read the per-source folders; removing it needs the team's agreement.
+
+**Manifest fields added:** `source_id` (for example `"fmla"`) and `source_name` (for display). Every source uses the identical `embedding` and `quantization` blocks; a client must refuse a server whose blocks differ, because its scores would not be comparable. Each source has its own `corpus_version`.
+
+**Server list:** `servers.json` at the repo root (C may let an environment variable override it):
+
+```json
+[{"id": "medlineplus", "name": "MedlinePlus (National Library of Medicine)", "url": "http://127.0.0.1:8080"},
+ {"id": "fmla", "name": "Federal FMLA regulations (29 CFR Part 825, eCFR)", "url": "http://127.0.0.1:8081"}]
+```
+
+With no list, clients use one server exactly as before.
+
+**Fan-out privacy rules (required):**
+- Send every question to **every** server. Choosing servers by topic reveals the topic.
+- Fetch exactly **k = 10** records from **every** server, whatever its scores. A different count reveals which server held the answer.
+
+**Merge:** tag each fetched chunk with `source` and `source_name` (chunk ids are only unique within a server), put each chunk's cosine estimate in `score`, sort all chunks by `score` (highest first), and pass the whole list (k × number of servers) to `answer()`. It reranks locally, keeps the best 5 as sources, and applies the score threshold to the best search score. Citations then carry `source` and `source_name`.
+
+**Eval ids:** for agreement checks, a chunk is identified as `"source:id"`, for example `"fmla:42"`.

@@ -19,7 +19,7 @@ MAX_ANSWER_TOKENS = 256  # guard against runaway output; the longest eval answer
 MIN_SCORE = 0.55  # cosine estimate of the top chunk; see eval/run_eval.py for calibration
 SUPPORT_MIN = 0.5  # share of a sentence's key terms that its cited source must contain
 DECLINE_MESSAGE = "I couldn't find a reliable source for this in the library. The closest passages are below."
-DISCLAIMER = "This is general health information, not medical advice."
+DISCLAIMER = "This is general information, not medical or legal advice."
 
 PROMPT = """You answer health questions using ONLY the numbered sources below.
 Rules:
@@ -187,5 +187,6 @@ def answer(question: str, chunks: list[dict], llm=ollama_generate,
     renumber = {n: i for i, n in enumerate(used, 1)}
     body = " ".join(_CITE.sub(lambda m: f"[{renumber[int(m.group(1))]}]", s) for s, _ in kept)
     body = re.sub(r"\s+([.,;:!?])", r"\1", re.sub(r"[ \t]{2,}", " ", body)).strip()
+    body = re.sub(r"(\[\d+\])(\s*\1)+", r"\1", body)  # "[1] [1]" -> "[1]"
     citations = [_cite(ctx[n - 1], _excerpt(ctx[n - 1], [s for s, ok in kept if n in ok])) for n in used]
     return result("answered", body, citations, removed)

@@ -15,8 +15,24 @@ def test_first_rank_and_recall():
     assert recall_table([1, 3, None, 12], ks=(1, 5, 20)) == {1: 0.25, 5: 0.5, 20: 0.75}
 
 
+def test_retrieval_ranks_over_the_merged_sources(tmp_path, monkeypatch):
+    import eval.run_eval as mod
+    from tests.test_retrieve import _source
+    from baseline.retrieve import MultiIndex, discover_sources
+    _source(tmp_path, "a", 1)
+    vb = _source(tmp_path, "b", 2)
+    idx = MultiIndex(discover_sources(tmp_path))
+    monkeypatch.setattr(mod, "default_index", lambda: idx)
+    monkeypatch.setattr(mod, "embed_query_float", lambda q: vb[5])
+    monkeypatch.setattr(mod, "rerank_chunks", lambda q, cs: cs)
+    q = {"id": "q1", "question": "x", "source_url": "b/5"}
+    row = mod.run_retrieval([q], modes=("int8",))[0]
+    assert row["int8_rank"] == 1 and row["evidence_rerank5"] is True
+    assert row["int8_top10_ids"][0] == "b:5" and len(row["int8_top10_ids"]) == 20  # 10 per source
+
+
 def test_questions_are_well_formed_and_gold_urls_exist():
-    urls = {json.loads(l)["url"] for l in (ROOT / "artifacts/chunks.jsonl").read_text().splitlines()}
+    urls = {json.loads(l)["url"] for f in ROOT.glob("artifacts/**/chunks.jsonl") for l in f.read_text().splitlines()}
     assert len(QUESTIONS) >= 25
     assert len({q["id"] for q in QUESTIONS}) == len(QUESTIONS)
     for q in QUESTIONS:

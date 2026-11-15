@@ -150,6 +150,15 @@ def test_citations_name_their_source_when_chunks_have_one():
     assert "source" not in r["citations"][0]
 
 
+def test_repeated_citation_markers_are_collapsed():
+    r = answer("q?", [A1C, KNEE], llm=lambda p: "A1C measures your average blood sugar over 3 months. [1] [1]")
+    assert "[1] [1]" not in r["answer"] and "[1]" in r["answer"]
+
+
+def test_disclaimer_covers_medical_and_legal_sources():
+    assert "medical" in DISCLAIMER and "legal" in DISCLAIMER
+
+
 def test_each_citation_carries_its_supporting_excerpt():
     r = answer("q?", [A1C, KNEE], llm=lambda p: "It measures average blood sugar over 3 months [1].")
     assert r["citations"][0]["excerpt"] == "It measures your average blood sugar level over the past 3 months."

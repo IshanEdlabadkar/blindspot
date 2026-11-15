@@ -72,7 +72,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, x: number, y: number,
   if (line && n < lines) ctx.fillText(line, x, y + n * lh)
 }
 
-export default function Sim({ run, onClose, inline }: { run: SimRun; onClose?: () => void; inline?: boolean }) {
+export default function Sim({ run, onClose, onRestart, inline }: { run: SimRun; onClose?: () => void; onRestart?: () => void; inline?: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlay = useRef<HTMLDivElement>(null)
@@ -605,7 +605,7 @@ export default function Sim({ run, onClose, inline }: { run: SimRun; onClose?: (
   }, [onClose, inline])
 
   return (
-    <div ref={scroller} className={inline ? 'relative bg-[#ECEBE7]' : 'fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-[#ECEBE7]'}
+    <div ref={scroller} className={inline ? 'sim-root relative bg-[#ECEBE7] text-[#1E1C1A]' : 'sim-root fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-[#ECEBE7]'}
       {...(inline ? { role: 'region' } : { role: 'dialog', 'aria-modal': true })}
       aria-label="How your question went through the pipeline, step by step in 3D">
       <div className="relative" style={{ height: `calc(${count} * 160dvh + 100dvh)` }}>
@@ -616,7 +616,7 @@ export default function Sim({ run, onClose, inline }: { run: SimRun; onClose?: (
             <div ref={overlay} className="pointer-events-none absolute inset-0 overflow-hidden" />
           </div>
           {caption && (
-            <p key={beat} className="sim-caption pointer-events-none absolute inset-x-0 bottom-[13%] text-center font-display text-[44px] leading-none font-black tracking-[-0.02em] text-white sm:text-[76px]">
+            <p key={beat} className="sim-caption pointer-events-none absolute inset-x-0 bottom-[13%] px-4 text-center font-display text-[44px] leading-none font-black tracking-[-0.02em] text-[#1E1C1A] sm:text-[76px]">
               {caption}
             </p>
           )}
@@ -624,6 +624,9 @@ export default function Sim({ run, onClose, inline }: { run: SimRun; onClose?: (
             <div className="sim-caption pointer-events-none absolute inset-x-0 top-[12%] text-center">
               <p className="font-display text-[48px] leading-none font-black tracking-[-0.02em] text-badger sm:text-[84px]">Blindspot</p>
               <p className="typed mt-3 text-[15px] text-graphite sm:text-[17px]">Ask privately. Prove it.</p>
+              {inline && onRestart && (
+                <button onClick={onRestart} className="press pointer-events-auto mt-6 h-11 rounded-[2px] bg-badger px-5 font-display text-[15px] font-bold text-white">Ask another question</button>
+              )}
             </div>
           )}
           <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 bg-gradient-to-b from-[#ECEBE7] to-transparent px-5 pt-4 pb-6">

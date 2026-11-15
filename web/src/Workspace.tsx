@@ -59,6 +59,7 @@ export function Workspace({ mode, status, disabled, toggle, homeTick }: { mode: 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const simRun = useMemo(() => (simTurn ? toRun(simTurn, status) : null), [simKey])
   const simBox = useRef<HTMLElement>(null)
+  const simStage = useRef<HTMLDivElement>(null)
   const [simNear, setSimNear] = useState(false)   // mount WebGL only when the section is close to the screen
   const [simIn, setSimIn] = useState(false)       // the composer steps aside while the walkthrough fills the screen
   useEffect(() => {
@@ -66,9 +67,10 @@ export function Workspace({ mode, status, disabled, toggle, homeTick }: { mode: 
     if (!el) { setSimNear(false); setSimIn(false); return }
     const a = new IntersectionObserver(([e]) => { if (e.isIntersecting) setSimNear(true) }, { rootMargin: '900px 0px' })
     const b = new IntersectionObserver(([e]) => setSimIn(e.isIntersecting), { rootMargin: '-45% 0px -45% 0px' })
-    a.observe(el); b.observe(el)
+    a.observe(el)
+    if (simStage.current) b.observe(simStage.current)
     return () => { a.disconnect(); b.disconnect() }
-  }, [simKey])
+  }, [simKey, simNear])
   const xrayTurn = turns.find((t) => t.id === xray)
   const lastTrace = [...turns].reverse().find((t) => t.trace)?.trace
   const composer = (compact: boolean) => (
@@ -104,7 +106,7 @@ export function Workspace({ mode, status, disabled, toggle, homeTick }: { mode: 
               <div ref={bottom} />
             </main>
             {simRun && (
-              <section ref={simBox} id="sim3d" aria-label="Watch it run in 3D" className="relative z-[1] scroll-mt-4 pb-32">
+              <section ref={simBox} id="sim3d" aria-label="Watch it run in 3D" className="relative z-[1] scroll-mt-4">
                 <Reveal className="mx-auto max-w-[760px] px-5 pb-6">
                   <p className="typed text-[13px] text-graphite">Your last question, step by step</p>
                   <h2 className="mt-1 max-w-[16ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[60px]">Now watch it run.</h2>
@@ -113,10 +115,9 @@ export function Workspace({ mode, status, disabled, toggle, homeTick }: { mode: 
                 <div aria-hidden className="h-28 bg-gradient-to-b from-transparent to-[#ECEBE7]" />
                 {simNear && (
                   <Suspense fallback={<div className="grid h-[60dvh] place-items-center bg-[#ECEBE7] font-display text-ink">Setting up the desk…</div>}>
-                    <Sim run={simRun} inline />
+                    <div ref={simStage}><Sim run={simRun} inline onRestart={() => simBox.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} /></div>
                   </Suspense>
                 )}
-                <div aria-hidden className="h-28 bg-gradient-to-b from-[#ECEBE7] to-transparent" />
               </section>
             )}
             <div data-fixed className={`fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4 transition-opacity duration-500 ${simIn ? 'pointer-events-none opacity-0' : ''}`}>

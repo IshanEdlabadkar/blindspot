@@ -98,6 +98,7 @@ h1, h2 { font-family: var(--font-display); }
 /* 3D pipeline view: labels pinned to the scene, typed like the DESK demo. */
 .sim-label { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: var(--font-type); font-size: 15px; font-weight: 700;
   color: #2B2926; transition: opacity .2s ease-out; will-change: transform; }
+.sim-label:not(.sim-card) { text-shadow: 0 0 3px #ECEBE7, 0 0 8px #ECEBE7, 0 0 14px #ECEBE7; font-size: 16px; }
 .sim-label.sim-sealed { color: var(--color-sealed); }
 .sim-label.sim-red { color: var(--color-stamp); }
 .sim-label[data-typing="1"]::after { content: ""; display: inline-block; width: .55em; height: 1em; margin-left: 2px; vertical-align: -2px;
@@ -109,7 +110,7 @@ h1, h2 { font-family: var(--font-display); }
 .sim-card mark { background: var(--color-highlighter); color: inherit; padding: 0 .1em; }
 .sim-lines line { stroke: #2B2926; stroke-width: 1; transition: opacity .2s ease-out; }
 .sim-lines circle { fill: #2B2926; transition: opacity .2s ease-out; }
-.sim-caption { text-shadow: 0 2px 22px rgba(30,28,26,.28); animation: caption-in .35s ease-out both; }
+.sim-caption { text-shadow: 0 2px 26px rgba(236,235,231,.9); animation: caption-in .35s ease-out both; }
 @keyframes caption-in { from { opacity: 0; transform: translateY(8px); } }
 /* Explanation cards that scroll past the 3D stage, one per step. */
 .sim-step { padding: 18px 20px 20px; background: var(--color-card); box-shadow: var(--shadow-paper); border-top: 3px solid var(--color-badger); }
@@ -139,7 +140,7 @@ h1, h2 { font-family: var(--font-display); }
   color: var(--color-ink);
   background-image: radial-gradient(var(--d-dot) 1px, transparent 1.4px);
 }
-:root:not([data-theme="paper"]) :is(.slip, .catalog, .receipt, .paper, .bg-card) {
+:root:not([data-theme="paper"]) :is(.slip, .catalog, .receipt, .paper, .bg-card, .sim-root) {
   --color-ink:#1E1C1A; --color-graphite:#57524B; --color-badger:#C5050C; --color-stamp:#B10E16;
   --color-sealed:#23408E; --color-rule:#A9C0DA; --color-blotter-dark:#B9C0B7; color:#1E1C1A;
 }

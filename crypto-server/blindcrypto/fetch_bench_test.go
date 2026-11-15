@@ -29,4 +29,3 @@ func BenchmarkFetchPrepare(b *testing.B) {
 		fc.prepare()
 	}
 }
-

@@ -2,6 +2,8 @@
 
   python3 scripts/check_servers.py                       # servers.remote.json (the hosted servers)
   python3 scripts/check_servers.py servers.json          # the local list
+  python3 scripts/check_servers.py --pin                 # after a check passes: record each server's corpus
+                                                         # version and hashes as its pin (client/pins.py)
 
 For each server: the manifest loads; its source_id matches the list; it is the real encrypted server
 (hint mode, PIR on); its embedding and quantization match the first server's (so scores can be merged);
@@ -21,7 +23,9 @@ ALLOWED = {"ts", "endpoint", "response_bytes", "latency_ms"}
 
 
 def main():
-    lst = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ROOT / "servers.remote.json")
+    args = [a for a in sys.argv[1:] if a != "--pin"]
+    do_pin = "--pin" in sys.argv[1:]
+    lst = pathlib.Path(args[0] if args else ROOT / "servers.remote.json")
     entries = json.loads(lst.read_text())
     print(f"Checking {len(entries)} servers from {lst.name} (a sleeping free server can take ~1 min to wake)\n")
     failures, ref = 0, None
@@ -74,12 +78,27 @@ def main():
                 notes.append(f"public log off ({lg.status_code})")
         except Exception as ex:  # noqa: BLE001
             notes.append(f"log not readable: {ex}")
+        pin = e.get("pin")
+        if pin:
+            got = {"corpus_version": m["corpus_version"], **(m.get("hashes") or {})}
+            off = [k for k, v in pin.items() if got.get(k) != v]
+            if off and not do_pin:
+                problems.append(f"does not match its pin in {lst.name}: {', '.join(off)} "
+                                f"(published a new version on purpose? rerun with --pin)")
+            elif not off:
+                notes.append("matches its pin")
+        if do_pin and not problems:
+            e["pin"] = {"corpus_version": m["corpus_version"], **(m.get("hashes") or {})}
+            notes.append("pinned")
         status = "ok  " if not problems else "FAIL"
         failures += bool(problems)
         print(f"{status} {sid:15} {m['corpus_version']}  {m['num_chunks']:>5} chunks  {secs:5.1f}s  {url}")
         for p in problems:
             print(f"     ✗ {p}")
         print(f"     {'; '.join(notes)}\n")
+    if do_pin and not failures:
+        lst.write_text("[\n" + ",\n".join("  " + json.dumps(e) for e in entries) + "\n]\n")
+        print(f"pins written to {lst.name}: commit it so every client checks them")
     print("ALL SERVERS OK" if not failures else f"{failures} server(s) with problems")
     return 1 if failures else 0
 

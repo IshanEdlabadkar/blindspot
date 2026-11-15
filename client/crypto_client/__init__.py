@@ -45,6 +45,35 @@ IS_MOCK = False
 FETCH_MODE = "download"   # trivial PIR; see README
 
 HELPER_URL = os.environ.get("BLIND_RAG_HELPER", "http://127.0.0.1:8090").rstrip("/")
+
+
+def _token_file() -> pathlib.Path:
+    """Where the helper writes this run's session token (same rule as crypto-helper's -token-file)."""
+    f = os.environ.get("BLIND_RAG_HELPER_TOKEN_FILE")
+    if f:
+        return pathlib.Path(f)
+    if sys.platform == "darwin":
+        base = pathlib.Path.home() / "Library" / "Caches"
+    else:
+        base = pathlib.Path(os.environ.get("XDG_CACHE_HOME") or pathlib.Path.home() / ".cache")
+    return base / "blind-rag" / "helper-token"
+
+
+def _helper_headers(url: str) -> dict:
+    """The session token, sent to the local helper only, never to a document server. Read on every
+    call, so a restarted helper (new token) just works."""
+    if not url.startswith(HELPER_URL):
+        return {}
+    try:
+        return {"X-Blind-RAG-Token": _token_file().read_text().strip()}
+    except OSError:
+        return {}
+
+
+class _HelperSession(requests.Session):
+    def request(self, method, url, **kw):
+        headers = {**_helper_headers(url), **(kw.pop("headers", None) or {})}
+        return super().request(method, url, headers=headers, **kw)
 SCORE_DTYPE = "<i4"
 PREPARE = os.environ.get("BLIND_RAG_PREPARE", "1") != "0"
 SCORE_MODE = os.environ.get("BLIND_RAG_SCORE_MODE")  # hint | token; default: the manifest's
@@ -65,7 +94,8 @@ class Key:
         self.n = int(manifest["num_chunks"])
         self.d = int(manifest["embedding"]["dim"])
         self.handle: str | None = None
-        self.http = requests.Session()
+        from client import net
+        self.http = net.session(_HelperSession)   # same minimal headers as the pipeline
         self.mode = SCORE_MODE or scoring.get("mode", "token")
         self._scoring = scoring
         self._pir = manifest.get("pir", {})
@@ -104,7 +134,7 @@ class Key:
 
 def _prepare(params) -> str:
     # Own connection: requests.Session is not thread-safe.
-    r = requests.post(HELPER_URL + "/prepare", params=params, timeout=60)
+    r = requests.post(HELPER_URL + "/prepare", params=params, timeout=60, headers=_helper_headers(HELPER_URL))
     r.raise_for_status()
     return r.headers["X-Handle"]
 
@@ -112,6 +142,9 @@ def _prepare(params) -> str:
 def _check_helper(http):
     try:
         http.get(HELPER_URL + "/health", timeout=3).raise_for_status()
+        if http.get(HELPER_URL + "/hint", params={"seed": "00", "n": 1, "d": 1}, timeout=3).status_code == 401:
+            raise RuntimeError(f"the crypto-helper refused our session token ({_token_file()}). "
+                               "Restart it with `make stop` then `make demo`, so it writes a fresh one.")
     except requests.RequestException as e:
         raise RuntimeError(
             f"crypto-helper not reachable at {HELPER_URL}. Start it with `make helper` "

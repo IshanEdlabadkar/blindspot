@@ -11,6 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p data
 PY=$(./scripts/find_python.sh sentence_transformers) || exit 1
+. ./scripts/privacy_env.sh
 export PYTHON="$PY"
 "$PY" -c "import fastapi, uvicorn" 2>/dev/null || { echo "ERROR: $PY needs FastAPI: $PY -m pip install fastapi uvicorn"; exit 1; }
 pids=()

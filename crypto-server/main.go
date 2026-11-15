@@ -116,7 +116,13 @@ func main() {
 	s.logOut = json.NewEncoder(lf)
 	log.Printf("corpus source: %s; request log: %s", src, *logPath)
 
-	mux := s.routes(*publicLog)
+	var handler http.Handler = s.routes(*publicLog)
+	if rc, on := rateConfigFromEnv(); on {
+		handler = newLimiter(rc).wrap(handler)
+		log.Printf("rate limits per client: %.0f question requests/min (burst %.0f), %.0f downloads/min (burst %.0f); "+
+			"penalty box %v after %d refusals in a minute; at most %d requests in flight",
+			rc.questionPerMin, rc.questionBurst, rc.downloadPerMin, rc.downloadBurst, rc.penalty, rc.strikes, rc.maxInFlight)
+	}
 	if !*tokenMode {
 		log.Printf("token mode off: hint mode only")
 	}
@@ -125,7 +131,12 @@ func main() {
 		log.Printf("checking for a new corpus_version every %v", *poll)
 	}
 	log.Printf("serving corpus %s on http://%s", s.cur.Load().version, *addr)
-	log.Fatal(http.ListenAndServe(*addr, mux))
+	// Timeouts so slow or stalled clients can't hold connections open (slowloris). Writes get
+	// minutes: a cold client downloads the 4 MB fetch store or the 17 MB hint over a slow link.
+	srv := &http.Server{Addr: *addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout: 60 * time.Second, WriteTimeout: 5 * time.Minute, IdleTimeout: 120 * time.Second,
+		MaxHeaderBytes: 64 << 10}
+	log.Fatal(srv.ListenAndServe())
 }
 
 func envOr(name, def string) string {

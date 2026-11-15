@@ -52,11 +52,31 @@ type urlSource struct {
 }
 
 func newURLSource(raw, auth string) (*urlSource, error) {
-	u, err := url.Parse(raw)
+	u, err := url.Parse(strings.Trim(strings.TrimSpace(raw), `"'`))
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") {
 		return nil, fmt.Errorf("data URL must be http(s): %q", raw)
 	}
-	return &urlSource{base: u, auth: auth, http: &http.Client{Timeout: 10 * time.Minute}}, nil
+	return &urlSource{base: u, auth: normalizeAuth(auth), http: &http.Client{Timeout: 10 * time.Minute}}, nil
+}
+
+// normalizeAuth forgives the usual paste mistakes in a dashboard: surrounding
+// quotes or whitespace, and a bare token without the "Bearer " scheme.
+func normalizeAuth(v string) string {
+	v = strings.Trim(strings.TrimSpace(v), `"'`)
+	v = strings.TrimSpace(v)
+	if v != "" && !strings.Contains(v, " ") {
+		v = "Bearer " + v
+	}
+	return v
+}
+
+// describeAuth says what is sent without revealing the secret.
+func describeAuth(v string) string {
+	if v == "" {
+		return "no Authorization header (BLIND_RAG_DATA_AUTH is empty)"
+	}
+	scheme, rest, _ := strings.Cut(v, " ")
+	return fmt.Sprintf("Authorization: %s <%d-character credential>", scheme, len(rest))
 }
 
 func (s *urlSource) Read(name string) ([]byte, error) {
@@ -71,6 +91,10 @@ func (s *urlSource) Read(name string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return nil, fmt.Errorf("GET %s: %s, sent %s. Check BLIND_RAG_DATA_AUTH: it should be \"Bearer <token>\" "+
+			"with a token that can read this volume", name, resp.Status, describeAuth(s.auth))
+	}
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("GET %s: %s", name, resp.Status)
 	}
@@ -80,7 +104,7 @@ func (s *urlSource) Read(name string) ([]byte, error) {
 func (s *urlSource) String() string {
 	u := *s.base
 	u.RawQuery = "" // never log tokens
-	return u.String()
+	return u.String() + " (" + describeAuth(s.auth) + ")"
 }
 
 type corpusOpts struct {

@@ -3,6 +3,7 @@
 # (some Apple Silicon compilers). Removes the flag from the two vendored libraries.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-sed -i.bak 's/ -march=native//' third_party/underhood/rlwe/rlwe.go third_party/simplepir/matrix/matrix.go
-rm -f third_party/underhood/rlwe/rlwe.go.bak third_party/simplepir/matrix/matrix.go.bak
+for f in $(grep -rl --include='*.go' -- '-march=native' third_party); do
+  sed -i.bak 's/ -march=native//g' "$f" && rm -f "$f.bak"
+done
 echo "Removed -march=native. Rebuild with: make test"

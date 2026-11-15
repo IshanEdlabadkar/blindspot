@@ -2,7 +2,8 @@
 
 Stands in for B's real tables. Used by A and C until hour 5.
 
-    python tools/make_dummy_tables.py --out data --n 5000
+    python tools/make_dummy_tables.py --out data --n 5000              # for the mock
+    python tools/make_dummy_tables.py --out data --n 5000 --normalize  # also accepted by A's real server
 """
 import argparse
 import hashlib
@@ -20,12 +21,18 @@ def sha(path):
     return "sha256:" + hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
 
 
-def main(out="data", n=5000, seed=0):
+def main(out="data", n=5000, seed=0, normalize=False):
     out = pathlib.Path(out)
     out.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(seed)
 
-    table = rng.integers(-127, 128, size=(n, c.DIM), dtype=np.int8)
+    if normalize:
+        # Unit-length rows at scale 127, like B's real table: safe for A's real server.
+        v = rng.standard_normal((n, c.DIM))
+        v /= np.linalg.norm(v, axis=1, keepdims=True)
+        table = np.clip(np.round(v * c.QUANT_SCALE), -127, 127).astype(np.int8)
+    else:
+        table = rng.integers(-127, 128, size=(n, c.DIM), dtype=np.int8)
     table.tofile(out / "score_table.bin")  # N x 384 int8, row by row
 
     with open(out / "fetch_store.bin", "wb") as f:
@@ -60,4 +67,6 @@ if __name__ == "__main__":
     p.add_argument("--out", default="data")
     p.add_argument("--n", type=int, default=5000)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--normalize", action="store_true",
+                   help="unit-length rows (needed for A's real server; random rows can overflow its score range)")
     main(**vars(p.parse_args()))

@@ -47,5 +47,5 @@ cat data/wiretap.out
 # make demo starts the local MedlinePlus server, the key helper, the plaintext server and the UI;
 # the UI talks to the servers only through the relays.
 case "$MEDLINEPLUS_URL" in http://127.0.0.1:8080*) ;; *) export BLIND_RAG_SERVER="$MEDLINEPLUS_URL" ;; esac
-export BLIND_RAG_SERVERS="$servers" BLIND_RAG_PLAIN_SERVER=http://127.0.0.1:9001
+export BLIND_RAG_SERVERS="$servers" WIRETAP_SERVERS="$servers" BLIND_RAG_PLAIN_SERVER=http://127.0.0.1:9001
 make demo

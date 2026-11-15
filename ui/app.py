@@ -33,8 +33,13 @@ from client import canned  # noqa: E402
 from client.evidence import supporting_excerpt  # noqa: E402
 from client.pipeline import Pipeline, PipelineError, health  # noqa: E402
 from client.multi import MultiPipeline, configured_servers  # noqa: E402
+from wiretap.proxy import read_records as wire_records  # noqa: E402
+from wiretap.search import question_words, search_traffic  # noqa: E402
 
 PLAIN_DEFAULT = os.environ.get("BLIND_RAG_PLAIN_SERVER", "http://127.0.0.1:8001")
+# B's wiretap (wiretap/proxy.py) records every byte the app sends to the servers; the traffic search
+# panel appears only when that recording exists.
+WIRE_LOG = pathlib.Path(os.environ.get("BLIND_RAG_WIRE_LOG", ROOT / "data" / "wire" / "wire.jsonl"))
 DECOYS = [
     "Can I take FMLA leave for a pregnancy complication?",
     "What are the symptoms of depression?",
@@ -441,6 +446,47 @@ def mirror_html(t, src):
             f'<div class="br-mirror">{left}{right}</div>')
 
 
+def utc_now() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def wire_panel(turn):
+    """Search every byte this laptop sent for the question's words. Recorded by B's wiretap relay, between
+    the app and the servers, so the result does not depend on any server's own log."""
+    records = wire_records(WIRE_LOG)
+    hits = search_traffic(records, turn["q"], turn.get("since"))
+    if not hits:
+        st.caption("No traffic recorded for this question. Start the recorder (python -m wiretap.proxy) and "
+                   "point BLIND_RAG_SERVERS at its ports.")
+        return
+    words = question_words(turn["q"])
+    st.markdown(f"Every byte this laptop sent for your question, searched for its **{len(words)} words** "
+                f"(4+ letters): " + ", ".join(f"`{w}`" for w in words))
+    for h in sorted(hits, key=lambda h: h["route"] == "plain"):
+        n = len(h["found"])
+        label = "A normal RAG server (plaintext)" if h["route"] == "plain" else f"Blind RAG · {h['route']} server"
+        line = (f"**{label}** · {h['requests']} requests, {h['bytes']:,} bytes sent → "
+                f"**{n} of {h['words']} words found**")
+        if n == 0:
+            st.success(line)
+            st.code((h["sample_hex"][:96] or "(no request body)") + " …", language=None)
+        else:
+            st.error(line + ": " + ", ".join(f"`{w}`" for w in h["found"]))
+            st.code(h["matches"][0]["context"], language=None)
+    luck = max(h["chance_by_luck"] for h in hits)
+    st.caption(f"Recorded on this laptop by a relay between the app and each server ({WIRE_LOG.name}), not taken "
+               f"from the servers' logs. Chance of any word appearing in random bytes by luck: about {luck:.0e}.")
+    word = st.text_input("Search the same traffic for any word, such as a secret word you put in your question",
+                         key=f"wire-{turn.get('since')}")
+    if word.strip():
+        found = search_traffic(records, word, turn.get("since"))
+        if not question_words(word):
+            st.caption("Use words of 4 letters or more.")
+        for h in found:
+            st.write(f"{h['route']}: {'found' if h['found'] else 'not found'} in {h['bytes']:,} bytes")
+
+
 def ask_plain_server(url, question):
     """Send the question to B's plaintext demo server and read back what it logged. Real data only."""
     try:
@@ -605,6 +651,7 @@ with tab_ask:
     asked = question.strip() if go and question.strip() else pending
     if asked:
         question, ss.error = asked, None
+        since = utc_now()  # the traffic search covers only this question's requests
         try:
             if canned_mode:
                 turn = {"q": question, "result": c.normalize_result(canned.ask(question)), "trace": None}
@@ -617,7 +664,7 @@ with tab_ask:
                     except Exception:
                         status.update(label="Stopped: no answer", state="error", expanded=False)
                         raise
-                    turn = {"q": question, "result": result, "trace": trace}
+                    turn = {"q": question, "result": result, "trace": trace, "since": since}
                     if compare:
                         st.write("Sending the same question to the normal (plaintext) server…")
                         turn["plain"] = ask_plain_server(plain_url, question)
@@ -670,6 +717,9 @@ with tab_ask:
                         else:
                             st.error("Wrong. Nothing on the server distinguishes these five questions.")
                         st.write(f"The question was: **{q}**")
+                if WIRE_LOG.exists():
+                    with st.expander("🔍 Search the traffic for your words", expanded=True):
+                        wire_panel(last)
             elif not canned_mode:
                 st.markdown('<div class="br-mirror-sub">Ask a question to see what each server kept.</div>',
                             unsafe_allow_html=True)

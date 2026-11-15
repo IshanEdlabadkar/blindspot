@@ -51,9 +51,9 @@ class PipelineError(RuntimeError):
     The pipeline never switches to a weaker mode on failure (no mock, no plaintext).
     """
 
-    def __init__(self, stage: str, message: str, fix: str = ""):
+    def __init__(self, stage: str, message: str, fix: str = "", status: int | None = None):
         super().__init__(message)
-        self.stage, self.message, self.fix = stage, message, fix
+        self.stage, self.message, self.fix, self.status = stage, message, fix, status
 
 
 OLLAMA_TAGS = "http://localhost:11434/api/tags"
@@ -161,7 +161,8 @@ class Pipeline:
             raise StaleCorpus()
         if r.status_code != 200:
             raise PipelineError(path, f"Server answered {r.status_code} on {path}: {r.text.strip()[:200]}",
-                                "The client and server may be on different versions: git pull, restart both.")
+                                "The client and server may be on different versions: git pull, restart both.",
+                                status=r.status_code)
         return r.content
 
     def ask_traced(self, question: str, on_stage=None):
@@ -236,11 +237,28 @@ class Pipeline:
             for i in top:
                 chunks.append(c.unpack_record(self._store[int(i) * L:(int(i) + 1) * L]))
         else:
-            for i in top:
-                sel = self.crypto.make_selector(self.key, int(i), n)
-                rec = self._post("/v1/fetch", sel)
-                sent("/v1/fetch", len(sel), len(rec))
-                chunks.append(c.unpack_record(self.crypto.decrypt_record(self.key, rec)))
+            # Real PIR. Batched when the crypto client supports it: all k selectors in ONE round
+            # trip, each with its own fresh key, always exactly k. The mock has no make_selectors.
+            batched = False
+            if hasattr(self.crypto, "make_selectors"):
+                sels = self.crypto.make_selectors(self.key, [int(i) for i in top], n)
+                try:
+                    blob = self._post("/v1/fetch_batch", sels)
+                    sent("/v1/fetch_batch", len(sels), len(blob))
+                    chunks = [c.unpack_record(r) for r in self.crypto.decrypt_records(self.key, blob)]
+                    batched = True
+                except PipelineError as e:
+                    if e.status != 404:
+                        raise  # 404 = server without the batch endpoint: one-by-one PIR below (still PIR)
+            if not batched:
+                for i in top:
+                    sel = self.crypto.make_selector(self.key, int(i), n)
+                    rec = self._post("/v1/fetch", sel)
+                    sent("/v1/fetch", len(sel), len(rec))
+                    chunks.append(c.unpack_record(self.crypto.decrypt_record(self.key, rec)))
+            if len(chunks) != len(top):
+                raise PipelineError("fetching", f"Asked for {len(top)} records, got {len(chunks)}.",
+                                    "make stop, then make demo")
         # B's answer() declines on a cosine estimate: raw int score / scale^2.
         scale = float(m["quantization"]["scale"])
         for ch, i in zip(chunks, top):

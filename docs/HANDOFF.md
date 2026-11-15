@@ -50,7 +50,7 @@ Entry point: `client/pipeline.py`, class `Pipeline`, method `ask_traced(question
 | 4. Encrypt | `crypto.encrypt_query(key, int8_vec)` | Returns the body for `/v1/score`. A's client makes a fresh secret key per question inside this call. |
 | 5. Score | `POST /v1/score` | Header `X-Corpus-Version`. A 409 means the corpus changed: the pipeline reloads the manifest and retries once. |
 | 6. Rank | `crypto.decrypt_scores(key, blob)` then `argsort` | N signed int32 scores. Top `top_k` (10), stable sort. |
-| 7. Fetch | download mode or PIR mode | Download: `GET /v1/fetch_store` once per manifest, then slice records locally. PIR: one `crypto.make_selector` + `POST /v1/fetch` + `crypto.decrypt_record` per chunk, always exactly k. |
+| 7. Fetch | download mode or PIR mode | Download (default): `GET /v1/fetch_store` once per manifest, then slice records locally. PIR (`BLIND_RAG_FETCH=pir`): one `POST /v1/fetch_batch` carrying all k selectors, each with its own fresh key (`crypto.make_selectors` / `decrypt_records`). If the server has no batch endpoint (404) or the client has no `make_selectors` (the mock), it falls back to k single `POST /v1/fetch` calls. Always exactly k. |
 | 8. Decode | `contracts.unpack_record()` | 2-byte little-endian length, JSON, zero padding. |
 | 9. Score for answer | in `_run` | Each chunk gets `raw_score` (int) and `score` (cosine estimate, `raw / scale²`). B's decline threshold reads `score`. |
 | 10. Answer | `answer_fn(question, chunks)` | B's `client.answer.answer` or C's stub. The result passes through `contracts.normalize_result()`. |

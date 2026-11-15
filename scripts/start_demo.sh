@@ -18,19 +18,9 @@ wait_for() {  # name url logfile
 }
 
 # Pick a Python that actually has the packages (Homebrew can repoint python3 at a bare install).
-need="streamlit, numpy, requests"
-[ "${BLIND_RAG_EMBED:-real}" = fake ] || need="$need, sentence_transformers"
-PY=""
-for cand in "${PYTHON:-}" python3.12 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
-            /opt/homebrew/opt/python@3.12/bin/python3.12 python3 python; do
-  [ -n "$cand" ] || continue
-  if "$cand" -c "import $need" >/dev/null 2>&1; then PY="$cand"; break; fi
-done
-if [ -z "$PY" ]; then
-  echo "ERROR: no Python found with: $need"
-  echo "Fix:   python3.12 -m pip install streamlit numpy requests sentence-transformers"
-  exit 1
-fi
+extra=""
+[ "${BLIND_RAG_EMBED:-real}" = fake ] || extra="sentence_transformers"
+PY=$(./scripts/find_python.sh "$extra") || exit 1
 echo "Using $("$PY" -c 'import sys; print(sys.executable)')"
 
 if [ "${1:-}" = "--preflight" ]; then shift; exec "$PY" demo/preflight.py "$@"; fi

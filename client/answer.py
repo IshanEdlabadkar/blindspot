@@ -27,6 +27,7 @@ Answer:"""
 
 def ollama_generate(prompt: str, model: str = MODEL, url: str = OLLAMA_URL, timeout: float = 180) -> str:
     r = requests.post(url, json={"model": model, "prompt": prompt, "stream": False,
+                                 "keep_alive": "30m",  # avoid a cold reload between demo questions
                                  "options": {"temperature": 0}}, timeout=timeout)
     r.raise_for_status()
     return r.json()["response"].strip()

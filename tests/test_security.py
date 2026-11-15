@@ -65,3 +65,16 @@ def test_web_ui_sends_a_strict_content_security_policy():
     csp = r.headers["Content-Security-Policy"]
     assert "script-src 'self'" in csp and "connect-src 'self'" in csp and "frame-ancestors 'none'" in csp
     assert r.headers["X-Frame-Options"] == "DENY" and r.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_plain_http_only_to_this_machine(monkeypatch):
+    from client import net
+    from client.pipeline import Pipeline, PipelineError
+    monkeypatch.delenv("BLIND_RAG_ALLOW_HTTP", raising=False)
+    assert not net.insecure_remote("http://127.0.0.1:8080") and not net.insecure_remote("http://localhost:9080")
+    assert not net.insecure_remote("https://blindspot-cz2t.onrender.com")
+    assert net.insecure_remote("http://blindspot-cz2t.onrender.com")
+    with pytest.raises(PipelineError):
+        Pipeline(server="http://203.0.113.5:8080")
+    monkeypatch.setenv("BLIND_RAG_ALLOW_HTTP", "1")
+    assert not net.insecure_remote("http://203.0.113.5:8080")

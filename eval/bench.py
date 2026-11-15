@@ -172,7 +172,44 @@ class TimedCrypto:
 
 def chunk_view(ch: dict) -> dict:
     return {"id": ch.get("id"), "server": ch.get("server"), "url": ch.get("url"), "title": ch.get("title"),
-            "score": round(float(ch.get("score", 0.0)), 4), "raw_score": ch.get("raw_score")}
+            "score": round(float(ch.get("score", 0.0)), 4), "raw_score": ch.get("raw_score"),
+            "rerank_score": round(float(ch["rerank_score"]), 3) if "rerank_score" in ch else None}
+
+
+class LLMCache:
+    """Model outputs by exact prompt (temperature 0, so the same prompt gives the same answer). Lets a sweep
+    of source-selection settings skip the model whenever a setting picks the same sources as before."""
+    active: "LLMCache | None" = None
+
+    def __init__(self, path: pathlib.Path):
+        from client import answer as A
+        self.path, self.hits, self.misses = path, 0, 0
+        self.salt = json.dumps([A.MODEL, A.SYSTEM, A.FEW_SHOT, A.OLLAMA_OPTIONS], sort_keys=True)
+        self.data = {}
+        if path.exists():
+            for ln in path.read_text().splitlines():
+                try:
+                    e = json.loads(ln)
+                    self.data[e["k"]] = e["v"]
+                except (ValueError, KeyError):
+                    continue
+
+    def _k(self, prompt: str) -> str:
+        import hashlib
+        return hashlib.sha256((self.salt + "\x00" + prompt).encode()).hexdigest()
+
+    def get(self, prompt):
+        v = self.data.get(self._k(prompt))
+        self.hits += v is not None
+        self.misses += v is None
+        return v
+
+    def put(self, prompt, out):
+        k = self._k(prompt)
+        self.data[k] = out
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"k": k, "v": out}) + "\n")
 
 
 def make_answer_fn(kind: str, rec: Recorder):
@@ -191,6 +228,7 @@ def make_answer_fn(kind: str, rec: Recorder):
         return stub
 
     from client import answer as A
+    cache = LLMCache.active
 
     def rerank(question, chunks):
         s = rec.now()
@@ -201,14 +239,31 @@ def make_answer_fn(kind: str, rec: Recorder):
 
     def llm(prompt, *a, **kw):
         s = rec.now()
-        out = A.ollama_chat(prompt, *a, **kw)
-        rec.event("model", s, rec.now() - s, model=A.MODEL, prompt_chars=len(prompt), output_chars=len(out))
+        out = cache.get(prompt) if cache else None
+        hit = out is not None
+        if not hit:
+            out = A.ollama_chat(prompt, *a, **kw)
+            if cache:
+                cache.put(prompt, out)
+        rec.event("model", s, rec.now() - s, model=A.MODEL, prompt_chars=len(prompt), output_chars=len(out),
+                  cached=hit)
         rec.answer_detail["raw_model_output"] = out
         return out
 
+    orig_select = A.select_sources
+
     def real(question, chunks):
         rec.search = [chunk_view(c) for c in chunks]
-        return A.answer(question, chunks, llm=llm, rerank=rerank)
+
+        def select(cs, n_context=A.N_CONTEXT):
+            out = orig_select(cs, n_context)
+            rec.answer_detail["sources"] = [chunk_view(c) for c in out]
+            return out
+        A.select_sources = select
+        try:
+            return A.answer(question, chunks, llm=llm, rerank=rerank)
+        finally:
+            A.select_sources = orig_select
     return real
 
 
@@ -435,14 +490,30 @@ def run_question(pipe, q: dict, rec: Recorder, ref: Reference | None, logs: Serv
             "servers": [s["server"] for s in trace.get("servers", [])] or [pipe_server(pipe)],
             "corpus_version": trace.get("corpus_version"), "top_k": trace.get("top_k"),
             "spans": spans, "answer_events": rec.events, "crypto_calls": rec.crypto, "requests": rec.requests,
-            "search": rec.search, "reranked": rec.reranked[:n_context] if rec.reranked else None,
+            "search": rec.search,
+            "reranked": rec.answer_detail.get("sources") or (rec.reranked[:n_context] if rec.reranked else None),
             "per_server": [{k: s[k] for k in ("server", "fetched", "used")} for s in trace.get("servers", [])],
             "ciphertext_sample": (trace.get("ciphertext_sample") or "")[:32],
         },
+        "synthesis": synthesis(rec, result, cited, answered),
         "answer": {"text": (result or {}).get("answer"), "citations": cited,
                    "raw_model_output": rec.answer_detail.get("raw_model_output")},
         "answer_kind": answer_kind,
     }
+
+
+def synthesis(rec: Recorder, result, cited, answered) -> dict | None:
+    """How much the answer drew on: sources given to the model, and how many distinct pages/servers it cited."""
+    src = rec.answer_detail.get("sources")
+    if src is None:
+        return None
+    servers_by_url = {c.get("url"): c.get("server") for c in src}
+    words = len(((result or {}).get("answer") or "").split()) if answered else 0
+    return {"sources": len(src), "source_pages": len({c.get("url") for c in src}),
+            "source_servers": len({c.get("server") for c in src if c.get("server")}) or (1 if src else 0),
+            "cited_pages": len(set(cited)) if answered else 0,
+            "cited_servers": len({servers_by_url.get(u) for u in set(cited) if servers_by_url.get(u)}) if answered else 0,
+            "answer_words": words}
 
 
 def pipe_server(pipe) -> str:
@@ -538,7 +609,21 @@ def summarize(rows: list[dict], meta: dict) -> dict:
             all(s["fetched"] == r["trace"]["top_k"] for s in r["trace"]["per_server"]) if r["trace"]["per_server"]
             else len(r["trace"]["search"]) == r["trace"]["top_k"] for r in ok) if ok else None,
     }
-    return {"meta": meta, "accuracy": acc, "speed": speed, "bytes": byt, "privacy": privacy}
+    syn_rows = [r for r in qs if r.get("synthesis")]
+    ans_rows = [r for r in syn_rows if r["status"] == "answered"]
+    synth = None
+    if syn_rows:
+        S = lambda r, k: r["synthesis"][k]  # noqa: E731
+        synth = {
+            "questions_reaching_model": len(syn_rows),
+            "sources_to_model": stats(S(r, "sources") for r in syn_rows),
+            "one_source_only": frac(sum(S(r, "sources") == 1 for r in syn_rows), len(syn_rows)),
+            "answers_citing_2plus_pages": frac(sum(S(r, "cited_pages") >= 2 for r in ans_rows), len(ans_rows)),
+            "answers_citing_2plus_servers": frac(sum(S(r, "cited_servers") >= 2 for r in ans_rows), len(ans_rows)),
+            "cited_pages": stats(S(r, "cited_pages") for r in ans_rows),
+            "answer_words": stats(S(r, "answer_words") for r in ans_rows),
+        }
+    return {"meta": meta, "accuracy": acc, "speed": speed, "bytes": byt, "privacy": privacy, "synthesis": synth}
 
 
 # ---------------------------------------------------------------- reports
@@ -589,6 +674,15 @@ def report_md(summary: dict) -> str:
         b_ = f"{v['behaved']}/{v['judged']}" if v["judged"] else "–"
         g_ = f"{v['gold_in_topk']}/{v['with_gold']}" if v["with_gold"] else "–"
         L.append(f"| {c} | {b_} | {g_} |")
+    y = summary.get("synthesis")
+    if y:
+        L += ["", f"## Synthesis (sources setting: `{m.get('sources_config') or 'default'}`)", "",
+              "| Metric | Value |", "|---|---|",
+              f"| Sources given to the model, mean (p50) | {y['sources_to_model']['mean']:.2f} ({y['sources_to_model']['p50']:.0f}) |",
+              f"| Questions where the model got only one source | {_f(y['one_source_only'])} |",
+              f"| Answers citing 2+ different pages | {_f(y['answers_citing_2plus_pages'])} |",
+              f"| Answers citing 2+ different servers | {_f(y['answers_citing_2plus_servers'])} |",
+              f"| Answer length, words p50 / p95 | {_s(y['answer_words'], '', 1, 0)} |" if y["answer_words"] else "| Answer length | n/a |"]
     L += ["", "## Speed (p50 / p95, warm runs)", "",
           f"Cold first question: {s['cold_first_question_seconds']:.3f} s · whole question: {_s(s['wall_seconds'])} · "
           f"retrieval only (embed → fetch): {_s(s['retrieval_seconds'], 'ms', 1000, 0)}", "",
@@ -634,6 +728,13 @@ def compare(dirs: list[pathlib.Path]):
                   "wrong_answers", "behaved_as_expected", "encrypted_scores_exact"):
             if k in a:
                 out[k + " %"] = a[k]["pct"]
+        y = sm.get("synthesis") or {}
+        if y:
+            out["sources to model (mean)"] = y["sources_to_model"]["mean"]
+            out["only one source %"] = y["one_source_only"]["pct"]
+            out["answers citing 2+ pages %"] = y["answers_citing_2plus_pages"]["pct"]
+            out["answers citing 2+ servers %"] = y["answers_citing_2plus_servers"]["pct"]
+            out["answer words p50"] = (y["answer_words"] or {}).get("p50")
         out["wall p50 s"] = (s["wall_seconds"] or {}).get("p50")
         out["wall p95 s"] = (s["wall_seconds"] or {}).get("p95")
         out["retrieval p50 ms"] = round(s["retrieval_seconds"]["p50"] * 1000, 1) if s["retrieval_seconds"] else None
@@ -677,6 +778,10 @@ def main(argv=None):
     ap.add_argument("--fetch", choices=["download", "pir"], help="default: BLIND_RAG_FETCH, else the pipeline's default")
     ap.add_argument("--answer", choices=["real", "stub", "none"], default=os.environ.get("BLIND_RAG_ANSWER", "real"),
                     help="real = rerank + local model (default); none = retrieval only")
+    ap.add_argument("--sources", default="",
+                    help="source-selection variant, e.g. 'n=8,margin=7,min=2,pages=1' (see client/answer.select_sources)")
+    ap.add_argument("--llm-cache", type=pathlib.Path,
+                    help="reuse model outputs for identical prompts across runs (file; temperature 0)")
     ap.add_argument("--repeat", type=int, default=1, help="runs per question (speed); accuracy uses the first")
     ap.add_argument("--server-log", default="auto",
                     help="auto (data/server.log for local, <server>/v1/server_log for remote) | off | file | URL")
@@ -709,6 +814,16 @@ def main(argv=None):
         print("no questions selected", file=sys.stderr)
         return 2
 
+    env_for = {"n": "BLIND_RAG_N_CONTEXT", "margin": "BLIND_RAG_RERANK_MARGIN", "min": "BLIND_RAG_MIN_SOURCES",
+               "pages": "BLIND_RAG_ONE_PER_PAGE"}
+    for part in filter(None, (x.strip() for x in a.sources.split(","))):
+        k, _, v = part.partition("=")
+        if k not in env_for:
+            print(f"--sources: unknown setting {k!r} (use {', '.join(env_for)})", file=sys.stderr)
+            return 2
+        os.environ[env_for[k]] = v
+    if a.llm_cache and a.answer == "real":
+        LLMCache.active = LLMCache(a.llm_cache)
     rec = Recorder()
     answer_fn = make_answer_fn(a.answer, rec)
     pipe, pipes = build_pipeline(servers, answer_fn, a.fetch)
@@ -738,7 +853,7 @@ def main(argv=None):
         "host": f"{platform.system()} {platform.machine()} · Python {platform.python_version()}",
         "servers": servers, "corpus": " + ".join(f"{m['corpus_version']} ({m['num_chunks']})" for m in manifests.values()),
         "crypto": pipe.crypto_kind, "fetch": pipe.fetch_mode, "embed": emb.mode(), "answer": a.answer,
-        "repeat": a.repeat, "setup_seconds": round(setup, 3), "questions_file": str(a.questions.relative_to(ROOT))
+        "repeat": a.repeat, "setup_seconds": round(setup, 3), "sources_config": a.sources or "default", "questions_file": str(a.questions.relative_to(ROOT))
         if a.questions.is_absolute() and ROOT in a.questions.parents else str(a.questions),
         "reference_tables": {s: v[2] for s, v in ref.tables.items()},
         "log_sources": {s: str(v[1]) for s, v in logs.sources.items()},
@@ -759,6 +874,8 @@ def main(argv=None):
                 ex = "" if not acc["parity"] else (" exact" if acc["parity"]["exact"] else " SCORE-MISMATCH")
                 print(f"  {row['id']:>6} r{rep} {row['speed']['wall_seconds']:7.2f}s {str(row['status']):9} {flag} "
                       f"rank={acc['gold_rank']}{ex}  {q['question'][:56]}", flush=True)
+    if LLMCache.active:
+        meta["llm_cache"] = {"hits": LLMCache.active.hits, "misses": LLMCache.active.misses}
     summary = summarize(rows, meta)
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     md = report_md(summary)

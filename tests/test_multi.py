@@ -10,6 +10,12 @@ MAN = {"protocol": "blind-rag/1", "corpus_version": "v", "num_chunks": 100, "top
        "quantization": {"scale": 127}}
 
 
+
+@pytest.fixture(autouse=True)
+def _fake_hosts_may_use_http(monkeypatch):
+    # these tests use made-up servers named http://a, http://b (no network); real remote servers need https
+    monkeypatch.setenv("BLIND_RAG_ALLOW_HTTP", "1")
+
 def make(servers, chunks_by_server, manifests=None, answer=None):
     seen = {}
 

@@ -112,7 +112,7 @@ function detail(id){
    <div class="legend"><span><i style="background:${css('--net')}"></i>client round trip</span><span><i style="background:${css('--srv')}"></i>server work (from its log)</span></div>
    <svg id="wf" viewBox="0 0 ${W} ${H}" width="100%"></svg>
    <div class="cols"><div><h2>Search order (what the encrypted top-k returned)</h2><table id="st"></table>
-   ${T.reranked?'<h2>Model sources after local rerank</h2><table id="rt"></table>':''}
+   ${T.reranked?'<h2>Sources given to the model (after local rerank and selection)</h2><table id="rt"></table>':''}
    ${a.parity?`<p class="meta">Exactness vs plaintext int8 on this machine: scores ${a.parity.exact?'<span class="ok">identical</span>':'<span class="bad">DIFFER</span>'}, top-k ${a.parity.top_ids_match?'<span class="ok">same</span>':'<span class="bad">different</span>'}</p>`:''}</div>
    <div><h2>Answer</h2><div class="ans">${esc(r.answer.text||'(no answer step)')}</div>
    <p class="meta">gold page: ${r.gold_url?`<a href="${esc(r.gold_url)}" target="_blank">${esc(r.gold_url)}</a> · rank ${a.gold_rank??'not in top-k'} · in sources ${a.gold_in_context??'–'} · cited ${a.gold_cited??'–'}`:'none (should decline)'}

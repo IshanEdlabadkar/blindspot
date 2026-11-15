@@ -7,6 +7,7 @@ import requests
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "llama3.2:3b"
 N_CONTEXT = 5
+MAX_ANSWER_TOKENS = 256  # guard against runaway output; the longest eval answer used 145
 MIN_SCORE = 0.55  # cosine estimate of the top chunk; tuned with eval/run_eval.py
 DECLINE_MESSAGE = "I couldn't find a reliable source for this in the library. The closest passages are below."
 DISCLAIMER = "This is general health information, not medical advice."
@@ -27,7 +28,9 @@ Answer:"""
 
 def ollama_generate(prompt: str, model: str = MODEL, url: str = OLLAMA_URL, timeout: float = 180) -> str:
     r = requests.post(url, json={"model": model, "prompt": prompt, "stream": False,
-                                 "options": {"temperature": 0}}, timeout=timeout)
+                                 "keep_alive": "30m",  # avoid a cold reload between demo questions
+                                 "options": {"temperature": 0, "num_predict": MAX_ANSWER_TOKENS}},
+                      timeout=timeout)
     r.raise_for_status()
     return r.json()["response"].strip()
 

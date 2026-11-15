@@ -459,7 +459,8 @@ def run_question(pipe, q: dict, rec: Recorder, ref: Reference | None, logs: Serv
                       "top_ids_match": all(c["top_ids_match"] for c in checks)}
 
     per_q = [r for r in rec.requests if not r["one_time"]]
-    return {
+    extra = {"_reranked_all": rec.reranked} if q.get("id") == "ask" else {}
+    return {**extra,
         "id": q.get("id"), "rep": rep, "question": q["question"], "category": q.get("category"),
         "split": q.get("split"), "expect": expect, "gold_url": gold,
         "status": status, "error": err,
@@ -767,9 +768,35 @@ def build_pipeline(servers, answer_fn, fetch):
     return mp, mp.pipes
 
 
+def print_trace(r: dict):
+    """A readable trace of one question in the terminal."""
+    T = r["trace"]
+    host = lambda u: (u or "").replace("https://", "").replace("http://", "").split(".onrender.com")[0]  # noqa: E731
+    print(f"\nQuestion: {r['question']}\nStatus: {r['status']}" + (f"  ERROR {r['error']}" if r["error"] else ""))
+    print("\nServers asked:")
+    for s in T["per_server"] or [{"server": T["servers"][0], "fetched": len(T["search"]), "used": len(T["search"])}]:
+        print(f"  {host(s['server']):28} sent back {s['fetched']}")
+    print(f"\nAll fetched passages, by encrypted search score ({len(T['search'])}):")
+    for i, c in enumerate(T["search"][:20], 1):
+        print(f"  {i:2}. {c['score']:.3f}  {host(c.get('server')):24} {c['title'][:60]}")
+    rr = r.get("_reranked_all")
+    if rr:
+        print("\nAfter the local reranker (top 12):")
+        for i, c in enumerate(rr[:12], 1):
+            print(f"  {i:2}. {c.get('rerank_score')!s:>7}  {host(c.get('server')):24} {c['title'][:60]}")
+    if T.get("reranked"):
+        print("\nSources given to the model:")
+        for i, c in enumerate(T["reranked"], 1):
+            print(f"  [{i}] {c.get('rerank_score')!s:>7}  {host(c.get('server')):24} {c['title'][:60]}")
+    print("\nAnswer:\n  " + (r["answer"]["text"] or "(none)").replace("\n", "\n  "))
+    print(f"\nTime: {r['speed']['wall_seconds']:.1f} s. Full trace: report.html in the run folder.")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--questions", type=pathlib.Path, default=ROOT / "eval" / "questions.jsonl")
+    ap.add_argument("--ask", help="trace one question of your own: which servers answered, what each sent back, "
+                                  "how the reranker ordered it, and which passages the model got")
     ap.add_argument("--limit", type=int, help="first N questions only")
     ap.add_argument("--ids", help="comma-separated question ids")
     ap.add_argument("--category", help="only this category (e.g. urgent, fmla)")
@@ -800,7 +827,8 @@ def main(argv=None):
     if a.fetch:
         os.environ["BLIND_RAG_FETCH"] = a.fetch
 
-    qs = load_questions(a.questions)
+    qs = ([{"id": "ask", "question": a.ask, "category": "ask", "expect": None, "source_url": None, "urgent": None}]
+          if a.ask else load_questions(a.questions))
     if a.ids:
         want = set(a.ids.split(","))
         qs = [q for q in qs if q["id"] in want]
@@ -885,7 +913,10 @@ def main(argv=None):
         pipe.close()
     except Exception:  # noqa: BLE001
         pass
-    print("\n" + md)
+    if a.ask:
+        print_trace(rows[0])
+    else:
+        print("\n" + md)
     print(f"wrote {out.relative_to(ROOT) if ROOT in out.parents else out}/ (report.html, report.md, summary.json, traces.jsonl)")
     return 0
 

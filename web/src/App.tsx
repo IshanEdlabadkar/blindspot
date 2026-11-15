@@ -3,7 +3,6 @@ import { ask, getStatus, type Status } from './api'
 import { Burrow } from './Burrow'
 import { Composer, Landing, TurnView } from './Chat'
 import { DeskObjects } from './DeskObjects'
-import { Scoreboard } from './Scoreboard'
 import { Simulation } from './Simulation'
 import type { Turn } from './turn'
 import { XRay } from './XRay'
@@ -29,7 +28,7 @@ export default function App() {
   const [turns, setTurns] = useState<Turn[]>([])
   const [compare, setCompare] = useState(true)
   const [xray, setXray] = useState<number | null>(null)
-  const [view, setView] = useState<'ask' | 'sim' | 'score'>('ask')
+  const [view, setView] = useState<'ask' | 'sim'>('ask')
   const nextId = useRef(1)
   const bottom = useRef<HTMLDivElement>(null)
   const busy = turns.some((t) => t.phase === 'working' || t.phase === 'answered')
@@ -76,14 +75,14 @@ export default function App() {
 
   return (
     <div className="desk relative min-h-dvh">
-      <DeskObjects viewKey={view === 'sim' ? 'sim' : view === 'score' ? 'score' : xrayTurn ? `xray-${xrayTurn.id}` : turns.length ? 'chat' : 'landing'}
+      <DeskObjects viewKey={view === 'sim' ? 'sim' : xrayTurn ? `xray-${xrayTurn.id}` : turns.length ? 'chat' : 'landing'}
         version={turns.map((t) => `${t.phase}${t.proof ? 'p' : ''}`).join(',')} />
       <header className="relative z-[1] mx-auto flex h-16 max-w-[1120px] items-center justify-between px-5">
         <button onClick={() => { setXray(null); setView('ask') }} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
           <Burrow size={32} mood="peek" /> Blind RAG
         </button>
         <nav aria-label="Views" className="flex items-center gap-5 sm:gap-7">
-          {([['ask', 'Ask'], ['sim', '100 people'], ['score', 'Scoreboard']] as const).map(([k, label]) => (
+          {([['ask', 'Ask'], ['sim', '100 people']] as const).map(([k, label]) => (
             <button key={k} onClick={() => setView(k)} aria-current={view === k ? 'page' : undefined}
               className={`font-display text-[15px] font-bold underline-offset-[10px] ${view === k ? 'text-ink underline decoration-badger decoration-[3px]' : 'text-graphite hover:text-ink'}`}>
               {label}
@@ -99,7 +98,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className={view === 'ask' ? '' : 'hidden'}>
+      <div className={view === 'sim' ? 'hidden' : ''}>
         {xrayTurn ? (
           <XRay turn={xrayTurn} number={xrayTurn.id} status={status} onBack={() => setXray(null)} />
         ) : turns.length === 0 ? (
@@ -116,7 +115,6 @@ export default function App() {
           </>
         )}
       </div>
-      {view === 'score' && <Scoreboard proof={[...turns].reverse().find((t) => t.proof)?.proof} />}
       <div className={view === 'sim' ? '' : 'hidden'}>
         <Simulation lastQuestion={turns.length ? turns[turns.length - 1].question : undefined} trace={lastTrace} />
       </div>

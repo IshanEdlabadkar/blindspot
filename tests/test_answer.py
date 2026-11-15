@@ -26,6 +26,28 @@ def test_reranker_order_decides_which_chunks_the_model_sees():
     assert r["status"] == "answered" and r["citations"][0]["id"] == 7
 
 
+def test_sources_far_below_the_best_rerank_score_are_not_given_to_the_model():
+    seen = {}
+
+    def llm(prompt):
+        seen["prompt"] = prompt
+        return "Fact zero [1]."
+
+    def scored(q, chunks):  # rerank scores like the real chlamydia / C. diff case
+        return [{**c, "rerank_score": s} for c, s in zip(chunks, [6.9, 4.3, 0.4, 0.1, -0.5])]
+
+    r = answer("q?", CHUNKS[:5], llm=llm, rerank=scored)
+    assert "[2] T1" in seen["prompt"] and "[3] T2" not in seen["prompt"]  # 6.9 - 0.4 > margin 5
+    assert r["status"] == "answered"
+
+
+def test_abbreviations_do_not_split_sentences():
+    from client.answer import _sentences
+    assert _sentences("About 1 in 6 people who have had a C. diff infection get it again [1]. Next one [2].") == [
+        "About 1 in 6 people who have had a C. diff infection get it again [1].", "Next one [2]."]
+    assert _sentences("Ask Dr. Smith about it. Then rest.") == ["Ask Dr. Smith about it.", "Then rest."]
+
+
 def test_score_threshold_uses_search_score_of_top_retrieved_chunk():
     chunks = [{**c, "score": 0.9 if c["id"] == 0 else 0.1} for c in CHUNKS]
     r = answer("q?", chunks, llm=lambda p: "Fact nine [1].", min_score=0.5,

@@ -71,7 +71,7 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
     return () => { alive = false }
   }, [])
 
-  // The same hundred made-up patrons as the "100 people" tab, after everyone has asked.
+  // The same hundred made-up patrons as the "Population scenario" tab, after everyone has asked.
   const sim = useMemo(() => {
     const people = makePeople(), tl = tally(makeEvents(people))
     const labelled = new Set<number>()
@@ -131,7 +131,7 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
 
         <div className="receipt typed px-6 pt-5 pb-3 text-[15px] leading-6 text-ink" aria-label="Targeted ads">
           <h4 className="font-display text-[18px] font-black">What a library can sell: targeted ads</h4>
-          <p className="text-[13px] leading-5 text-graphite">{sim.n} made-up patrons asked {sim.questions} questions (see the <span className="font-bold">100 people</span> tab)</p>
+          <p className="text-[13px] leading-5 text-graphite">{sim.n} made-up patrons asked {sim.questions} questions (see the <span className="font-bold">Population scenario</span> tab)</p>
           <div className="mt-1"><Legend /></div>
           <div className="mt-2">
             <Row label="Patrons with a profile on file" normal={pct(sim.profiled, sim.n)} blind={0} />

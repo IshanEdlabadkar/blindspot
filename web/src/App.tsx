@@ -32,6 +32,13 @@ export default function App() {
     setDisabledRaw(s)
     try { localStorage.setItem('blindspot.disabled', JSON.stringify([...s])) } catch { /* private mode */ }
   }
+  const toggle = (u: string) => {
+    const servers = status?.servers ?? []
+    const next = new Set(disabled)
+    if (next.has(u)) next.delete(u)
+    else if (servers.filter((s) => !next.has(s.url)).length > 1) next.add(u)   // always keep one library on
+    setDisabled(next)
+  }
   const setMode = (m: Mode) => { setModeRaw(m); history.replaceState(null, '', m === 'demo' ? '#demo' : location.pathname); window.scrollTo({ top: 0 }) }
   const refresh = useCallback(() => { void getStatus().then(setStatus).catch(() => setStatus(null)) }, [])
   useEffect(() => {
@@ -57,8 +64,8 @@ export default function App() {
           <Health status={status} />
         </div>
       </header>
-      <div className={mode === 'chat' ? '' : 'hidden'}><Workspace mode="chat" status={status} disabled={disabled} homeTick={homeTick} /></div>
-      <div className={mode === 'demo' ? '' : 'hidden'}><Workspace mode="demo" status={status} disabled={disabled} homeTick={homeTick} /></div>
+      <div className={mode === 'chat' ? '' : 'hidden'}><Workspace mode="chat" status={status} disabled={disabled} toggle={toggle} homeTick={homeTick} /></div>
+      <div className={mode === 'demo' ? '' : 'hidden'}><Workspace mode="demo" status={status} disabled={disabled} toggle={toggle} homeTick={homeTick} /></div>
     </div>
   )
 }

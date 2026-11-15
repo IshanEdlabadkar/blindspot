@@ -6,7 +6,7 @@ import { Simulation } from './Simulation'
 import type { Turn } from './turn'
 import { XRay } from './XRay'
 
-export function Workspace({ mode, status, disabled, homeTick }: { mode: 'chat' | 'demo'; status: Status | null; disabled: Set<string>; homeTick: number }) {
+export function Workspace({ mode, status, disabled, toggle, homeTick }: { mode: 'chat' | 'demo'; status: Status | null; disabled: Set<string>; toggle: (url: string) => void; homeTick: number }) {
   const demo = mode === 'demo'
   const [turns, setTurns] = useState<Turn[]>([])
   const [compare, setCompare] = useState(demo)
@@ -53,7 +53,7 @@ export function Workspace({ mode, status, disabled, homeTick }: { mode: 'chat' |
   const lastTrace = [...turns].reverse().find((t) => t.trace)?.trace
   const composer = (compact: boolean) => (
     <Composer onAsk={onAsk} busy={busy} compare={compare} setCompare={setCompare} status={status}
-      number={nextId.current} compact={compact} autoFocus={false} disabled={disabled} plain={!demo} />
+      number={nextId.current} compact={compact} autoFocus={false} disabled={disabled} onToggle={toggle} plain={!demo} />
   )
 
   return (
@@ -63,7 +63,7 @@ export function Workspace({ mode, status, disabled, homeTick }: { mode: 'chat' |
       {demo && (
         <nav aria-label="Demo views" className="relative z-20 mx-auto flex max-w-[1120px] items-center gap-6 px-5 pb-1">
           <span className="typed text-[13px] text-graphite">Live demo, for presenters</span>
-          {([['ask', 'Ask and receipts'], ['sim', '100 people']] as const).map(([k, label]) => (
+          {([['ask', 'Ask and receipts'], ['sim', 'Population scenario']] as const).map(([k, label]) => (
             <button key={k} onClick={() => { setView(k); if (k === 'ask') setHome(false) }} aria-current={view === k ? 'page' : undefined}
               className={`font-display text-[14px] font-bold underline-offset-[8px] ${view === k ? 'text-ink underline decoration-badger decoration-[3px]' : 'text-graphite hover:text-ink'}`}>
               {label}

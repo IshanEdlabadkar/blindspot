@@ -9,9 +9,9 @@ export const short = (name: string) => name.replace(/ \(.*\)$/, '').replace(/^Fe
 export const slipNo = (n: number) => `No. ${String(n).padStart(4, '0')}`
 
 /** The call slip: where a question is written and handed in. */
-export function Composer({ onAsk, busy, compare, setCompare, status, number, compact, autoFocus, disabled, plain }: {
+export function Composer({ onAsk, busy, compare, setCompare, status, number, compact, autoFocus, disabled, plain, onToggle }: {
   onAsk: (q: string) => void; busy: boolean; compare: boolean; setCompare: (v: boolean) => void; plain?: boolean
-  status: Status | null; number: number; compact?: boolean; autoFocus?: boolean; disabled?: Set<string>
+  status: Status | null; number: number; compact?: boolean; autoFocus?: boolean; disabled?: Set<string>; onToggle?: (url: string) => void
 }) {
   const [q, setQ] = useState('')
   const qid = useId()
@@ -38,10 +38,13 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
           <p className="typed text-[14px] leading-6 text-graphite">Send sealed to</p>
           <ul className="mt-1 grid gap-x-6 text-[15px] leading-7 sm:grid-cols-2">
             {libs.map((s) => (
-              <li key={s.url} className={`flex items-baseline gap-2 ${s.ok && !disabled?.has(s.url) ? 'text-ink' : 'text-graphite line-through'}`}>
-                <span aria-hidden className="typed">{s.ok && !disabled?.has(s.url) ? '[x]' : '[ ]'}</span>
-                <span>{short(s.name)}</span>
-                {s.num_chunks != null && <span className="typed text-[13px] text-graphite">{s.num_chunks.toLocaleString()}</span>}
+              <li key={s.url}>
+                <button type="button" role="checkbox" aria-checked={!disabled?.has(s.url)} onClick={() => onToggle?.(s.url)} disabled={!onToggle}
+                  className={`flex w-full cursor-pointer items-baseline gap-2 text-left hover:text-badger ${s.ok && !disabled?.has(s.url) ? 'text-ink' : 'text-graphite line-through'}`}>
+                  <span aria-hidden className="typed">{!disabled?.has(s.url) ? '[x]' : '[ ]'}</span>
+                  <span>{short(s.name)}{!s.ok && ' (offline)'}</span>
+                  {s.num_chunks != null && <span className="typed text-[13px] text-graphite">{s.num_chunks.toLocaleString()}</span>}
+                </button>
               </li>
             ))}
           </ul>

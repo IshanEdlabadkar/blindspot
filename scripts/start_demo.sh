@@ -3,9 +3,9 @@
 #   make demo            (Ctrl+C stops everything this script started)
 #   (B's plaintext "normal RAG" server on :8001 always starts too, for the log contrast;
 #    PLAIN=0 make demo skips it)
-#   Document servers come from servers.json: one local server per entry, from artifacts/<id>/
-#   (MedlinePlus on :8080, FMLA on :8081). REMOTE=1 make demo uses servers.remote.json instead
-#   (the hosted servers on Render). BLIND_RAG_SERVER=https://host make demo   just that one server
+#   Document servers: the hosted ones in servers.remote.json (corpora on Databricks) first; any that
+#   doesn't answer falls back to a local server from its repo backup in artifacts/<id>/.
+#   LOCAL=1 make demo: all local from servers.json (offline). BLIND_RAG_SERVER=<url>: just that one.
 # Reuses a server or helper that is already running. Logs: data/server.out, data/helper.out
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -39,50 +39,53 @@ start_local() {  # url data_dir
   else ./crypto-server/crypto-server -data "$2" -addr "127.0.0.1:$port" -log "$log" > "data/server-$port.out" 2>&1 & pids+=($!)
        wait_for "document server (:$port, $2)" "$1/v1/manifest" "data/server-$port.out"; fi
 }
-check_remote() {  # url   (a free Render server may be asleep: the first request can take ~1 min)
-  echo "  checking remote document server $1 (can take ~1 min if it was asleep)..."
-  local code=000
-  for _ in $(seq 1 12); do
-    code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 "$1/v1/manifest" 2>/dev/null || true)
-    [ "$code" = 200 ] && { echo "  using remote document server $1"; return 0; }
-    sleep 3
-  done
-  echo "ERROR: document server $1 did not answer (last HTTP status: $code)."
-  echo "       Open $1/v1/manifest in a browser: if it loads, run make demo again."
-  exit 1
-}
-
-# Which document servers: BLIND_RAG_SERVER (one), DATA=<folder> (one local), else the server list:
-# servers.json (local, one server per artifacts/<id>/) or, with REMOTE=1, servers.remote.json.
-servers=()
+# Which document servers: BLIND_RAG_SERVER (one), DATA=<folder> (one local), else a server list.
+# Default: the hosted servers in servers.remote.json (Databricks-backed). A hosted server that does not
+# answer is replaced by a local server from its backup in artifacts/<id>/, if the repo has one.
+# LOCAL=1: everything local from servers.json (offline).
+servers=()   # each: url|backup_dir|local_url
 if [ -n "${BLIND_RAG_SERVER:-}" ]; then
-  servers=("${BLIND_RAG_SERVER%/}|$DATA")
+  servers=("${BLIND_RAG_SERVER%/}|$DATA|http://127.0.0.1:8080")
 elif [ "$DATA" != artifacts ]; then
-  servers=("http://127.0.0.1:8080|$DATA")
+  servers=("http://127.0.0.1:8080|$DATA|http://127.0.0.1:8080")
 else
-  [ "${REMOTE:-0}" = 1 ] && export BLIND_RAG_SERVERS_FILE="${BLIND_RAG_SERVERS_FILE:-servers.remote.json}"
-  LIST="${BLIND_RAG_SERVERS_FILE:-servers.json}"
+  if [ "${LOCAL:-0}" = 1 ]; then LIST="${BLIND_RAG_SERVERS_FILE:-servers.json}"
+  else LIST="${BLIND_RAG_SERVERS_FILE:-servers.remote.json}"; fi
   echo "Document servers from $LIST:"
   while IFS= read -r line; do servers+=("$line"); done < <("$PY" - "$LIST" <<'PY'
 import json, os, sys
-for e in json.load(open(sys.argv[1])):
+for i, e in enumerate(json.load(open(sys.argv[1]))):
     d = os.path.join("artifacts", e["id"])
-    print(f"{e['url'].rstrip('/')}|{d if os.path.isdir(d) else 'artifacts'}")
+    print(f"{e['url'].rstrip('/')}|{d if os.path.isfile(os.path.join(d, 'manifest.json')) else ''}|http://127.0.0.1:{8080 + i}")
 PY
 )
 fi
-# Wake every remote server at once (a sleeping free Render service takes ~1 min), then check each.
+is_local() { case "$1" in http://127.0.0.1:*|http://localhost:*) return 0 ;; esac; return 1; }
+
+# Wake every hosted server at once (a sleeping free Render service takes up to ~1 min), then check each.
+wake=()
 for s in "${servers[@]}"; do
-  case "${s%%|*}" in http://127.0.0.1:*|http://localhost:*) ;; *) curl -s -o /dev/null --max-time 90 "${s%%|*}/v1/manifest" & ;; esac
+  url=${s%%|*}; is_local "$url" || { curl -s -o /dev/null --max-time 90 "$url/v1/manifest" & wake+=($!); }
 done
+if [ ${#wake[@]} -gt 0 ]; then
+  echo "  waking ${#wake[@]} hosted server(s) (up to ~1 min if they were asleep)..."
+  wait "${wake[@]}" 2>/dev/null || true
+fi
 urls=()
 for s in "${servers[@]}"; do
-  url=${s%%|*}; dir=${s#*|}; urls+=("$url")
-  case "$url" in
-    http://127.0.0.1:*|http://localhost:*) start_local "$url" "$dir" ;;
-    *) check_remote "$url" ;;
-  esac
+  IFS='|' read -r url dir lurl <<< "$s"
+  if is_local "$url"; then
+    start_local "$url" "${dir:-artifacts}"; urls+=("$url")
+  elif [ "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$url/v1/manifest" 2>/dev/null || true)" = 200 ]; then
+    echo "  using hosted server $url"; urls+=("$url")
+  elif [ -n "$dir" ]; then
+    echo "  WARNING: $url did not answer; using the repo backup $dir on $lurl instead"
+    start_local "$lurl" "$dir"; urls+=("$lurl")
+  else
+    echo "  WARNING: $url did not answer and the repo has no backup for it; leaving it out"
+  fi
 done
+[ ${#urls[@]} -gt 0 ] || { echo "ERROR: no document server available."; exit 1; }
 BLIND_RAG_SERVERS=$(IFS=,; echo "${urls[*]}"); export BLIND_RAG_SERVERS
 unset BLIND_RAG_SERVER
 echo "  the UI offers: $BLIND_RAG_SERVERS"

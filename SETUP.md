@@ -131,6 +131,7 @@ Runs are not committed (`eval/results/bench/` is ignored); copy a report somewhe
 
 ## Changelog
 
+- **Nov 15 (`person-a/latest`):** **Databricks first, repo as backup.** `make demo` uses the hosted servers in `servers.remote.json` (corpora on Databricks). If one doesn't answer, it starts a local server from that corpus's backup in `artifacts/<id>/` and says so; a corpus with no backup is left out. `LOCAL=1 make demo` runs everything locally (offline). The UI and `make bench` default to the same hosted list.
 - **Nov 15 (`person-a/latest`):** **`make demo` starts one document server per entry in `servers.json`**: MedlinePlus on :8080 and FMLA on :8081, each from its own `artifacts/<id>/` folder, and the UI offers both. `REMOTE=1 make demo` uses the hosted servers in `servers.remote.json` instead. `BLIND_RAG_SERVER=<url>` still means just that one server. `make stop` also stops :8081 and :8082.
 - **Nov 15 (`bench`):** `make bench` / `make bench-quick`: accuracy, speed per stage and a clickable per-question trace (`eval/results/bench/<run>/report.html`). No setup beyond `make demo`; see "Benchmark" above.
 - **Nov 14, 21:45 (`integration`):** **search several document servers**: pick them in the sidebar, or set `BLIND_RAG_SERVERS=https://a,https://b`. Each selected server gets the same encrypted question and exactly 10 fetches; results merge on the device. See "Searching several document servers" in `docs/crypto.md`.

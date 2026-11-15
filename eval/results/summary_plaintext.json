@@ -1,0 +1,15 @@
+{
+  "pipeline": "baseline.ask_plain:ask_plain",
+  "questions": 82,
+  "answered": "54/64",
+  "right_page_cited": "48/64",
+  "declined_out_of_scope": "18/18",
+  "behaved_as_expected": "72/82",
+  "urgent_notice_correct": "80/82",
+  "agreement_with_plaintext": "82/82",
+  "sentences_removed": 76,
+  "median_seconds": 21.76,
+  "p95_seconds": 38.17,
+  "median_upload_bytes": null,
+  "median_download_bytes": null
+}

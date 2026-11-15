@@ -124,7 +124,7 @@ const OBJECTS: Record<string, Draw> = {
 
 type Placed = { id: number; kind: string; v: number; x: number; y: number; w: number; h: number; rot: number; box: DOMRect }
 
-const CLEAR = 'header, h1, h2, main p, main ul, main ol, label, button, form, .slip, .catalog, .receipt, img, [data-clear]'
+const CLEAR = 'header, h1, h2, main p, main ul, main ol, section p, section ul, section li, label, button, form, .slip, .catalog, .receipt, img, [data-clear]'
 
 export function DeskObjects({ viewKey, version }: { viewKey: string; version: string }) {
   const layer = useRef<HTMLDivElement>(null)

@@ -105,3 +105,6 @@ h1, h2 { font-family: var(--font-display); }
     transition-duration: 0.01ms !important; }
   .mark { background-size: 100% 100%; }
 }
+
+/* Text on a catalog card sits on its ruled lines: one 28px rhythm for everything typed on it. */
+.catalog p, .catalog li, .catalog ol { line-height: 28px; }

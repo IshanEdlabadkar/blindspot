@@ -73,7 +73,7 @@ export function SearchDemo({ mode }: { mode: 'leak' | 'sealed' }) {
 }
 
 function Beat({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <section className={`relative z-[1] mx-auto flex min-h-[78dvh] max-w-[860px] flex-col justify-center px-5 py-16 ${className}`}>{children}</section>
+  return <section className={`relative z-[1] mx-auto flex min-h-[60dvh] max-w-[860px] flex-col justify-center px-5 py-16 ${className}`}>{children}</section>
 }
 
 const Reveal = ({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) => (
@@ -94,7 +94,7 @@ export function Beats({ onSkip }: { onSkip: () => void }) {
         <h1 className="max-w-[18ch] text-[40px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[64px]">
           You looked up a symptom on your health plan's website.
         </h1>
-        <div className="mt-[34dvh]"><Reveal>
+        <div className="mt-[16dvh]"><Reveal>
           <p className="max-w-[20ch] text-[28px] leading-9 font-bold text-badger sm:text-[40px] sm:leading-[46px]">Google, Microsoft and X may have seen it.</p>
         </Reveal></div>
       </Beat>

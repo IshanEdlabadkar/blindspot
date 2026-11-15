@@ -19,7 +19,7 @@ function Health({ status }: { status: Status | null }) {
   return (
     <span className={`text-sm ${ok ? 'text-graphite' : 'font-medium text-stamp'}`} title={issues || 'All systems ready'}>
       <span className="hidden sm:inline">{up} of {status.servers.length} libraries open{issues ? `, ${issues}` : ''}</span>
-      <span className="sm:hidden">{up} of {status.servers.length} open{issues ? ', check' : ''}</span>
+      <span className="sm:hidden">{issues ? `${up}/${status.servers.length} open, check` : ''}</span>
     </span>
   )
 }
@@ -88,11 +88,11 @@ export default function App() {
     <div className="desk relative min-h-dvh">
       <DeskObjects viewKey={view === 'sim' ? 'sim' : xrayTurn ? `xray-${xrayTurn.id}` : turns.length ? 'chat' : 'landing'}
         version={turns.map((t) => `${t.phase}${t.proof ? 'p' : ''}`).join(',')} />
-      <header className="relative z-[1] mx-auto flex h-16 max-w-[1120px] items-center justify-between px-5">
+      <header className="relative z-[1] mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-4 whitespace-nowrap sm:px-5">
         <button onClick={() => { setXray(null); setView('ask') }} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
-          <Burrow size={32} mood="peek" /> Blindspot
+          <Burrow size={32} mood="peek" /> <span className="hidden sm:inline">Blindspot</span>
         </button>
-        <nav aria-label="Views" className="flex items-center gap-5 sm:gap-7">
+        <nav aria-label="Views" className="flex items-center gap-4 sm:gap-7">
           {([['ask', 'Ask'], ['sim', '100 people']] as const).map(([k, label]) => (
             <button key={k} onClick={() => setView(k)} aria-current={view === k ? 'page' : undefined}
               className={`font-display text-[15px] font-bold underline-offset-[10px] ${view === k ? 'text-ink underline decoration-badger decoration-[3px]' : 'text-graphite hover:text-ink'}`}>
@@ -100,7 +100,7 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3 sm:gap-5">
           <Libraries status={status} disabled={disabled} setDisabled={setDisabled} refresh={refresh} />
           <a href="http://localhost:8501" target="_blank" rel="noreferrer" title="Measured results, who sees what, and more"
             className="hidden text-sm text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger sm:inline">

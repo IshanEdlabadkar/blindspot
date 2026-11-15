@@ -128,7 +128,7 @@ function FiledSlip({ turn, number }: { turn: Turn; number: number }) {
           })}
         </ol>
         {turn.result && (
-          <span className="stamp absolute top-7 right-6 text-[14px] text-stamp" style={{ ['--r' as string]: '-7deg' }}>Answered</span>
+          <span className="stamp absolute top-1.5 right-[104px] text-[12px] text-stamp" style={{ ['--r' as string]: '-7deg' }}>Answered</span>
         )}
       </div>
       {working && <Burrow size={64} mood="dig" className="hidden shrink-0 sm:inline-block" />}

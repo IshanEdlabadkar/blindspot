@@ -1,0 +1,25 @@
+{"id": "q01", "question": "What are early signs of a miscarriage?", "source_url": "https://medlineplus.gov/miscarriage.html", "type": "semantic"}
+{"id": "q02", "question": "I feel sad and empty most days and have lost interest in things. Could this be depression?", "source_url": "https://medlineplus.gov/depression.html", "type": "semantic"}
+{"id": "q03", "question": "I had a baby a month ago and feel hopeless. Is that more than the baby blues?", "source_url": "https://medlineplus.gov/postpartumdepression.html", "type": "semantic"}
+{"id": "q04", "question": "How is chlamydia treated?", "source_url": "https://medlineplus.gov/chlamydiainfections.html", "type": "exact-term"}
+{"id": "q05", "question": "Can genital herpes be cured?", "source_url": "https://medlineplus.gov/genitalherpes.html", "type": "exact-term"}
+{"id": "q06", "question": "How does HIV spread from one person to another?", "source_url": "https://medlineplus.gov/hiv.html", "type": "semantic"}
+{"id": "q07", "question": "What are my options for birth control?", "source_url": "https://medlineplus.gov/birthcontrol.html", "type": "semantic"}
+{"id": "q08", "question": "What causes trouble getting or keeping an erection?", "source_url": "https://medlineplus.gov/erectiledysfunction.html", "type": "semantic"}
+{"id": "q09", "question": "Why do I leak urine when I cough or sneeze?", "source_url": "https://medlineplus.gov/urinaryincontinence.html", "type": "semantic"}
+{"id": "q10", "question": "How do I know if my drinking has become a problem?", "source_url": "https://medlineplus.gov/alcoholusedisorderaud.html", "type": "semantic"}
+{"id": "q11", "question": "What should I do if someone overdoses on opioids?", "source_url": "https://medlineplus.gov/opioidoverdose.html", "type": "semantic"}
+{"id": "q12", "question": "What are the types of eating disorders?", "source_url": "https://medlineplus.gov/eatingdisorders.html", "type": "semantic"}
+{"id": "q13", "question": "My heart races and I feel sudden terror for no reason. What is happening?", "source_url": "https://medlineplus.gov/panicdisorder.html", "type": "semantic"}
+{"id": "q14", "question": "What are the symptoms of PTSD?", "source_url": "https://medlineplus.gov/posttraumaticstressdisorder.html", "type": "exact-term"}
+{"id": "q15", "question": "What is bipolar disorder and how is it treated?", "source_url": "https://medlineplus.gov/bipolardisorder.html", "type": "semantic"}
+{"id": "q16", "question": "What causes severe pelvic pain during periods?", "source_url": "https://medlineplus.gov/endometriosis.html", "type": "semantic"}
+{"id": "q17", "question": "Why might a woman have trouble getting pregnant?", "source_url": "https://medlineplus.gov/femaleinfertility.html", "type": "semantic"}
+{"id": "q18", "question": "What symptoms should I expect during menopause?", "source_url": "https://medlineplus.gov/menopause.html", "type": "semantic"}
+{"id": "q19", "question": "How do people get hepatitis C?", "source_url": "https://medlineplus.gov/hepatitisc.html", "type": "exact-term"}
+{"id": "q20", "question": "What does an A1C test measure?", "source_url": "https://medlineplus.gov/a1c.html", "type": "exact-term"}
+{"id": "q21", "question": "What does a high PSA test result mean?", "source_url": "https://medlineplus.gov/lab-tests/prostate-specific-antigen-psa-test/", "type": "exact-term"}
+{"id": "q22", "question": "What is a TSH test used for?", "source_url": "https://medlineplus.gov/lab-tests/tsh-thyroid-stimulating-hormone-test/", "type": "exact-term"}
+{"id": "q23", "question": "What does a complete blood count (CBC) measure?", "source_url": "https://medlineplus.gov/lab-tests/complete-blood-count-cbc/", "type": "exact-term"}
+{"id": "q24", "question": "What happens during a Pap smear?", "source_url": "https://medlineplus.gov/lab-tests/pap-smear/", "type": "exact-term"}
+{"id": "q25", "question": "How does an HIV screening test work, and do I need one?", "source_url": "https://medlineplus.gov/lab-tests/hiv-screening-test/", "type": "exact-term"}

@@ -144,12 +144,15 @@ class Pipeline:
                 rec = self._post("/v1/fetch", sel)
                 sent("/v1/fetch", len(sel), len(rec))
                 chunks.append(c.unpack_record(self.crypto.decrypt_record(self.key, rec)))
+        # B's answer() declines on a cosine estimate: raw int score / scale^2.
+        scale = float(m["quantization"]["scale"])
         for ch, i in zip(chunks, top):
-            ch["score"] = int(scores[i])
+            ch["raw_score"] = int(scores[i])
+            ch["score"] = float(scores[i]) / (scale * scale)
         stage("fetching")
 
         # 8-9. rerank and answer (B's answer() does both, and the safe decline)
-        result = self.answer_fn(question, chunks)
+        result = c.normalize_result(self.answer_fn(question, chunks))
         stage("answering")
 
         trace["upload_bytes"] = sum(r["request_bytes"] for r in trace["requests"])

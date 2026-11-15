@@ -136,10 +136,12 @@ def turn_html(q, result, trace):
         srcs += (f'<details class="br-src"><summary><b>{i}</b><span>{esc(cit.get("title"))}</span></summary>'
                  f'<div>{esc(cit.get("text"))}<br>{link}</div></details>')
     label = "Closest passages" if result["declined"] else "Answer"
+    # B's answer() already ends with its own disclaimer; do not show two.
+    note = "" if "not medical advice" in result["answer"] else f'<div class="br-note">{esc(c.DISCLAIMER)}</div>'
     return (f'<div class="br-turn"><div class="br-q">{esc(q)}</div>{chips}'
             f'<div class="br-card"><div class="br-label">{label}</div>'
             f'<p class="br-answer">{esc(result["answer"])}</p>{srcs}'
-            f'<div class="br-note">{esc(c.DISCLAIMER)}</div></div></div>')
+            f'{note}</div></div>')
 
 
 def server_html(trace):
@@ -214,7 +216,7 @@ with left:
         question = question.strip()
         try:
             if canned_mode:
-                result, trace = canned.ask(question), None
+                result, trace = c.normalize_result(canned.ask(question)), None
             else:
                 with status_box.status("Working…", expanded=True) as status:
                     def on_stage(name, secs):

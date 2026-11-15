@@ -69,7 +69,7 @@ def test_ollama_request_keeps_model_loaded_and_caps_length(monkeypatch):
     monkeypatch.setattr(answer_mod.requests, "post", fake_post)
     assert answer_mod.ollama_generate("p") == "ok"
     assert sent["keep_alive"] == "30m"
-    assert sent["options"] == {"temperature": 0, "num_predict": 256}
+    assert sent["options"] == {"temperature": 0, "num_predict": 256, "num_ctx": 8192}
 
 
 def test_answer_cites_renumbers_and_drops_bad_citations():
@@ -185,3 +185,72 @@ def test_emergency_question_shows_911_before_the_answer():
     assert r["status"] == "answered"
     assert r["answer"].startswith(EMERGENCY_MESSAGE)
     assert r["urgent"]["kind"] == "emergency"
+
+
+def test_answer_call_sends_rules_as_system_message_with_examples(monkeypatch):
+    sent = {}
+
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"message": {"content": " Fact [1]. "}}
+
+    def fake_post(url, json, timeout):
+        sent.update(json, url=url)
+        return Resp()
+
+    monkeypatch.setattr(answer_mod.requests, "post", fake_post)
+    assert answer_mod.ollama_chat("Sources:\n[1] T\nx\n\nQuestion: q") == "Fact [1]."
+    msgs = sent["messages"]
+    assert sent["url"].endswith("/api/chat")
+    assert msgs[0]["role"] == "system" and "NO_ANSWER" in msgs[0]["content"]
+    assert [m["role"] for m in msgs[1:-1]] == ["user", "assistant"] * 3   # three examples
+    assert msgs[-1] == {"role": "user", "content": "Sources:\n[1] T\nx\n\nQuestion: q"}
+    assert sent["options"]["num_ctx"] == 8192 and sent["keep_alive"] == "30m"
+
+
+def test_distinctive_terms():
+    assert answer_mod.distinctive_terms("When are GLP-1s good for me?") == {"glp1"}
+    assert answer_mod.distinctive_terms("What does an A1C test and LDL show? Is XR-417 approved?") == {"a1c", "ldl", "xr417"}
+    assert answer_mod.distinctive_terms("I have a headache and feel tired") == set()
+
+
+def test_question_naming_something_absent_from_sources_declines_without_calling_model():
+    chunks = [{**c, "text": "Type 1 diabetes means the body does not make insulin."} for c in CHUNKS]
+
+    def boom(p):
+        raise AssertionError("model should not be called")
+
+    r = answer("When are GLP-1s good for me?", chunks, llm=boom)
+    assert r["status"] == "declined" and r["answer"].startswith(DECLINE_MESSAGE)
+
+
+def test_question_term_present_in_a_source_is_answered():
+    chunks = [{**CHUNKS[0], "text": "An A1C test measures your average blood sugar over three months."}] + CHUNKS[1:]
+    r = answer("What does an A1C test measure?", chunks,
+               llm=lambda p: "An A1C test measures your average blood sugar over three months [1].")
+    assert r["status"] == "answered" and "A1C" in r["answer"]
+
+
+def test_sentence_naming_a_term_its_source_lacks_is_removed():
+    chunks = [{**CHUNKS[0], "text": "Diabetes medicines help people with type 2 diabetes manage blood sugar."}] + CHUNKS[1:]
+    text = ("Diabetes medicines help people with type 2 diabetes manage blood sugar [1]. "
+            "GLP-1 medicines help people with type 2 diabetes manage blood sugar [1].")
+    r = answer("How do diabetes medicines help?", chunks, llm=lambda p: text)
+    assert r["status"] == "answered" and "GLP-1" not in r["answer"]
+    assert r["checks"]["removed_sentences"] == 1
+
+
+def test_coverage_note_is_kept_without_a_citation():
+    chunks = [{**CHUNKS[0], "text": "Inhalers can help control asthma symptoms."}] + CHUNKS[1:]
+    r = answer("Do inhalers help asthma, and what about yoga?", chunks,
+               llm=lambda p: "Inhalers can help control asthma symptoms [1]. The sources do not mention yoga.")
+    assert r["status"] == "answered"
+    assert r["answer"].startswith("Inhalers can help control asthma symptoms [1]. The sources do not mention yoga.")
+
+
+def test_coverage_note_alone_is_not_an_answer():
+    r = answer("q?", CHUNKS, llm=lambda p: "The sources do not mention this.")
+    assert r["status"] == "declined"

@@ -1,0 +1,41 @@
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "tailwindcss";
+
+/* Vault tokens. seal = locked/safe/actions. leak is used ONLY where words escaped. */
+@theme {
+  --color-night: #0E1116;
+  --color-slate: #161B22;
+  --color-lift: #1C232C;
+  --color-seam: #262E38;
+  --color-paper: #E6EAEE;
+  --color-fog: #8B97A4;
+  --color-dim: #7D8995; /* 5.3:1 on night: readable on a projector, passes WCAG AA for small text */
+  --color-seal: #7FD1C4;
+  --color-seal-deep: #2E5F58;
+  --color-leak: #FF6B6B;
+  --color-leak-deep: #4A1F22;
+  --color-amber: #F2C46D;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+:root { color-scheme: dark; }
+html, body { background: var(--color-night); color: var(--color-paper); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+::selection { background: var(--color-seal-deep); color: var(--color-paper); }
+
+:focus-visible { outline: 2px solid var(--color-seal); outline-offset: 3px; border-radius: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+.hex { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0.02em; word-break: break-all; }
+.caret::after { content: ""; display: inline-block; width: 0.55ch; height: 1.05em; margin-left: 2px;
+  vertical-align: -0.15em; background: var(--color-seal); animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }

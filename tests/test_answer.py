@@ -170,6 +170,9 @@ def test_citations_name_their_source_when_chunks_have_one():
     assert r["citations"][0]["source_name"] == "Federal FMLA regulations"
     r = answer("q?", [A1C, KNEE], llm=lambda p: "A1C measures your average blood sugar [1].")
     assert "source" not in r["citations"][0]
+    from_server = {**A1C, "server": "http://127.0.0.1:9081"}  # C's multi-server pipeline tags chunks this way
+    r = answer("q?", [from_server, KNEE], llm=lambda p: "A1C measures your average blood sugar [1].")
+    assert r["citations"][0]["server"] == "http://127.0.0.1:9081"
 
 
 def test_repeated_citation_markers_are_collapsed():

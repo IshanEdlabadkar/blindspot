@@ -1,6 +1,6 @@
 [
   {"id": "medlineplus", "name": "MedlinePlus (National Library of Medicine)", "url": "https://blindspot-cz2t.onrender.com"},
-  {"id": "fmla", "name": "Federal FMLA regulations (29 CFR Part 825, eCFR)", "url": "https://blind-rag-fmla.onrender.com"},
-  {"id": "genetics", "name": "MedlinePlus Genetics (National Library of Medicine)", "url": "https://blind-rag-genetics.onrender.com"},
-  {"id": "myhealthfinder", "name": "MyHealthfinder (ODPHP, health.gov)", "url": "https://blind-rag-myhealthfinder.onrender.com"}
+  {"id": "fmla", "name": "Federal FMLA regulations (29 CFR Part 825, eCFR)", "url": "https://blindspot-fmla.onrender.com"},
+  {"id": "genetics", "name": "MedlinePlus Genetics (National Library of Medicine)", "url": "https://blindspot-genetics.onrender.com"},
+  {"id": "myhealthfinder", "name": "MyHealthfinder (ODPHP, health.gov)", "url": "https://blindspot-myhealthfinder.onrender.com"}
 ]

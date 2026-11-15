@@ -148,6 +148,12 @@ export function DeskObjects({ viewKey, version }: { viewKey: string; version: st
       const r = n.getBoundingClientRect()
       if (r.width && r.height) blocked.push(new DOMRect(r.left - origin.left - pad, r.top - origin.top - pad, r.width + pad * 2, r.height + pad * 2))
     })
+    // A sticky column slides through its whole parent as you scroll, so keep that whole lane clear.
+    root.querySelectorAll<HTMLElement>('[data-sticky]').forEach((n) => {
+      const r = n.getBoundingClientRect()
+      const lane = (n.parentElement ?? n).getBoundingClientRect()
+      blocked.push(new DOMRect(r.left - origin.left - pad, lane.top - origin.top - pad, r.width + pad * 2, lane.height + pad * 2))
+    })
     const hits = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
     const inside = (b: DOMRect) => b.top >= 0 && b.bottom <= H && b.left > -b.width * 0.4 && b.right < W + b.width * 0.4
 

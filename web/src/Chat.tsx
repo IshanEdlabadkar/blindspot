@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { Fragment, useRef, useState } from 'react'
-import type { Citation, Status } from './api'
+import type { Citation, Plain, Status } from './api'
 import { Burrow } from './Burrow'
 import { STAGES, splitAnswer, type Turn } from './turn'
 
@@ -166,6 +166,45 @@ function Source({ c, n, open, library }: { c: Citation; n: number; open: boolean
   )
 }
 
+/** The unsealed copy sent to a normal AI service, and the line that service wrote about you in its own log. */
+function CarbonCopy({ plain, onXray, libraries }: { plain?: Plain; onXray: () => void; libraries: number }) {
+  const e = plain?.entry
+  const when = e && !Number.isNaN(Date.parse(e.time)) ? new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : e?.time
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="relative mt-6 max-w-[580px] bg-[#F6DDE1] px-5 pt-4 pb-5 shadow-paper sm:ml-20 sm:rotate-[0.7deg] sm:px-7">
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="font-display text-[15px] font-black text-ink">Carbon copy</span>
+        <span className="typed text-[14px] text-[#2B3A8C]">unsealed</span>
+      </div>
+      {!plain && <p className="typed mt-2 text-[15px] leading-6 text-[#2B3A8C]">Sending the same question, unsealed, to a normal AI service to compare…</p>}
+      {plain?.error && (
+        <p className="mt-2 text-[15px] leading-6 text-ink">The normal AI service couldn't be reached, so there is nothing to compare this time. <span className="typed text-[13px] text-graphite">{plain.error}</span></p>
+      )}
+      {e && (
+        <>
+          <p className="mt-2 text-[15px] leading-6 text-ink">
+            The same question also went, unsealed, to a normal AI service. This is the line it wrote about you in its own log:
+          </p>
+          <div className="relative">
+          <span className="stamp absolute top-1 right-0 text-[15px] text-stamp" style={{ ['--r' as string]: '-8deg', ['--d' as string]: '.6s' }}>Kept on file</span>
+          <dl className="typed mt-3 grid grid-cols-[4.5em_1fr] gap-y-1 text-[15px] leading-6 text-[#2B3A8C]">
+            <dt className="text-graphite">time</dt><dd>{when}</dd>
+            <dt className="text-graphite">from</dt><dd>{e.client}</dd>
+            <dt className="text-graphite">asked</dt><dd className="font-bold text-ink">“<mark className="mark bg-transparent" style={{ ['--d' as string]: '.35s' }}>{e.question}</mark>”</dd>
+            {e.returned?.length > 0 && <><dt className="text-graphite">sent</dt><dd>{[...new Set(e.returned.map((x) => x.title))].join('; ')}</dd></>}
+          </dl>
+          </div>
+          <p className="mt-4 border-t border-dashed border-graphite/40 pt-3 text-[15px] leading-6 text-ink">
+            {libraries > 1 ? `All ${libraries} libraries` : 'The library'} got sealed bytes instead and kept nothing they can read.{' '}
+            <button onClick={onXray} className="typed font-bold text-badger underline underline-offset-4 hover:text-stamp">Compare them on the receipt</button>
+          </p>
+        </>
+      )}
+    </motion.div>
+  )
+}
+
 export function TurnView({ turn, number, onXray, nameOf }: { turn: Turn; number: number; onXray: () => void; nameOf: (url?: string) => string | undefined }) {
   const [open, setOpen] = useState<number | null>(null)
   const r = turn.result
@@ -197,6 +236,11 @@ export function TurnView({ turn, number, onXray, nameOf }: { turn: Turn; number:
           <ol className="mt-7">
             {r.citations.map((c, i) => <Source key={`${c.source ?? ''}${c.id}-${i}`} c={c} n={i + 1} open={open === i + 1} library={nameOf(c.server)} />)}
           </ol>
+          {(r.checks?.removed_sentences ?? 0) > 0 && (
+            <p className="typed mt-7 text-[14px] text-graphite">
+              {r.checks!.removed_sentences} sentence{r.checks!.removed_sentences === 1 ? '' : 's'} the model wrote without a source {r.checks!.removed_sentences === 1 ? 'was' : 'were'} taken out before you saw this.
+            </p>
+          )}
           <div className="mt-7 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
             <p className="typed text-[13px] text-graphite">{disclaimer || 'General information, not medical or legal advice.'}</p>
             <button onClick={onXray} className="press typed text-[15px] font-bold text-badger underline underline-offset-4 hover:text-stamp">
@@ -205,6 +249,7 @@ export function TurnView({ turn, number, onXray, nameOf }: { turn: Turn; number:
           </div>
         </motion.div>
       )}
+      {r && turn.compare && <CarbonCopy plain={turn.plain} onXray={onXray} libraries={turn.trace?.servers?.length ?? 1} />}
     </article>
   )
 }

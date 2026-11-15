@@ -86,19 +86,21 @@ BLIND_RAG_CRYPTO=real BLIND_RAG_FETCH=download streamlit run ui/app.py
 
 With `make server` and `make helper` running, `make measure` asks 10 random questions (5 s apart, like a user reading), prints timings, and writes `data/measurements.md` in the spec's format. It also fails if the server log holds anything but the four agreed fields. Run it on the demo laptop for the real numbers.
 
-Last run, on B's corpus (2,101 chunks), a 2-vCPU cloud VM, medians:
+Last run, on B's corpus (2,101 chunks), a 2-vCPU cloud VM, medians, hint mode (the default):
 
 | | Value |
 | --- | --- |
-| Encrypt on device | 0.05 s (key prepared in the background; 1.2 s without) |
-| `/v1/score` round trip | 2.4 s (target < 2 s) |
-| Crypto part of a question | 2.5 s |
-| Upload / download per question | 34 MB / 0.5 MB, plus the 4.3 MB fetch store once |
-| Server CPU per question | 4.1 core-s (target < 2), almost all of it processing the 33 MB key |
+| Crypto part of a question (encrypt + score + decrypt + fetch) | ~6 ms |
+| Upload / download per question | 3.1 KB / 16.8 KB |
+| Server CPU per question | < 10 ms |
+| One-time per corpus version | 17.2 MB scoring hint (cached in `~/.cache/blind-rag/`) + 4.3 MB fetch store |
 | Server log | only the four agreed fields, no query data |
+
+Every spec performance target is met. Token mode (`BLIND_RAG_SCORE_MODE=token`) is the old path: 34 MB up and ~2.7 s per question, kept as a fallback.
 
 ## Changelog
 
+- **Nov 14, 19:05:** **hint mode** is the default: the client downloads a 17 MB public scoring hint once per corpus (cached on disk), then each question is 3 KB up, 17 KB down, ~6 ms. The client falls back to the old token mode automatically if anything goes wrong. Pull and restart `make server` and `make helper`; C's code is unchanged.
 - **Nov 14, 18:15:** the helper prepares the next question's key in the background (`BLIND_RAG_PREPARE=0` turns it off), so encrypting takes 0.05 s instead of 1.2 s. Added `make measure`. No changes needed in C's code; restart `make helper` after pulling.
 - **Nov 14, 17:40:** server reads `artifacts/` by default (`make server DATA=data` for dummy tables) and logs to `data/server.log`. It refuses tables whose scale can overflow. **B: rebuild with scale 127 and a little-endian length prefix** (see Data files).
 - **Nov 14, 17:20:** `make test` verified on A's Windows laptop (WSL2). Added the WSL "Catastrophic failure" fix.

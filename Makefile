@@ -17,10 +17,10 @@ helper:        ## asker-side key holder at http://127.0.0.1:8090 (needed for BLI
 
 .PHONY: bench bench-quick
 bench:         ## with make demo running: accuracy + speed + per-question trace for every eval question -> eval/results/bench/<run>/report.html
-	uv run python -m eval.bench $(ARGS)
+	python3 -m eval.bench $(ARGS)
 
 bench-quick:   ## same, retrieval only (no rerank/model): crypto speed + right page in top-k, ~1 s per question
-	uv run python -m eval.bench --answer none $(ARGS)
+	python3 -m eval.bench --answer none $(ARGS)
 
 .PHONY: measure
 measure:       ## with server + helper running: latency, bytes, CPU, log check -> data/measurements.md

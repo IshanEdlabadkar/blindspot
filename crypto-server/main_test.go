@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/IshanEdlabadkar/blindspot/crypto-server/blindcrypto"
+	"github.com/henrycg/simplepir/pir"
 	"github.com/henrycg/simplepir/rand"
 )
 
@@ -372,4 +373,61 @@ func TestDatabricksStyleSource(t *testing.T) {
 		}
 	}
 	t.Logf("Databricks-style volume URL + bearer token: corpus %s loaded and verified", s.cur.Load().version)
+}
+
+func TestFetchBatchHTTP(t *testing.T) {
+	n, d, L := 2101, 384, 2048
+	dir := t.TempDir()
+	writeTestCorpus(t, dir, n, d, L)
+	store, _ := os.ReadFile(filepath.Join(dir, "fetch_store.bin"))
+	s, err := load(dir, false, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(s.routes(false))
+	defer ts.Close()
+	resp, _ := http.Get(ts.URL + "/v1/manifest")
+	var man map[string]any
+	json.NewDecoder(resp.Body).Decode(&man)
+	pm := man["pir"].(map[string]any)
+	resp, _ = http.Get(pm["hint_url"].(string))
+	hb, _ := io.ReadAll(resp.Body)
+	sb, _ := hex.DecodeString(pm["seed"].(string))
+	var seed rand.PRGKey
+	copy(seed[:], sb)
+	info, _ := blindcrypto.FetchDBInfo(uint64(n), uint64(L))
+	h, _ := blindcrypto.DecodeHint(hb, info.L, 2048)
+	fc := blindcrypto.NewFetchClient(&seed, info, h, uint64(n), uint64(L))
+	defer fc.Close()
+
+	idx := []uint64{5, 77, 900, 1500, 2100, 0, 1, 2, 3, 4}
+	keys := make([]*blindcrypto.FetchKey, len(idx))
+	qs := make([]*pir.Query[blindcrypto.Elem], len(idx))
+	for i, j := range idx {
+		keys[i], qs[i], _ = fc.Query(j)
+	}
+	resp, err = post(ts.URL+"/v1/fetch_batch", "test.1", blindcrypto.MarshalFetchBatch(qs))
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("fetch_batch: %v %v", err, resp.Status)
+	}
+	as, err := blindcrypto.UnmarshalAnswers(resp.Body)
+	if err != nil || len(as) != len(idx) {
+		t.Fatalf("answers: %v (%d)", err, len(as))
+	}
+	for i, j := range idx {
+		rec, err := keys[i].Decrypt(as[i])
+		if err != nil || !bytes.Equal(rec, store[j*uint64(L):(j+1)*uint64(L)]) {
+			t.Fatalf("record %d mismatch (%v)", j, err)
+		}
+	}
+	// Too many selectors is refused.
+	big := make([]*pir.Query[blindcrypto.Elem], blindcrypto.MaxFetchBatch+1)
+	for i := range big {
+		big[i] = qs[0]
+	}
+	resp, _ = post(ts.URL+"/v1/fetch_batch", "test.1", blindcrypto.MarshalFetchBatch(big))
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("oversized batch got %d", resp.StatusCode)
+	}
+	t.Logf("fetch_batch: %d records in one request, all exact; oversized batch refused", len(idx))
 }

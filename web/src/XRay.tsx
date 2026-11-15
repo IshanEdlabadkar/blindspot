@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { searchWire, type Route, type ServerTrace, type Status } from './api'
 import { Burrow } from './Burrow'
 import { short, slipNo } from './Chat'
+import { Scoreboard } from './Scoreboard'
 import { libraryName, type Turn } from './turn'
 
 const HEX = '0123456789abcdef'
@@ -254,6 +255,7 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
           Sealing hides the words, not the fact that you asked.
         </p>
       </div>
+      <Scoreboard proof={turn.proof} />
     </main>
   )
 }

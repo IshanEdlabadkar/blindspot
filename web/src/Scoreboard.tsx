@@ -45,6 +45,7 @@ function Legend() {
   )
 }
 
+/** Shown under the two receipts: the numbers behind them. */
 export function Scoreboard({ proof }: { proof?: Proof }) {
   const [card, setCard] = useState<Card | null>(null)
   useEffect(() => {
@@ -70,9 +71,9 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
   const blindWords = blind.reduce((n, r) => n + r.words, 0)
 
   return (
-    <main className="relative z-[1] mx-auto max-w-[900px] px-5 pt-6 pb-24">
-      <h2 className="text-[36px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[48px]">Same answers. Nothing to sell.</h2>
-      <p className="mt-4 max-w-[62ch] text-[17px] leading-7 text-graphite">
+    <div className="mx-auto mt-16 max-w-[900px]">
+      <h2 className="text-[30px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[40px]">Same answers. Nothing to sell.</h2>
+      <p className="mt-3 max-w-[62ch] text-[17px] leading-7 text-graphite">
         On the questions we tested, Blind RAG answers as well as a normal AI service. What a library can learn about the people asking is a different story.
       </p>
 
@@ -130,9 +131,9 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
             </div>
           </>
         ) : (
-          <p className="mt-3 text-graphite">Ask a question on the <span className="font-bold">Ask</span> tab with the unsealed-copy box ticked, then come back.</p>
+          <p className="mt-3 text-graphite">Tick the unsealed-copy box on the call slip and ask again to measure this.</p>
         )}
       </section>
-    </main>
+    </div>
   )
 }

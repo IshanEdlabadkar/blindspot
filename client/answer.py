@@ -3,6 +3,14 @@
 Every sentence shown to the user must cite a source the model was given, and that source must contain
 most of the sentence's key terms. Sentences that fail are removed; if none survive, the answer declines.
 No citation is ever added that the model did not write.
+
+Distinctive terms (acronyms and letter-digit codes such as GLP-1, A1C, LDL, XR-417) are checked exactly:
+the stemmed word-overlap check cannot see them. A question whose distinctive term appears in none of the
+sources declines, and an answer sentence naming one its cited sources lack is removed.
+
+The rules go to the model as a system message with three short examples (answered, partly covered,
+not covered), through Ollama's chat endpoint with an explicit context window so a longer prompt is never
+silently truncated from the front, where the rules are.
 """
 import re
 import time
@@ -13,6 +21,8 @@ import requests
 from client.safety import urgent_notice
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_CHAT_URL = "http://localhost:11434/api/chat"
+NUM_CTX = 8192  # Ollama's default on laptops is 4096; a prompt is ~2,300 tokens. Set it so nothing is cut.
 MODEL = "llama3.2:3b"
 N_CONTEXT = 5
 MAX_ANSWER_TOKENS = 256  # guard against runaway output; the longest eval answer used 145
@@ -21,18 +31,35 @@ SUPPORT_MIN = 0.5  # share of a sentence's key terms that its cited source must 
 DECLINE_MESSAGE = "I couldn't find a reliable source for this in the library. The closest passages are below."
 DISCLAIMER = "This is general health information, not medical advice."
 
-PROMPT = """You answer health questions using ONLY the numbered sources below.
+SYSTEM = """You answer health questions using ONLY the numbered sources the user gives you.
 Rules:
-- Use only facts stated in the sources. Do not add outside knowledge.
-- After each sentence, cite the source numbers it came from, like [1] or [2][3].
-- If the sources do not answer the question, reply with exactly: NO_ANSWER
-- Answer in plain language, in under 150 words.
+- Use only facts stated in the sources. Never add outside knowledge.
+- Never name a drug, test, condition or number that is not in the sources.
+- End every sentence with the numbers of the sources it came from, like [1] or [2][3].
+- If the sources cover only part of the question, answer that part, then add one sentence saying the
+  sources do not cover the rest.
+- If the sources do not answer the question at all, reply with exactly: NO_ANSWER
+- Write 3 to 5 plain-language sentences when the sources allow, at most 150 words."""
 
-Sources:
+# Three tiny examples: answered, partly covered, not covered. Kept short so they cost ~200 tokens.
+FEW_SHOT = [
+    {"role": "user", "content": "Sources:\n[1] Flu\nThe flu is caused by influenza viruses. Symptoms include fever, "
+                                "cough and body aches. Most people recover in one to two weeks.\n\n"
+                                "Question: What causes the flu and how long does it last?"},
+    {"role": "assistant", "content": "The flu is caused by influenza viruses [1]. It often brings fever, cough and "
+                                     "body aches [1]. Most people recover in one to two weeks [1]."},
+    {"role": "user", "content": "Sources:\n[1] Asthma\nAsthma inflames and narrows the airways. Inhalers can help "
+                                "control symptoms.\n\nQuestion: Can a new pill called Breathex cure my asthma?"},
+    {"role": "assistant", "content": "Inhalers can help control asthma symptoms [1]. The sources do not mention Breathex."},
+    {"role": "user", "content": "Sources:\n[1] Sunburn\nSunburn is skin damage from ultraviolet rays.\n\n"
+                                "Question: How much does a knee replacement cost?"},
+    {"role": "assistant", "content": "NO_ANSWER"},
+]
+
+PROMPT = """Sources:
 {sources}
 
-Question: {question}
-Answer:"""
+Question: {question}"""
 
 _STOP = {"about", "after", "also", "because", "been", "before", "being", "could", "does", "doesn",
          "each", "from", "have", "into", "many", "might", "more", "most", "only", "other", "should",
@@ -64,18 +91,61 @@ def _default_rerank(question: str, chunks: list[dict]) -> list[dict]:
     return rerank_chunks(question, chunks)
 
 
+OLLAMA_OPTIONS = {"temperature": 0, "num_predict": MAX_ANSWER_TOKENS, "num_ctx": NUM_CTX}
+
+
 def ollama_generate(prompt: str, model: str = MODEL, url: str = OLLAMA_URL, timeout: float = 180) -> str:
+    """Plain completion (used by the plaintext demo server's warm-up)."""
     r = requests.post(url, json={"model": model, "prompt": prompt, "stream": False,
                                  "keep_alive": "30m",  # avoid a cold reload between demo questions
-                                 "options": {"temperature": 0, "num_predict": MAX_ANSWER_TOKENS}},
+                                 "options": OLLAMA_OPTIONS},
                       timeout=timeout)
     r.raise_for_status()
     return r.json()["response"].strip()
 
 
+def ollama_chat(prompt: str, model: str = MODEL, url: str = OLLAMA_CHAT_URL, timeout: float = 180) -> str:
+    """The answer call: rules as a system message, the examples, then the sources and question."""
+    messages = [{"role": "system", "content": SYSTEM}, *FEW_SHOT, {"role": "user", "content": prompt}]
+    r = requests.post(url, json={"model": model, "messages": messages, "stream": False,
+                                 "keep_alive": "30m", "options": OLLAMA_OPTIONS},
+                      timeout=timeout)
+    r.raise_for_status()
+    return r.json()["message"]["content"].strip()
+
+
 def _terms(text: str) -> set[str]:
     """Key terms: words over 3 letters, minus common words, cut to 5 letters as a crude stem."""
     return {w[:5] for w in re.findall(r"[a-z0-9']+", text.lower()) if len(w) > 3 and w not in _STOP}
+
+
+def distinctive_terms(text: str) -> set[str]:
+    """Acronyms and letter-digit codes, normalized: GLP-1s -> glp1, A1C -> a1c, LDL -> ldl, XR-417 -> xr417."""
+    out = set()
+    for tok in re.findall(r"[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]", text):
+        mixed = any(ch.isdigit() for ch in tok) and any(ch.isalpha() for ch in tok)
+        acronym = tok.isalpha() and tok.isupper() and len(tok) >= 2
+        if not (mixed or acronym):
+            continue
+        t = tok.lower().replace("-", "")
+        if t.endswith("s") and len(t) > 3:  # plural: GLP-1s, LDLs
+            t = t[:-1]
+        out.add(t)
+    return out
+
+
+def _has_term(term: str, text: str) -> bool:
+    return term in text.lower().replace("-", "")
+
+
+def _missing_terms(text: str, sources: list[str]) -> set[str]:
+    """Distinctive terms in text that appear in none of the sources."""
+    return {t for t in distinctive_terms(text) if not any(_has_term(t, s) for s in sources)}
+
+
+# A sentence that only says what the sources do not cover is kept without a citation.
+_COVERAGE_NOTE = re.compile(r"^\s*(the )?(sources?|library|passages?) (do|does|did) not (mention|cover|say|discuss|"
+                            r"address|include)\b[^\[\]]*$", re.I)
 
 
 def _sentences(text: str) -> list[str]:
@@ -139,7 +209,7 @@ def _cite(c: dict, excerpt: str | None = None) -> dict:
     return out
 
 
-def answer(question: str, chunks: list[dict], llm=ollama_generate,
+def answer(question: str, chunks: list[dict], llm=ollama_chat,
            n_context: int = N_CONTEXT, min_score: float = MIN_SCORE, rerank=None) -> dict:
     """chunks: the k fetched records in search order. They are reranked locally, then the best
     n_context become the model's sources. The score threshold uses the search score of the top hit."""
@@ -162,6 +232,10 @@ def answer(question: str, chunks: list[dict], llm=ollama_generate,
 
     if not ctx or (top_score is not None and top_score < min_score):
         return decline()
+    # The question names something specific (GLP-1, XR-417) that none of the sources mention: decline
+    # rather than let the model fill the gap from memory.
+    if _missing_terms(question, [c["title"] + " " + c["text"] for c in ctx]):
+        return decline()
 
     sources = "\n\n".join(f"[{i}] {c['title']}\n{c['text']}" for i, c in enumerate(ctx, 1))
     # Small models sometimes append NO_ANSWER after a real answer; drop the token and check what is left.
@@ -169,8 +243,14 @@ def answer(question: str, chunks: list[dict], llm=ollama_generate,
 
     kept: list[tuple[str, list[int]]] = []
     removed = 0
+    notes: list[str] = []
     for s, cited, inherited in _claims(text, len(ctx)):
+        if not cited and _COVERAGE_NOTE.match(s):  # "The sources do not mention X." Honest, keep it.
+            notes.append(s)
+            continue
         ok = _supported(s, cited, ctx)
+        if ok and _missing_terms(s, [ctx[n - 1]["title"] + " " + ctx[n - 1]["text"] for n in ok]):
+            ok = []  # names a specific drug/test/code its cited sources do not contain
         if not ok:
             removed += 1
         elif inherited:
@@ -182,7 +262,7 @@ def answer(question: str, chunks: list[dict], llm=ollama_generate,
 
     used = sorted({n for _, ok in kept for n in ok})
     renumber = {n: i for i, n in enumerate(used, 1)}
-    body = " ".join(_CITE.sub(lambda m: f"[{renumber[int(m.group(1))]}]", s) for s, _ in kept)
+    body = " ".join([_CITE.sub(lambda m: f"[{renumber[int(m.group(1))]}]", s) for s, _ in kept] + notes)
     body = re.sub(r"\s+([.,;:!?])", r"\1", re.sub(r"[ \t]{2,}", " ", body)).strip()
     citations = [_cite(ctx[n - 1], _excerpt(ctx[n - 1], [s for s, ok in kept if n in ok])) for n in used]
     return result("answered", body, citations, removed)

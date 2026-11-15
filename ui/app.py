@@ -43,11 +43,12 @@ DECOYS = [
     "How much salt should I eat in a day?",
     "What is MRSA and how do people catch it?",
 ]
-STAGE_LABEL = {"embedding": "Embedding question on device", "encrypting": "Encrypting on device",
-               "scoring": "Server scoring every chunk", "fetching": "Fetching the top chunks",
-               "answering": "Writing the answer on device"}
+MASCOT = "Burrow"
+STAGE_LABEL = {"embedding": "Reading your question on this laptop", "encrypting": "Locking it on this laptop",
+               "scoring": "The server is searching without reading it", "fetching": "Fetching the best passages privately",
+               "answering": "Writing your answer on this laptop"}
 
-st.set_page_config(page_title="Blind RAG", page_icon=":lock:", layout="wide",
+st.set_page_config(page_title="Blind RAG", page_icon=":badger:", layout="wide",
                    initial_sidebar_state="collapsed")
 ss = st.session_state
 ss.setdefault("history", [])     # list of {"q", "result", "trace", "plain"}
@@ -141,7 +142,7 @@ table.br-t {border-collapse: collapse; width: 100%; font-size: 14px; background:
 table.br-t th, table.br-t td {text-align: left; padding: 9px 12px; border-bottom: 1px solid #E6E9EF; vertical-align: top;}
 table.br-t th {font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: #4A5362;}
 
-/* ---- redesign: header, status pill, Locket, receipts ---- */
+/* ---- redesign: header, status pill, Burrow, receipts ---- */
 .br-head {display: flex; align-items: center; gap: 12px;}
 .br-head .sub {font-size: 12px; color: #4A5362; margin-top: 2px;}
 .br-pillbar {display: flex; justify-content: flex-end;}
@@ -154,7 +155,18 @@ table.br-t th {font-size: 12px; letter-spacing: .05em; text-transform: uppercase
 .br-problems {background: #FDECEA; border: 1px solid #F3B8B1; border-radius: 12px; padding: 12px 16px; margin: 10px 0 4px;
               font-size: 14px; color: #7A1810; display: flex; flex-direction: column; gap: 6px;}
 .br-problems code {background: #fff; color: #12151C; padding: 2px 6px; border-radius: 4px; font-size: 12px;}
-.st-key-welcome {background: #fff; border: 1px solid #DDE1E8; border-radius: 18px; padding: 26px 28px 18px; margin: 18px 0 10px;}
+.st-key-welcome {background: transparent; border: 0; padding: 0; margin: 18px 0 10px;}
+.br-say {display: flex; gap: 12px; align-items: flex-start;}
+.br-say .av {flex: 0 0 44px; width: 44px; margin-top: 2px;}
+.br-say .av.big {flex-basis: 72px; width: 72px;}
+.br-say .msg {flex: 1; min-width: 0;}
+.br-say .nm {font-size: 12px; font-weight: 600; color: #4A5362; margin: 0 0 4px 2px;}
+.br-say .br-card2 {border-radius: 4px 16px 16px 16px;}
+.br-bubble {background: #fff; border: 1px solid #DDE1E8; border-radius: 4px 18px 18px 18px; padding: 16px 20px;
+  font-size: 16px; line-height: 1.6; color: #2B313C; max-width: 620px;}
+.br-bubble b {font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 19px; color: #12151C; display: block; margin-bottom: 4px;}
+.st-key-welcome .br-try, .st-key-welcome .stButton {margin-left: 84px;}
+.st-key-welcome .stButton {width: calc(100% - 84px); max-width: 620px;}
 .br-welcome {display: flex; gap: 22px; align-items: center; flex-wrap: wrap;}
 .br-welcome h3 {margin: 0 0 6px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 22px;}
 .br-welcome p {margin: 0; font-size: 15px; line-height: 1.55; color: #2B313C; max-width: 520px;}
@@ -303,16 +315,21 @@ def answer_html(text):
 
 
 def locket(px=40, wave=False):
-    """Locket, Blind RAG's own mascot: a padlock with a face. Original art, inline SVG."""
-    arm = ('<path d="M37 24 q3 -3 2 -7" fill="none" stroke="#1F4FC9" stroke-width="2.6" stroke-linecap="round"/>'
-           if wave else "")
-    return (f'<svg width="{px}" height="{round(px * 1.1)}" viewBox="0 0 40 44" role="img" '
-            f'aria-label="Locket, the Blind RAG mascot">'
-            '<path d="M11 18 V12 a9 9 0 0 1 18 0 V18" fill="none" stroke="#12151C" stroke-width="3.2" stroke-linecap="round"/>'
-            '<rect x="3" y="16" width="34" height="26" rx="10" fill="#1F4FC9"/>'
-            '<circle cx="14" cy="26" r="2.5" fill="#fff"/><circle cx="26" cy="26" r="2.5" fill="#fff"/>'
-            '<path d="M15 33 q5 4 10 0" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/>'
-            f'{arm}</svg>')
+    """Burrow, Blind RAG's own mascot: a badger in a blue scarf. Original art, inline SVG."""
+    return (f'<svg width="{px}" height="{px}" viewBox="0 0 64 64" role="img" '
+            f'aria-label="{MASCOT}, the Blind RAG badger">'
+            '<circle cx="12.5" cy="14" r="6.5" fill="#2B2F3A"/><circle cx="51.5" cy="14" r="6.5" fill="#2B2F3A"/>'
+            '<path d="M8 11.5 a6.5 6.5 0 0 1 9 -3" fill="none" stroke="#F6F3EC" stroke-width="2.2" stroke-linecap="round"/>'
+            '<path d="M56 11.5 a6.5 6.5 0 0 0 -9 -3" fill="none" stroke="#F6F3EC" stroke-width="2.2" stroke-linecap="round"/>'
+            '<path d="M32 8 C49 8 58 20 56 33 C54 46 44 58 32 58 C20 58 10 46 8 33 C6 20 15 8 32 8Z" fill="#F6F3EC" stroke="#2B2F3A" stroke-width="2"/>'
+            '<path d="M12.5 17 C15.5 11.5 21 9.3 26 10 C27 22 28.5 34 30 45.5 C27 45.5 24.5 44 23 41.5 C18.5 34 14.5 26 12.5 17Z" fill="#2B2F3A"/>'
+            '<path d="M51.5 17 C48.5 11.5 43 9.3 38 10 C37 22 35.5 34 34 45.5 C37 45.5 39.5 44 41 41.5 C45.5 34 49.5 26 51.5 17Z" fill="#2B2F3A"/>'
+            '<circle cx="22.3" cy="29" r="3.4" fill="#fff"/><circle cx="41.7" cy="29" r="3.4" fill="#fff"/>'
+            '<circle cx="22.9" cy="29.5" r="1.8" fill="#12151C"/><circle cx="41.1" cy="29.5" r="1.8" fill="#12151C"/>'
+            '<ellipse cx="32" cy="46.5" rx="5" ry="3.5" fill="#12151C"/>'
+            '<path d="M27.5 52 q4.5 3.6 9 0" fill="none" stroke="#12151C" stroke-width="1.8" stroke-linecap="round"/>'
+            '<path d="M17 57.5 q15 8 30 0" fill="none" stroke="#1F4FC9" stroke-width="5" stroke-linecap="round"/>'
+            '</svg>')
 
 
 def turn_html(t):
@@ -355,16 +372,17 @@ def turn_html(t):
                  f'<details><summary>Full passage</summary><div>{esc(cit.get("text"))}</div></details></div>')
     if result["declined"]:
         body = ('<div class="br-label">No reliable source found</div>'
-                '<p class="br-answer">The library did not contain a passage that answers this, so no answer was '
-                'written. These are the closest passages.</p>')
+                '<p class="br-answer">I couldn\'t find a passage in my library that answers this, so I won\'t guess. '
+                'These are the closest passages I have.</p>')
         card = "br-card2 declined"
     else:
         body = f'<p class="br-answer">{answer_html(answer)}</p>'
         card = "br-card2"
     return (f'<div class="br-turn"><div class="br-q">{esc(q)}</div>'
+            f'<div class="br-say"><div class="av">{locket(44)}</div><div class="msg"><div class="nm">{MASCOT}</div>'
             f'<div class="{card}"><div class="hd"><span class="b {cls}">{esc(badge_txt)}</span><span>{esc(right)}</span></div>'
             f'<div class="bd">{urgent_html}{body}<div class="br-srcs">{srcs}</div>'
-            f'<div class="ft">{esc(c.DISCLAIMER)}<br>How this ran: {esc(detail)}</div></div></div></div>')
+            f'<div class="ft">{esc(c.DISCLAIMER)}<br>How this ran: {esc(detail)}</div></div></div></div></div></div>')
 
 
 def _bars(text):
@@ -549,8 +567,8 @@ with head_r:
     show_server = st.toggle("Show what the server saw", key="show_server")
 st.markdown(CSS.replace("MAXW", "1180" if show_server else "880"), unsafe_allow_html=True)
 with head_l:
-    st.markdown(f'<div class="br-head">{locket(40)}<div><div class="br-brand">Blind RAG</div>'
-                '<div class="sub">Your laptop holds the only key</div></div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="br-head">{locket(46)}<div><div class="br-brand">Blind RAG</div>'
+                f'<div class="sub">Ask {MASCOT}. Your laptop holds the only key.</div></div></div>', unsafe_allow_html=True)
 
 if down:   # problems are never hidden: name each one and its fix
     st.markdown('<div class="br-problems">' + "".join(
@@ -580,7 +598,7 @@ with tab_ask:
                                    "plaintext demo server, so its log can be shown next to Blind RAG's.")
     with st.form("ask", clear_on_submit=True):
         f1, f2 = st.columns([7, 2], vertical_alignment="center")
-        question = f1.text_input("Your question", placeholder="Ask a sensitive question",
+        question = f1.text_input("Your question", placeholder=f"Ask {MASCOT} a sensitive question",
                                  label_visibility="collapsed")
         go = f2.form_submit_button("Ask privately", type="primary")
     pending = ss.pop("pending_q", None)
@@ -591,7 +609,7 @@ with tab_ask:
             if canned_mode:
                 turn = {"q": question, "result": c.normalize_result(canned.ask(question)), "trace": None}
             else:
-                with status_box.status("Locking your question and searching…", expanded=True) as status:
+                with status_box.status(f"{MASCOT} is locking your question and searching…", expanded=True) as status:
                     def on_stage(name, secs):
                         st.write(f"{STAGE_LABEL[name]} · {secs:.2f} s")
                     try:
@@ -614,10 +632,13 @@ with tab_ask:
     with history_box:
         if not ss.history and not ss.error:
             with st.container(key="welcome"):
-                st.markdown(f'<div class="br-welcome">{locket(92)}<div><h3>Hi, I\'m Locket.</h3>'
-                            '<p>I lock your question before it leaves this laptop. The server does the math on the '
-                            'lock and never sees inside, so it can\'t keep, leak or sell what you asked.</p></div></div>'
-                            '<div class="br-try">Try asking</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="br-say"><div class="av big">{locket(72)}</div><div class="msg">'
+                    f'<div class="nm">{MASCOT}</div><div class="br-bubble"><b>Hi, I\'m {MASCOT}.</b> Ask me a health '
+                    'question you\'d rather keep to yourself. I lock it before it leaves this laptop, the '
+                    'library\'s server searches without ever reading it, and I write your answer right here, '
+                    'with sources.</div></div></div><div class="br-try">You could ask me</div>',
+                    unsafe_allow_html=True)
                 for i, sq in enumerate(SUGGESTIONS):
                     if st.button(sq, key=f"sugg{i}", width="stretch"):
                         ss.pending_q = sq
@@ -626,7 +647,7 @@ with tab_ask:
         if ss.error:
             e = ss.error
             fix = f'<br>Fix: <code>{esc(e["fix"])}</code>' if e["fix"] else ""
-            st.markdown(f'<div class="br-err"><b>No answer for “{esc(e["q"])}” (failed at: {esc(e["stage"])})</b>'
+            st.markdown(f'<div class="br-err"><b>Sorry, I could not answer “{esc(e["q"])}” (failed at: {esc(e["stage"])})</b>'
                         f'{esc(e["message"])}{fix}<br><span style="font-size:13px">Nothing was retried in a '
                         f'weaker mode.</span></div>', unsafe_allow_html=True)
 

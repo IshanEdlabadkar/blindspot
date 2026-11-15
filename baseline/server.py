@@ -96,12 +96,13 @@ def main():
     args = ap.parse_args()
 
     from baseline.ask_plain import ask_plain, default_index
-    from client.answer import ollama_generate
+    from client.answer import ollama_generate, rerank_chunks
     from common.embedding import embed_query_float
 
-    print("warming up the embedder and local model...", flush=True)
+    print("warming up the embedder, reranker and local model...", flush=True)
     default_index()
     embed_query_float("warm up")
+    rerank_chunks("warm up", [{"id": 0, "title": "t", "url": "u", "updated": "d", "text": "warm up"}])
     ollama_generate("Say OK.")
 
     srv = PlainServer((args.host, args.port), ask_plain)

@@ -6,6 +6,7 @@ No citation is ever added that the model did not write.
 """
 import re
 import time
+from functools import lru_cache
 
 import requests
 
@@ -38,6 +39,29 @@ _STOP = {"about", "after", "also", "because", "been", "before", "being", "could"
          "some", "such", "than", "that", "their", "them", "there", "these", "they", "this", "very",
          "were", "what", "when", "where", "which", "while", "will", "with", "would", "your", "you're"}
 _CITE = re.compile(r"\[(\d+)\]")
+
+
+RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L6-v2"
+RERANK_REVISION = "233902d25c440f23af6f7d6e94d2946bac0bee0a"
+
+
+@lru_cache(maxsize=1)
+def _cross_encoder():
+    from sentence_transformers import CrossEncoder
+    return CrossEncoder(RERANK_MODEL, revision=RERANK_REVISION, device="cpu")
+
+
+def rerank_chunks(question: str, chunks: list[dict]) -> list[dict]:
+    """Reorder retrieved chunks by a local cross-encoder; each gets "rerank_score". Runs on the device."""
+    if not chunks:
+        return []
+    scores = _cross_encoder().predict([(question, f"{c['title']}\n{c['text']}") for c in chunks])
+    ranked = sorted(zip(scores, range(len(chunks))), key=lambda p: -p[0])
+    return [{**chunks[i], "rerank_score": float(s)} for s, i in ranked]
+
+
+def _default_rerank(question: str, chunks: list[dict]) -> list[dict]:
+    return rerank_chunks(question, chunks)
 
 
 def ollama_generate(prompt: str, model: str = MODEL, url: str = OLLAMA_URL, timeout: float = 180) -> str:
@@ -116,9 +140,14 @@ def _cite(c: dict, excerpt: str | None = None) -> dict:
 
 
 def answer(question: str, chunks: list[dict], llm=ollama_generate,
-           n_context: int = N_CONTEXT, min_score: float = MIN_SCORE) -> dict:
+           n_context: int = N_CONTEXT, min_score: float = MIN_SCORE, rerank=None) -> dict:
+    """chunks: the k fetched records in search order. They are reranked locally, then the best
+    n_context become the model's sources. The score threshold uses the search score of the top hit."""
     t0 = time.perf_counter()
     urgent = urgent_notice(question)
+    top_score = chunks[0].get("score") if chunks else None
+    chunks = (rerank or _default_rerank)(question, chunks)
+    t_rerank = (time.perf_counter() - t0) * 1000
     ctx = chunks[:n_context]
 
     def result(status, text, citations, removed=0):
@@ -126,12 +155,12 @@ def answer(question: str, chunks: list[dict], llm=ollama_generate,
         return {"status": status, "answer": f"{body}\n\n{DISCLAIMER}", "citations": citations,
                 "urgent": {"kind": urgent[0], "message": urgent[1]} if urgent else None,
                 "checks": {"removed_sentences": removed},
-                "timings": {"answer_ms": (time.perf_counter() - t0) * 1000}}
+                "timings": {"rerank_ms": t_rerank, "answer_ms": (time.perf_counter() - t0) * 1000 - t_rerank}}
 
     def decline(removed=0):
         return result("declined", DECLINE_MESSAGE, [_cite(c) for c in chunks[:3]], removed)
 
-    if not ctx or ("score" in ctx[0] and ctx[0]["score"] < min_score):
+    if not ctx or (top_score is not None and top_score < min_score):
         return decline()
 
     sources = "\n\n".join(f"[{i}] {c['title']}\n{c['text']}" for i, c in enumerate(ctx, 1))

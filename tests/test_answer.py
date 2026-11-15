@@ -1,6 +1,46 @@
+import pytest
+
 from client import answer as answer_mod
 from client.answer import DECLINE_MESSAGE, DISCLAIMER, answer
 from client.safety import CRISIS_MESSAGE, EMERGENCY_MESSAGE
+
+
+@pytest.fixture(autouse=True)
+def no_real_reranker(monkeypatch):
+    """Unit tests keep retrieval order; the real cross-encoder is covered by the slow test."""
+    monkeypatch.setattr(answer_mod, "_default_rerank", lambda q, chunks: list(chunks))
+
+
+def test_reranker_order_decides_which_chunks_the_model_sees():
+    seen = {}
+
+    def llm(prompt):
+        seen["prompt"] = prompt
+        return "Fact seven [1]."
+
+    def move_seven_first(q, chunks):
+        return [chunks[7]] + [c for c in chunks if c["id"] != 7]
+
+    r = answer("q?", CHUNKS, llm=llm, rerank=move_seven_first)
+    assert "[1] T7" in seen["prompt"]
+    assert r["status"] == "answered" and r["citations"][0]["id"] == 7
+
+
+def test_score_threshold_uses_search_score_of_top_retrieved_chunk():
+    chunks = [{**c, "score": 0.9 if c["id"] == 0 else 0.1} for c in CHUNKS]
+    r = answer("q?", chunks, llm=lambda p: "Fact nine [1].", min_score=0.5,
+               rerank=lambda q, cs: list(reversed(cs)))
+    assert r["status"] == "answered"
+
+
+@pytest.mark.slow
+def test_real_reranker_puts_fractures_first_for_broken_shoulder():
+    shoulder = {"id": 1, "title": "Dislocated Shoulder", "url": "u1", "updated": "d",
+                "text": "A dislocated shoulder happens when the upper arm bone pops out of the socket."}
+    fracture = {"id": 2, "title": "Fractures", "url": "u2", "updated": "d",
+                "text": "A fracture is a broken bone. Symptoms include pain, swelling and a bone that looks out of place."}
+    ranked = answer_mod.rerank_chunks("I think I broke a bone in my shoulder", [shoulder, fracture])
+    assert ranked[0]["id"] == 2 and "rerank_score" in ranked[0]
 
 CHUNKS = [{"id": i, "title": f"T{i}", "url": f"u{i}", "updated": "d", "text": f"fact {i}",
            "score": 0.8 - i * 0.01} for i in range(10)]

@@ -36,7 +36,7 @@ demo-compare:  ## same as make demo (which now always starts B's plaintext serve
 	PLAIN=1 ./scripts/start_demo.sh
 
 stop:          ## stop the server, helper, plaintext server and UI left running (do this after git pull)
-	-@for port in 8080 8090 8001; do pids=$$(lsof -ti tcp:$$port -sTCP:LISTEN 2>/dev/null); [ -n "$$pids" ] && kill $$pids 2>/dev/null; done; \
+	-@for port in 8080 8081 8082 8090 8001; do pids=$$(lsof -ti tcp:$$port -sTCP:LISTEN 2>/dev/null); [ -n "$$pids" ] && kill $$pids 2>/dev/null; done; \
 	  pkill -f "[g]o run . -data"; pkill -f "[g]o run ./cmd/crypto-helper"; pkill -f "[s]treamlit run ui/app.py"; \
 	  echo "stopped"
 

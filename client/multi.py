@@ -17,11 +17,15 @@ S x k fetched chunks by score and gives the best k to the answer step, which rer
 """
 from __future__ import annotations
 
+import json
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from client.pipeline import Pipeline, PipelineError, load_answer, load_crypto
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _compat_key(m: dict) -> tuple:
@@ -29,9 +33,23 @@ def _compat_key(m: dict) -> tuple:
     return (e.get("model"), e.get("revision"), e.get("dim"), e.get("query_prefix"), q.get("scale"))
 
 
+def server_list_file() -> Path:
+    """servers.json (local servers, the default) or another list such as servers.remote.json."""
+    f = os.environ.get("BLIND_RAG_SERVERS_FILE", "servers.json")
+    p = Path(f)
+    return p if p.is_absolute() else ROOT / p
+
+
 def configured_servers() -> list[str]:
-    """Servers offered to the user: BLIND_RAG_SERVERS (comma-separated), else BLIND_RAG_SERVER."""
-    raw = os.environ.get("BLIND_RAG_SERVERS") or os.environ.get("BLIND_RAG_SERVER", "http://127.0.0.1:8080")
+    """Servers offered to the user: BLIND_RAG_SERVERS (comma-separated), else BLIND_RAG_SERVER, else the
+    urls in the server list file (servers.json, or BLIND_RAG_SERVERS_FILE), else the local default."""
+    raw = os.environ.get("BLIND_RAG_SERVERS") or os.environ.get("BLIND_RAG_SERVER")
+    if not raw:
+        try:
+            raw = ",".join(e["url"] for e in json.loads(server_list_file().read_text()))
+        except (OSError, ValueError, KeyError, TypeError):
+            raw = ""
+    raw = raw or "http://127.0.0.1:8080"
     out = []
     for s in raw.split(","):
         s = s.strip().rstrip("/")

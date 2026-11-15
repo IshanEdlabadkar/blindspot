@@ -222,4 +222,5 @@ Record a backup video of every step.
 | C's run commands and checklist | `README_C.md` |
 | Presenting: script, prompts, runbook | `demo/` |
 | How B built the corpus | `ingest/`, `docs/superpowers/plans/2026-11-14-b-ml-and-content.md` |
+| Adding sources (Genetics, MyHealthfinder) | `docs/corpus.md`, `make corpus-expanded` |
 | Eval results | `eval/results/` |

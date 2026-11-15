@@ -1,7 +1,7 @@
 # Run from the repo root. Crypto targets need Go + SEAL (see SETUP.md).
 # DATA: folder with manifest.json, score_table.bin, fetch_store.bin (B writes artifacts/).
 DATA ?= artifacts
-.PHONY: seal test server helper integration demo demo-compare stop preflight
+.PHONY: seal test server helper integration demo demo-compare stop preflight corpus-expanded
 
 seal:          ## one-time: build and install Microsoft SEAL 4.1.1
 	./scripts/install_seal.sh
@@ -35,3 +35,7 @@ stop:          ## stop the server, helper, plaintext server and UI left running 
 
 preflight:     ## with make demo running: the 8-step smoke test before presenting (real crypto + real model)
 	./scripts/start_demo.sh --preflight
+
+corpus-expanded: ## build artifacts-expanded/: MedlinePlus + MedlinePlus Genetics + MyHealthfinder (needs internet, ~5 min)
+	$$(./scripts/find_python.sh sentence_transformers) -m ingest.build_multi --out artifacts-expanded
+	@echo "Serve it with:  make stop && make demo DATA=artifacts-expanded"

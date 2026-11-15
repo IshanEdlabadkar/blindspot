@@ -100,6 +100,7 @@ The app runs the real encrypted path unless you ask for the mock like this, and 
 | `make demo-compare` | The same, plus a plaintext "normal RAG" server for the side-by-side log contrast |
 | `make preflight` | 8-step smoke test before presenting |
 | `make stop` | Stop any server or helper left running (do this after `git pull`) |
+| `make corpus-expanded` | Build a larger library with MedlinePlus Genetics and MyHealthfinder ([docs/corpus.md](docs/corpus.md)) |
 | `make integration` | Checks the encrypted top 10 equals the plaintext top 10 |
 | `make test` | Crypto unit and HTTP tests |
 | `make measure` | Latency, bytes and CPU per question, written to `data/measurements.md` |

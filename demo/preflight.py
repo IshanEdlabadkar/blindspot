@@ -24,6 +24,7 @@ ap.add_argument("--embed", choices=["real", "fake"], default=os.environ.get("BLI
 ap.add_argument("--question", default="How is chlamydia treated and can I get it again?")
 ap.add_argument("--off-topic", default="Can my landlord evict me for reporting mold?")
 ap.add_argument("--log", default=str(ROOT / "data" / "server.log"))
+ap.add_argument("--data", default=os.environ.get("DATA", "artifacts"), help="corpus folder the server was started on")
 args = ap.parse_args()
 os.environ["BLIND_RAG_EMBED"] = args.embed
 
@@ -51,10 +52,11 @@ if "FAIL" in results:
 
 # 2. manifest matches the local tables
 m = requests.get(args.server + "/v1/manifest", timeout=10).json()
-local = json.loads((ROOT / "artifacts" / "manifest.json").read_text())
-check("2. corpus_version matches artifacts/", m["corpus_version"] == local["corpus_version"],
+DATA_DIR = ROOT / args.data
+local = json.loads((DATA_DIR / "manifest.json").read_text())
+check(f"2. corpus_version matches {args.data}/", m["corpus_version"] == local["corpus_version"],
       f"server {m['corpus_version']}, local {local['corpus_version']}")
-check("2. table hashes match artifacts/", m.get("hashes") == local.get("hashes"))
+check(f"2. table hashes match {args.data}/", m.get("hashes") == local.get("hashes"))
 check("2. server is the encrypted one", "seed" in m.get("scoring", {}))
 
 # 3. one answerable question through the real encrypted path
@@ -70,7 +72,7 @@ check("3. really encrypted, not mock", trace["mode"]["crypto"] == "real" and not
 
 # 4. encrypted ranking equals plaintext int8 scoring
 n = m["num_chunks"]
-table = np.fromfile(ROOT / "artifacts" / "score_table.bin", dtype=np.int8).reshape(n, c.DIM).astype(np.int32)
+table = np.fromfile(DATA_DIR / "score_table.bin", dtype=np.int8).reshape(n, c.DIM).astype(np.int32)
 q = emb.quantize(emb.embed(args.question, m["embedding"].get("query_prefix", c.QUERY_PREFIX)),
                  m["quantization"]["scale"]).astype(np.int32)
 plain_scores = table @ q
@@ -78,7 +80,7 @@ expect = np.argsort(-plain_scores, kind="stable")[:m["top_k"]].tolist()
 check("4. encrypted top 10 equals plaintext top 10", trace["top_ids"] == expect, f"ids {trace['top_ids'][:5]}...")
 
 # 5. citations resolve to real fetched chunks
-store = (ROOT / "artifacts" / "fetch_store.bin").read_bytes()
+store = (DATA_DIR / "fetch_store.bin").read_bytes()
 L = m["pir"]["record_bytes"]
 ok = bool(result["citations"])
 for cit in result["citations"]:

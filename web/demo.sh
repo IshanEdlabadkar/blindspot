@@ -93,5 +93,5 @@ if [ "${NO_OPEN:-0}" != 1 ]; then
       fi; sleep 1; done ) &
 fi
 BLIND_RAG_SERVERS="$WIRE" BLIND_RAG_PLAIN_SERVER=http://127.0.0.1:9001 BLIND_RAG_CRYPTO=real BLIND_RAG_ANSWER=real \
-  BLIND_RAG_FETCH="${BLIND_RAG_FETCH:-download}" \
+  BLIND_RAG_FETCH="${BLIND_RAG_FETCH:-pir}" \
   "$PY" -m uvicorn api.app:app --host 127.0.0.1 --port 8600 --log-level warning

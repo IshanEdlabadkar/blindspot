@@ -59,7 +59,7 @@ func TestEndToEndHTTP(t *testing.T) {
 	n, d, L := 5000, 384, 2048
 	dir := t.TempDir()
 	table := writeTestCorpus(t, dir, n, d, L)
-	s, err := load(dir, false, true)
+	s, err := load(dir, false, true, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestEndToEndHintModeHTTP(t *testing.T) {
 	n, d, L := 2101, 384, 2048
 	dir := t.TempDir()
 	table := writeTestCorpus(t, dir, n, d, L)
-	s, err := load(dir, false, true)
+	s, err := load(dir, false, true, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,4 +194,59 @@ func TestEndToEndHintModeHTTP(t *testing.T) {
 			t.Logf("hint %.1f MB once; per question upload %d B; all %d scores exact", float64(len(hintBytes))/1e6, len(body), n)
 		}
 	}
+}
+
+func TestFetchPIRHTTP(t *testing.T) {
+	n, d, L := 2101, 384, 2048
+	dir := t.TempDir()
+	writeTestCorpus(t, dir, n, d, L)
+	store, _ := os.ReadFile(filepath.Join(dir, "fetch_store.bin"))
+	s, err := load(dir, false, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/manifest", s.logged("/v1/manifest", s.handleManifest))
+	mux.HandleFunc("GET /v1/fetch_hint", s.logged("/v1/fetch_hint", s.handleFetchHint))
+	mux.HandleFunc("POST /v1/fetch", s.logged("/v1/fetch", s.handleFetch))
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	resp, _ := http.Get(ts.URL + "/v1/manifest")
+	var man map[string]any
+	json.NewDecoder(resp.Body).Decode(&man)
+	pm := man["pir"].(map[string]any)
+	resp, _ = http.Get(pm["hint_url"].(string))
+	hb, _ := io.ReadAll(resp.Body)
+	if blindcrypto.HintSHA256(hb) != pm["hint_sha256"] {
+		t.Fatal("fetch hint hash mismatch")
+	}
+	sb, _ := hex.DecodeString(pm["seed"].(string))
+	var seed rand.PRGKey
+	copy(seed[:], sb)
+	info, _ := blindcrypto.FetchDBInfo(uint64(n), uint64(L))
+	h, err := blindcrypto.DecodeHint(hb, info.L, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fc := blindcrypto.NewFetchClient(&seed, info, h, uint64(n), uint64(L))
+	for _, idx := range []uint64{0, 1234, 2100} {
+		k, q, _ := fc.Query(idx)
+		resp, err := post(ts.URL+"/v1/fetch", "test.1", blindcrypto.MarshalQuery(q))
+		if err != nil || resp.StatusCode != 200 {
+			t.Fatalf("fetch: %v %v", err, resp.Status)
+		}
+		a, err := blindcrypto.UnmarshalAnswer(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec, err := k.Decrypt(a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(rec, store[idx*uint64(L):(idx+1)*uint64(L)]) {
+			t.Fatalf("record %d mismatch", idx)
+		}
+	}
+	t.Logf("real PIR over HTTP: 3 records exact; fetch hint %.1f MB", float64(len(hb))/1e6)
 }

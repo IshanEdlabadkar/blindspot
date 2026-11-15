@@ -3,7 +3,7 @@ services:
   - type: web
     name: blind-rag-server
     runtime: docker
-    plan: 0.5c-512mb          # hint mode needs ~100 MB; the free plan sleeps when idle
+    plan: 0.5c-512mb          # ~210 MB with hint mode + real PIR; the free plan sleeps when idle
     region: oregon
     branch: main
     dockerfilePath: ./Dockerfile

@@ -72,6 +72,8 @@ def main():
     ap.add_argument("--log", default=str(ROOT / "data" / "server.log"))
     ap.add_argument("--server-pid", type=int, default=None)
     ap.add_argument("--out", default=str(ROOT / "data" / "measurements.md"))
+    ap.add_argument("--fetch", choices=["download", "pir"], default="download",
+                    help="download = trivial PIR (default); pir = real PIR, k private fetches per question")
     a = ap.parse_args()
 
     from client import crypto_client as cc
@@ -115,15 +117,26 @@ def main():
             "Content-Type": "application/octet-stream", "X-Corpus-Version": manifest["corpus_version"]})
         resp.raise_for_status()
         t_score = time.perf_counter() - t
-        cpu1 = cpu_seconds(pid)
         t = time.perf_counter()
         scores = cc.decrypt_scores(key, resp.content)
         top = np.argsort(-scores, kind="stable")[:k]
         L = manifest["pir"]["record_bytes"]
-        _ = [store[int(j) * L:(int(j) + 1) * L] for j in top]
+        f_up = f_down = 0
+        if a.fetch == "pir":
+            for j in top:
+                sel = cc.make_selector(key, int(j), n)
+                fr = http.post(a.server + "/v1/fetch", data=sel, timeout=60, headers={
+                    "Content-Type": "application/octet-stream", "X-Corpus-Version": manifest["corpus_version"]})
+                fr.raise_for_status()
+                rec = cc.decrypt_record(key, fr.content)
+                assert rec == store[int(j) * L:(int(j) + 1) * L], "PIR record mismatch"
+                f_up, f_down = f_up + len(sel), f_down + len(fr.content)
+        else:
+            _ = [store[int(j) * L:(int(j) + 1) * L] for j in top]
         t_dec = time.perf_counter() - t
+        cpu1 = cpu_seconds(pid)  # scoring plus, in PIR mode, the k fetches
         rows.append({"encrypt": t_enc, "score_rt": t_score, "decrypt_rank_fetch": t_dec,
-                     "total": t_enc + t_score + t_dec, "up": len(body), "down": len(resp.content),
+                     "total": t_enc + t_score + t_dec, "up": len(body) + f_up, "down": len(resp.content) + f_down,
                      "server_cpu": None if cpu0 is None else cpu1 - cpu0})
         print(f"q{i+1:02d}  encrypt {fmt_t(t_enc)}  score {fmt_t(t_score)}  decrypt+rank {fmt_t(t_dec)}  "
               f"total {fmt_t(rows[-1]['total'])}  up {fmt_b(len(body))}  down {fmt_b(len(resp.content))}")
@@ -149,14 +162,17 @@ def main():
         "",
         f"Machine: {platform.node()} ({platform.system()} {platform.machine()}), "
         f"N = {n}, d = {d}, k = {k}, {a.questions} questions, {a.think:g} s between questions. "
-        f"Corpus {manifest['corpus_version']}. Scoring mode: **{mode}**. Medians.",
+        f"Corpus {manifest['corpus_version']}. Scoring mode: **{mode}**, fetch: **{a.fetch}**. Medians.",
         "",
         "| Metric | Target | Measured | Met |",
         "| --- | --- | --- | --- |",
         f"| Encrypt on device | (not in spec) | {fmt_t(med['encrypt'])} | |",
         f"| Encrypted scoring round trip | < 2 s | {fmt_t(med['score_rt'])} | {'yes' if med['score_rt'] < 2 else 'no'} |",
-        f"| Private fetch of k = 10 (trivial PIR) | < 3 s | {fmt_t(med['decrypt_rank_fetch'])} per question, "
-        f"plus {fmt_t(store_secs)} once for the {fmt_b(store_bytes)} store | {'yes' if med['decrypt_rank_fetch'] < 3 else 'no'} |",
+        (f"| Private fetch of k = 10 (real PIR, {k} fetches) | < 3 s | {fmt_t(med['decrypt_rank_fetch'])} per question, each record checked | "
+         if a.fetch == "pir" else
+         f"| Private fetch of k = 10 (trivial PIR) | < 3 s | {fmt_t(med['decrypt_rank_fetch'])} per question, "
+         f"plus {fmt_t(store_secs)} once for the {fmt_b(store_bytes)} store | ")
+        + f"{'yes' if med['decrypt_rank_fetch'] < 3 else 'no'} |",
         f"| Crypto part of end-to-end latency | < 10 s total | {fmt_t(med['total'])} | {'yes' if med['total'] < 10 else 'no'} |",
         f"| Upload per query | < 5 MB | {fmt_b(med['up'])} | {'yes' if med['up'] < 5e6 else 'no'} |",
         f"| Download per query | < 20 MB | {fmt_b(med['down'])}, plus one-time downloads below | "
@@ -168,7 +184,9 @@ def main():
         "",
         f"One-time per corpus version: manifest {fmt_b(manifest_bytes)}, "
         + (f"scoring hint {fmt_b(hint_bytes)} (cached on disk after the first run), " if hint_bytes else "")
-        + f"fetch store {fmt_b(store_bytes)}. Setup took {fmt_t(setup_secs)} (key setup {fmt_t(keygen_secs)}).",
+        + (f"fetch hint {fmt_b(manifest['pir'].get('hint_bytes', 0))} (real PIR; the {fmt_b(store_bytes)} store was "
+           "downloaded here only to check every fetched record). " if a.fetch == "pir" else f"fetch store {fmt_b(store_bytes)}. ")
+        + f"Setup took {fmt_t(setup_secs)} (key setup {fmt_t(keygen_secs)}).",
         "Rerank and answer generation (B's part) are not included.",
     ]
     out = pathlib.Path(a.out)

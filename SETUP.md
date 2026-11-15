@@ -82,18 +82,24 @@ BLIND_RAG_CRYPTO=real BLIND_RAG_FETCH=download streamlit run ui/app.py
 - The UI reads `data/server.log` by default, which is where the real server writes too.
 - To check everything at once after merging: `make integration`. It runs C's pipeline with real crypto and with the mock, and checks that both return the same top 10 chunks. Last run: ALL PASS, about 4 s per question.
 
-## What to expect (measured, N = 5,000, 2-vCPU cloud VM)
+## Measuring (hours 13 to 16)
+
+With `make server` and `make helper` running, `make measure` asks 10 random questions (5 s apart, like a user reading), prints timings, and writes `data/measurements.md` in the spec's format. It also fails if the server log holds anything but the four agreed fields. Run it on the demo laptop for the real numbers.
+
+Last run, on B's corpus (2,101 chunks), a 2-vCPU cloud VM, medians:
 
 | | Value |
 | --- | --- |
-| Server startup precompute | ~5 s |
-| Per question: encrypt on device | ~1.1 s |
-| Per question: `/v1/score` round trip | ~3.0 s |
-| Upload per question | ~34 MB |
-| Download per question | ~0.8 MB, plus 10 MB fetch store once per corpus version |
+| Encrypt on device | 0.05 s (key prepared in the background; 1.2 s without) |
+| `/v1/score` round trip | 2.4 s (target < 2 s) |
+| Crypto part of a question | 2.5 s |
+| Upload / download per question | 34 MB / 0.5 MB, plus the 4.3 MB fetch store once |
+| Server CPU per question | 4.1 core-s (target < 2), almost all of it processing the 33 MB key |
+| Server log | only the four agreed fields, no query data |
 
 ## Changelog
 
+- **Nov 14, 18:15:** the helper prepares the next question's key in the background (`BLIND_RAG_PREPARE=0` turns it off), so encrypting takes 0.05 s instead of 1.2 s. Added `make measure`. No changes needed in C's code; restart `make helper` after pulling.
 - **Nov 14, 17:40:** server reads `artifacts/` by default (`make server DATA=data` for dummy tables) and logs to `data/server.log`. It refuses tables whose scale can overflow. **B: rebuild with scale 127 and a little-endian length prefix** (see Data files).
 - **Nov 14, 17:20:** `make test` verified on A's Windows laptop (WSL2). Added the WSL "Catastrophic failure" fix.
 - **Nov 14, 17:10:** aligned with C's `contracts.py`: `X-Corpus-Version` header, log to `data/server.log` with the four agreed fields. Added the crypto-helper and real `client/crypto_client`, plus `make helper` and `make integration`.

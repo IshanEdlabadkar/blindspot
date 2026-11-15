@@ -212,6 +212,24 @@ table.br-t th {font-size: 12px; letter-spacing: .05em; text-transform: uppercase
 .br-rc .row span:first-child {color: #6F6858;}
 .br-rc .k {color: #6F6858; margin-top: 8px;}
 .br-rc .hl {background: #FBE3DF; color: #8A1C12; padding: 6px 10px; margin-top: 4px; word-break: break-word;}
+.br-wire-h {font-size: 14px; color: #2B313C; margin-bottom: 10px;}
+.br-wire-h .chips, .br-wire .chips {display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;}
+.br-wire-h code, .br-wire code {font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; padding: 2px 7px;
+  border-radius: 5px; background: #EEF1F6; color: #2B313C;}
+.br-wire {border: 1px solid #DDE1E8; border-left: 4px solid #1F4FC9; border-radius: 8px; background: #fff;
+  padding: 12px 14px; margin: 8px 0;}
+.br-wire.bad {border-left-color: #B3261E; background: #FFF8F6;}
+.br-wire.bad code {background: #FBE3DF; color: #8A1C12;}
+.br-wire .top {display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; font-size: 14px;}
+.br-wire .top span {color: #4A5362; font-size: 13px;}
+.br-wire .top em {margin-left: auto; font-style: normal; font-weight: 700; font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase; color: #163A96;}
+.br-wire.bad .top em {color: #8A1C12;}
+.br-wire .raw {font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; color: #4A5362; margin-top: 8px;
+  word-break: break-all;}
+.br-wire.bad .raw {color: #8A1C12;}
+.br-wire.slim {padding: 8px 14px; margin: 6px 0;}
+.br-wire-n {font-size: 12px; color: #4A5362; line-height: 1.5; margin: 10px 0 6px;}
 .br-rc .bars {display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;}
 .br-rc .bars i {display: block; height: 16px; background: #16140F;}
 .br-rc .hex {color: #6F6858; word-break: break-all; font-size: 12px;}
@@ -461,30 +479,42 @@ def wire_panel(turn):
                    "point BLIND_RAG_SERVERS at its ports.")
         return
     words = question_words(turn["q"])
-    st.markdown(f"Every byte this laptop sent for your question, searched for its **{len(words)} words** "
-                f"(4+ letters): " + ", ".join(f"`{w}`" for w in words))
+    chips = "".join(f"<code>{esc(w)}</code>" for w in words)
+    rows = ""
     for h in sorted(hits, key=lambda h: h["route"] == "plain"):
         n = len(h["found"])
-        label = "A normal RAG server (plaintext)" if h["route"] == "plain" else f"Blind RAG · {h['route']} server"
-        line = (f"**{label}** · {h['requests']} requests, {h['bytes']:,} bytes sent → "
-                f"**{n} of {h['words']} words found**")
+        plain = h["route"] == "plain"
+        label = "A normal AI health service" if plain else f"Blind RAG · {h['route']} server"
+        sent = f"{h['requests']} requests · {fmt_bytes(h['bytes'])} sent"
         if n == 0:
-            st.success(line)
-            st.code((h["sample_hex"][:96] or "(no request body)") + " …", language=None)
+            body = esc(h["sample_hex"][:96] or "(no request body)") + " …"
+            rows += (f'<div class="br-wire ok"><div class="top"><b>{esc(label)}</b><span>{esc(sent)}</span>'
+                     f'<em>0 of {h["words"]} words found</em></div><div class="raw">{body}</div></div>')
         else:
-            st.error(line + ": " + ", ".join(f"`{w}`" for w in h["found"]))
-            st.code(h["matches"][0]["context"], language=None)
+            found = "".join(f"<code>{esc(w)}</code>" for w in h["found"])
+            rows += (f'<div class="br-wire bad"><div class="top"><b>{esc(label)}</b><span>{esc(sent)}</span>'
+                     f'<em>{n} of {h["words"]} words found</em></div><div class="chips">{found}</div>'
+                     f'<div class="raw">{esc(h["matches"][0]["context"])}</div></div>')
     luck = max(h["chance_by_luck"] for h in hits)
-    st.caption(f"Recorded on this laptop by a relay between the app and each server ({WIRE_LOG.name}), not taken "
-               f"from the servers' logs. Chance of any word appearing in random bytes by luck: about {luck:.0e}.")
+    st.markdown(
+        f'<div class="br-wire-h">Every byte this laptop sent for your question, searched for its '
+        f'<b>{len(words)} words</b> of 4+ letters<div class="chips">{chips}</div></div>{rows}'
+        f'<div class="br-wire-n">Recorded on this laptop by a relay between the app and each server '
+        f'({esc(WIRE_LOG.name)}), not taken from the servers\' logs. Chance of any word appearing in random '
+        f'bytes by luck: about {luck:.0e}.</div>', unsafe_allow_html=True)
     word = st.text_input("Search the same traffic for any word, such as a secret word you put in your question",
                          key=f"wire-{turn.get('since')}")
     if word.strip():
         found = search_traffic(records, word, turn.get("since"))
         if not question_words(word):
             st.caption("Use words of 4 letters or more.")
+        out = ""
         for h in found:
-            st.write(f"{h['route']}: {'found' if h['found'] else 'not found'} in {h['bytes']:,} bytes")
+            hit = bool(h["found"])
+            who = "normal AI health service" if h["route"] == "plain" else f"Blind RAG · {h['route']}"
+            out += (f'<div class="br-wire {"bad" if hit else "ok"} slim"><div class="top"><b>{esc(who)}</b>'
+                    f'<span>{fmt_bytes(h["bytes"])} searched</span><em>{"found" if hit else "not found"}</em></div></div>')
+        st.markdown(out, unsafe_allow_html=True)
 
 
 def ask_plain_server(url, question):

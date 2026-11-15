@@ -82,6 +82,17 @@ def test_configured_servers(monkeypatch):
     assert configured_servers() == ["http://c"]
 
 
+def test_configured_servers_from_list_file(monkeypatch, tmp_path):
+    monkeypatch.delenv("BLIND_RAG_SERVERS", raising=False)
+    monkeypatch.delenv("BLIND_RAG_SERVER", raising=False)
+    f = tmp_path / "s.json"
+    f.write_text('[{"id": "a", "name": "A", "url": "https://a.example/"}, {"id": "b", "name": "B", "url": "http://b:1"}]')
+    monkeypatch.setenv("BLIND_RAG_SERVERS_FILE", str(f))
+    assert configured_servers() == ["https://a.example", "http://b:1"]
+    monkeypatch.setenv("BLIND_RAG_SERVERS_FILE", str(tmp_path / "missing.json"))
+    assert configured_servers() == ["http://127.0.0.1:8080"]
+
+
 def test_same_passage_from_two_servers_is_used_once():
     same = [ch(1, .9), ch(2, .8), ch(3, .7)]
     m, seen = make(["http://local", "http://remote"], {"http://local": same, "http://remote": same})

@@ -13,7 +13,7 @@ Privacy, per selected server:
 
 Ranking: all selected servers must use the same embedding model, revision, dimension and quantization
 scale (checked from their manifests), so their scores are directly comparable. The device merges the
-S x k fetched chunks by score and gives the best k to the answer step, which reranks and checks them.
+S x k fetched chunks by score and gives all of them to the answer step, which reranks them and keeps the best few.
 """
 from __future__ import annotations
 
@@ -120,7 +120,10 @@ class MultiPipeline:
                 seen.add(key)
                 unique.append(ch)
         k = min(t["top_k"] for _, t in results)
-        best = unique[:k]
+        # Every fetched passage goes to the answer step (docs/contracts.md section 9): it reranks all
+        # S x k locally and keeps the best few. Cutting to k by search score first would drop good
+        # passages whenever several servers hold related pages.
+        best = unique
 
         t0 = time.perf_counter()
         result = self.pipes[0]._answer(question, best)

@@ -464,6 +464,7 @@ def summarize(rows: list[dict], meta: dict) -> dict:
         "questions": len(qs), "runs": len(rows), "errors": len(rows) - len(ok),
         "recall_at": {str(k): frac(sum(1 for r in pos if A(r, "gold_rank") and A(r, "gold_rank") <= k), len(pos))
                       for k in KS},
+        "gold_in_fetched": frac(sum(1 for r in pos if A(r, "gold_rank")), len(pos)),
         "gold_in_model_sources": frac(sum(1 for r in pos if A(r, "gold_in_context")), len(pos)),
     }
     if judged:
@@ -569,6 +570,7 @@ def report_md(summary: dict) -> str:
          "## Accuracy", "", "| Metric | Value |", "|---|---|"]
     for k in KS:
         L.append(f"| Right page in encrypted top {k} | {_f(a['recall_at'][str(k)])} |")
+    L.append(f"| Right page anywhere in what was fetched (k per server) | {_f(a['gold_in_fetched'])} |")
     L.append(f"| Right page among the model's sources (after rerank) | {_f(a['gold_in_model_sources'])} |")
     for key, label in (("answerable_answered", "Answerable questions answered"),
                        ("answerable_cited_right_page", "Answerable questions citing the right page"),

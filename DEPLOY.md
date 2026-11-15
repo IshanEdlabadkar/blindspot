@@ -1,42 +1,68 @@
-# Deploying the document server remotely (Render)
+# Deploying the document server remotely
 
-On Render the server runs hint-mode scoring plus real PIR fetch, with token mode off: ~210 MB RAM, about 3 s startup, and about 3 KB uploaded per question (171 KB with real PIR fetch). The asker's device still runs the crypto-helper and the UI locally. Keys never leave the device.
+Three separate pieces, owned the way a real provider would own them:
 
-**Status:** the Dockerfile's build steps are the same ones verified on Linux and WSL (SEAL 4.1.1, a portable build without `-march=native`, offline Go build). The image itself has not been built yet, because the workspace it was written in can't reach Docker Hub. The first Render build is its first real test. If it fails, the build log shows exactly which step.
+| Piece | Where | Who |
+| --- | --- | --- |
+| Corpus files (manifest, score table, fetch store) | A Databricks Unity Catalog volume: the provider's storage | B publishes with `scripts/publish_corpus.sh` |
+| Document server (code only, no data) | Render, built from this repo's `Dockerfile` | A |
+| crypto-helper + UI (holds the only keys) | The asker's laptop | C |
 
-## 1. Get the code onto `main`
+The server loads the corpus from the volume at startup and checks every sha256 hash in the manifest. Every minute it checks for a new `corpus_version` and swaps it in without a restart. If an upload is incomplete or corrupt, it keeps serving the old version. Clients holding the old version get HTTP 409 and reload the manifest.
 
-The image bakes in B's tables from `artifacts/`, which live on `main`. Merge `person-a/crypto` into `main` (a pull request on GitHub). It merges with no conflicts.
+**Status:** the server code, URL loading, hash checks, live swap, and the publish script are tested, including end to end against a stand-in for Databricks' file API. Not yet tested against real Databricks or real Render: the Docker image has never been built, because this workspace can't reach Docker Hub.
 
-## 2. Create the service on Render
+## 1. Databricks: create the volume and a token (once)
 
-1. Sign in at render.com with GitHub and give it access to `IshanEdlabadkar/blindspot`.
-2. **New > Blueprint**, pick the repo. Render reads `render.yaml` and proposes one web service, `blind-rag-server`, on the `0.5c-512mb` plan (paid; the free plan sleeps when idle and takes about a minute to wake). Click **Apply**.
-3. The first build compiles SEAL and takes about 5 to 10 minutes. After that, every push to `main` redeploys automatically (`autoDeployTrigger: commit`).
+On Databricks Free Edition:
 
-Without the Blueprint, use **New > Web Service**, pick the repo, choose **Docker**, set the health check path to `/v1/manifest`, and add the environment variables `BLIND_RAG_TOKEN_MODE=0` and `BLIND_RAG_PUBLIC_LOG=1`.
+1. **Catalog** > pick a catalog (Free Edition has one called `workspace`) and schema (`default`) > **Create > Volume**, named `blindrag` (managed).
+2. **Settings > Developer > Access tokens > Generate new token**. Copy it; it's shown once.
+3. Note your workspace URL, such as `https://<something>.cloud.databricks.com`.
 
-## 3. Check it
-
-```bash
-curl https://blind-rag-server.onrender.com/v1/manifest      # use your service's URL
-curl https://blind-rag-server.onrender.com/v1/server_log
-```
-
-The manifest's `scoring.hint_url` should start with `https://`.
-
-## 4. Point the demo laptop at it
+## 2. B: publish the corpus (every time the corpus changes)
 
 ```bash
-make helper                                                   # still local: holds the keys
-BLIND_RAG_SERVER=https://blind-rag-server.onrender.com python3 scripts/measure.py --log /dev/null
+export DATABRICKS_HOST=https://<workspace>.cloud.databricks.com
+export DATABRICKS_TOKEN=<token>
+export BLIND_RAG_VOLUME=/Volumes/workspace/default/blindrag/corpus
+./scripts/publish_corpus.sh artifacts
 ```
 
-The first question downloads the 17 MB scoring hint and the 4.3 MB fetch store once. Both are cached; the hint is cached on disk in `~/.cache/blind-rag/`. After that, each question is about 3 KB up and 17 KB down.
+The script checks the hashes and scale locally first, uploads the data files and then the manifest, and prints the two values for step 3. Bump `corpus_version` whenever the files change; that's what the server watches.
 
-## What C needs to change for a remote server
+Optional next step: run B's ingestion as a scheduled Databricks job that writes straight to the volume. Note that Free Edition limits outbound internet to trusted domains unless the account is verified, so downloading MedlinePlus pages and the embedding model from a job may be blocked.
 
-1. **Server panel:** the UI reads `data/server.log`, a local file. With a remote server, read `GET <server>/v1/server_log?n=50` instead. It returns the same JSON lines (`ts`, `endpoint`, `response_bytes`, `latency_ms`) and is not itself logged. For example, in `ui/app.py`:
+## 3. Render: the server (once)
+
+1. Sign in at render.com **with GitHub** and give it access to `IshanEdlabadkar/blindspot`.
+2. **New > Blueprint**, pick the repo, **Apply**. Render reads `render.yaml`: one web service, `blind-rag-server`, plan `0.5c-512mb` (paid; the free plan sleeps when idle).
+3. In the service's **Environment** tab, set the two secrets the publish script printed:
+   - `BLIND_RAG_DATA_URL` = `https://<workspace>.cloud.databricks.com/api/2.0/fs/files/Volumes/workspace/default/blindrag/corpus/`
+   - `BLIND_RAG_DATA_AUTH` = `Bearer <token>`
+4. Deploy. The first build compiles SEAL (about 5 to 10 minutes). On startup the server logs `corpus source: ...` (without the token) and `serving corpus <version>`.
+
+Check it:
+
+```bash
+curl https://<your-service>.onrender.com/v1/manifest      # corpus_version, scoring.hint_url starts with https://
+curl https://<your-service>.onrender.com/v1/server_log
+```
+
+If the build or startup fails, the last lines of the Render log say which step.
+
+## 4. The demo laptop
+
+```bash
+make helper                                    # local: holds the keys
+BLIND_RAG_SERVER=https://<your-service>.onrender.com python3 scripts/measure.py --log /dev/null
+```
+
+The first question downloads the 17 MB scoring hint and the 4.3 MB fetch store once; both are cached. Each question after that is about 3 KB up and 17 KB down.
+
+### What C needs to change for a remote server
+
+1. **Server panel:** read `GET <server>/v1/server_log?n=50` instead of the local `data/server.log`. It returns the same JSON lines and isn't itself logged. For example, in `ui/app.py`:
    ```python
    def log_lines(k=15):
        src = os.environ.get("BLIND_RAG_SERVER_LOG", "")
@@ -45,19 +71,31 @@ The first question downloads the 17 MB scoring hint and the 4.3 MB fetch store o
        ...  # existing file path
    ```
    Then run with `BLIND_RAG_SERVER_LOG=https://<server>/v1/server_log`.
-2. **`make demo`:** it starts a local server on :8080. With `BLIND_RAG_SERVER` set to a remote URL, it should skip that and start only the helper and the UI.
+2. **`make demo`:** when `BLIND_RAG_SERVER` points at a remote URL, skip starting the local server and start only the helper and the UI.
+
+## Server settings
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `BLIND_RAG_DATA_URL` | (none) | Base URL of the corpus files. Overrides `BLIND_RAG_DATA_DIR`. A query string (a signed-URL token) is kept on every request. |
+| `BLIND_RAG_DATA_AUTH` | (none) | `Authorization` header for that URL, such as `Bearer <token>`. Never logged. |
+| `BLIND_RAG_DATA_DIR` | `../artifacts` (`/data` in Docker) | A local or mounted folder, used when no URL is set. |
+| `BLIND_RAG_DATA_POLL` | `1m` | How often to check for a new `corpus_version` (`0` = never). |
+| `BLIND_RAG_TOKEN_MODE` | on (off in Docker) | 33 MB-per-question fallback. Costs about 650 MB RAM, so it's off on Render. |
+| `BLIND_RAG_PIR` | on | Real PIR fetch at `/v1/fetch` (about 50 MB RAM). |
+| `BLIND_RAG_PUBLIC_LOG` | off (on in Docker) | `GET /v1/server_log`. |
+| `PORT` | Render sets it | The server binds `0.0.0.0:$PORT`. |
 
 ## Fallback on the day
 
-If Render or the venue network misbehaves, run `make demo` with everything on the laptop. Nothing else changes.
+If Render, Databricks or the venue network misbehaves, run `make demo` with everything on the laptop. It reads `artifacts/` locally.
 
-## Other hosts
+## Other hosts and storage
 
-The same image runs anywhere with Docker:
+The same image runs anywhere with Docker. Point `BLIND_RAG_DATA_URL` at any HTTPS storage (S3 or R2 signed URLs, a private web server), or mount a folder:
 
 ```bash
-docker build -t blind-rag-server .     # on a branch with artifacts/
-docker run -p 8080:8080 blind-rag-server
+docker build -t blind-rag-server .
+docker run -p 8080:8080 -e BLIND_RAG_DATA_URL=https://<storage>/<corpus>/ blind-rag-server
+docker run -p 8080:8080 -v /srv/corpus:/data:ro blind-rag-server
 ```
-
-Put HTTPS in front of it with any reverse proxy, such as Caddy. The server builds `hint_url` from the `Host` and `X-Forwarded-Proto` headers.

@@ -45,17 +45,19 @@ function Legend() {
   )
 }
 
-/** A headline number: normal service on the left in red, Blindspot on the right in blue. */
-function Tile({ label, normal, blind, sub }: { label: string; normal: string; blind: string; sub?: string }) {
+/** One line of the verdict: what a normal service holds against what Blindspot holds, typed on the slip. */
+function Verdict({ label, normal, blind, sub }: { label: string; normal: string; blind: string; sub?: string }) {
   return (
-    <div className="slip px-5 pt-6 pb-4">
-      <p className="font-display text-[14px] leading-5 font-bold text-ink">{label}</p>
-      <div className="mt-2 flex items-end gap-4 font-display font-black tabular-nums">
-        <div><p className="text-[34px] leading-9 text-badger">{normal}</p><p className="typed text-[12px] leading-4 font-normal text-graphite">normal AI</p></div>
-        <span aria-hidden className="pb-2 text-[22px] text-graphite">&rarr;</span>
-        <div><p className="text-[34px] leading-9 text-sealed">{blind}</p><p className="typed text-[12px] leading-4 font-normal text-graphite">Blindspot</p></div>
+    <div className="border-t border-dashed border-graphite/40 py-3">
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="font-display text-[15px] leading-5 font-bold text-ink">{label}</p>
+        <p className="typed shrink-0 text-[20px] leading-6 font-bold tabular-nums">
+          <span className="text-badger">{normal}</span><span aria-hidden className="px-2 font-normal text-graphite">/</span><span className="text-sealed">{blind}</span>
+        </p>
       </div>
-      {sub && <p className="mt-2 text-[12.5px] leading-[18px] text-graphite">{sub}</p>}
+      <p className="typed mt-0.5 flex justify-between gap-4 text-[13.5px] leading-5 text-graphite">
+        <span>{sub}</span><span className="shrink-0">normal / Blindspot</span>
+      </p>
     </div>
   )
 }
@@ -96,15 +98,18 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
         Blindspot answered as well as a normal AI service on our test questions. What the library learns about the person asking is where they differ.
       </p>
 
-      <div className={`mt-5 grid gap-5 sm:grid-cols-2 ${q ? 'lg:grid-cols-4' : 'lg:grid-cols-2'}`}>
-        {q && <Tile label="Right source in the top 10" normal={`${top10n}%`} blind={`${top10b}%`} sub="Same ranking, rounded to 8-bit numbers" />}
-        {q && <Tile label="Questions answered" normal={`${pct(q.answered ?? 0, q.answerable ?? 0)}%`} blind={`${pct(q.answered ?? 0, q.answerable ?? 0)}%`} sub="Same answer step, on this laptop" />}
-        <Tile label="Patrons a library can profile" normal={`${pct(sim.profiled, sim.n)}%`} blind="0%" sub={`${sim.n} simulated patrons`} />
-        <Tile label="Your words visible on the wire" normal={wire ? `${wire.normal}%` : '...'} blind={wire ? `${wire.blind}%` : '...'}
-          sub={wire ? `${wire.n} of ${wire.w} words in the clear, ${wire.bf} of ${wire.bw} sealed` : 'Tick the unsealed-copy box and ask to measure this'} />
+      <div className="slip typed mt-5 px-6 pt-7 pb-3 sm:px-8" aria-label="The verdict">
+        <p className="font-display text-[15px] font-black text-ink">The verdict</p>
+        <div className={`grid gap-x-10 ${q ? 'md:grid-cols-2' : ''}`}>
+          {q && <Verdict label="Right source in the top 10" normal={`${top10n}%`} blind={`${top10b}%`} sub="Same ranking, rounded to 8-bit numbers" />}
+          {q && <Verdict label="Questions answered" normal={`${pct(q.answered ?? 0, q.answerable ?? 0)}%`} blind={`${pct(q.answered ?? 0, q.answerable ?? 0)}%`} sub="Same answer step, on this laptop" />}
+          <Verdict label="Patrons a library can profile" normal={`${pct(sim.profiled, sim.n)}%`} blind="0%" sub={`${sim.n} simulated patrons`} />
+          <Verdict label="Your words visible on the wire" normal={wire ? `${wire.normal}%` : '...'} blind={wire ? `${wire.blind}%` : '...'}
+            sub={wire ? `${wire.n} of ${wire.w} in the clear, ${wire.bf} of ${wire.bw} sealed` : 'Tick the unsealed-copy box and ask to measure this'} />
+        </div>
       </div>
 
-      <div className={`mt-5 grid gap-5 ${q ? 'md:grid-cols-2' : 'max-w-[620px]'}`}>
+      <div className={`mt-5 grid gap-5 ${q ? 'md:grid-cols-2' : ''}`}>
         {q && <div className="receipt typed px-6 pt-5 pb-3 text-[15px] leading-6 text-ink" aria-label="Answer quality">
           <h4 className="font-display text-[18px] font-black">Answer quality</h4>
           <p className="text-[13px] leading-5 text-graphite">{card?.answerable ?? 79} answerable and {card?.should_decline ?? 17} should-decline test questions</p>

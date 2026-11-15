@@ -63,40 +63,61 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
 export function Landing({ status, examples, onAsk, children }: { status: Status | null; examples: string[]; onAsk: (q: string) => void; children: React.ReactNode }) {
   const libs = (status?.servers ?? []).filter((s) => s.ok).map((s) => short(s.name))
   const total = (status?.servers ?? []).filter((s) => s.ok).reduce((n, s) => n + (s.num_chunks ?? 0), 0)
-  const skip = () => {
-    document.getElementById('ask')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const toSlip = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     setTimeout(() => document.getElementById('q')?.focus({ preventScroll: true }), 500)
   }
   return (
     <>
-      <Beats onSkip={skip} />
-      <main id="ask" className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] scroll-mt-4 content-center gap-y-8 px-5 pt-6 pb-16 md:grid-cols-[1fr_540px] md:gap-x-16">
-        <div className="md:self-end">
-          <h2 className="max-w-[16ch] font-display text-[40px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[52px]">
-            Blindspot can't leak your question. It never sees it.
-          </h2>
-          <p className="mt-5 max-w-[48ch] text-[17px] leading-7 text-graphite">
-            Your question is sealed on this laptop before it goes anywhere.
-            {libs.length > 0 && <> {libs.length > 1 ? `${libs.slice(0, -1).join(', ')} and ${libs[libs.length - 1]}` : libs[0]} search all {total.toLocaleString()} of their passages for it without being able to read it.</>}
-            {' '}The answer is written here, from what they send back.
+      <main id="ask" className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-10 px-5 pt-4 pb-12 md:grid-cols-[1fr_520px] md:gap-x-14">
+        <div className="md:self-center">
+          <h1 className="max-w-[16ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[58px]">
+            You looked up a symptom on your health plan's website.
+          </h1>
+          <p className="mt-5 max-w-[22ch] text-[26px] leading-[32px] font-bold text-badger sm:text-[34px] sm:leading-[40px]">
+            Google, Microsoft and X may have seen it.
           </p>
-          <div className="mt-8"><SearchDemo mode="sealed" /></div>
+          <p className="mt-6 max-w-[46ch] text-[17px] leading-7 text-graphite">
+            Blindspot can't leak your question. It never sees it.
+            {libs.length > 0 && <> Your question is sealed on this laptop, then {libs.length > 1 ? `${libs.slice(0, -1).join(', ')} and ${libs[libs.length - 1]}` : libs[0]} search all {total.toLocaleString()} of their passages for it without being able to read it.</>}
+          </p>
+          <a href="#why" onClick={(e) => { e.preventDefault(); document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' }) }}
+            className="mt-6 inline-block text-[15px] text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">
+            Why this matters, in four short steps
+          </a>
         </div>
-        <div className="relative md:col-start-2 md:row-span-2 md:row-start-1 md:self-center">
+        <div className="relative md:self-center">
           <div className="md:rotate-[-1.2deg]">{children}</div>
           <div className="absolute -top-[84px] right-6 hidden md:block"><Burrow size={92} mood="idle" /></div>
-        </div>
-        <div className="md:self-start">
-          {examples.length > 0 && <p className="text-[14px] text-graphite">Or try one of these</p>}
-          <ul className="mt-2 space-y-1.5">
-            {examples.map((s) => (
-              <li key={s}>
-                <button onClick={() => onAsk(s)} className="text-left text-[16px] leading-6 text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">{s}</button>
-              </li>
-            ))}
-          </ul>
+          {examples.length > 0 && (
+            <div className="mt-6 md:ml-2">
+              <p className="text-[14px] text-graphite">Or try one of these</p>
+              <ul className="mt-2 space-y-1.5">
+                {examples.map((s) => (
+                  <li key={s}>
+                    <button onClick={() => onAsk(s)} className="text-left text-[16px] leading-6 text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">{s}</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </main>
+
+      <div id="why" className="scroll-mt-4"><Beats /></div>
+
+      <section className="relative z-[1] mx-auto max-w-[860px] px-5 pt-8 pb-28">
+        <h2 className="max-w-[18ch] font-display text-[36px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[48px]">
+          Same search. Nothing readable leaves.
+        </h2>
+        <p className="mt-4 max-w-[52ch] text-[17px] leading-7 text-graphite">
+          Here is the same kind of search, sealed on this laptop first. Google, Microsoft and X would receive nothing they can read.
+        </p>
+        <div className="mt-8"><SearchDemo mode="sealed" /></div>
+        <button onClick={toSlip} className="press mt-10 h-12 rounded-[2px] bg-badger px-6 font-display text-[16px] font-bold text-white hover:bg-stamp">
+          Hand in your own question
+        </button>
+      </section>
     </>
   )
 }

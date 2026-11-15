@@ -88,7 +88,7 @@ export default function App() {
 
   return (
     <div className="desk relative min-h-dvh">
-      <DeskObjects viewKey={view === 'sim' ? 'sim' : xrayTurn ? `xray-${xrayTurn.id}` : turns.length && !home ? 'chat' : 'landing'}
+      <DeskObjects calm={view === 'sim' || xray !== null} viewKey={view === 'sim' ? 'sim' : xrayTurn ? `xray-${xrayTurn.id}` : turns.length && !home ? 'chat' : 'landing'}
         version={turns.map((t) => `${t.phase}${t.proof ? 'p' : ''}`).join(',')} />
       <header className="relative z-[1] mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-4 whitespace-nowrap sm:px-5">
         <button aria-label="Blindspot, back to the home page" onClick={() => { setXray(null); setView('ask'); setHome(true) }} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">

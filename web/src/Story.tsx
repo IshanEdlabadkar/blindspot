@@ -118,22 +118,10 @@ const Reveal = ({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 
 const SENT = ['Your name', 'Your IP address', 'The pages you visited', 'Whether you were signed in', 'What you searched']
 
-/** Beats 1 to 4 of the landing page: the problem, told with the Kaiser Permanente case. */
-export function Beats({ onSkip }: { onSkip: () => void }) {
+/** The story under the hero: the Kaiser case, told in three beats. */
+export function Beats() {
   return (
     <>
-      <Beat>
-        <div className="absolute top-2 right-5">
-          <button onClick={onSkip} className="text-[14px] text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">Skip to the app</button>
-        </div>
-        <h1 className="max-w-[18ch] text-[40px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[64px]">
-          You looked up a symptom on your health plan's website.
-        </h1>
-        <div className="mt-[16dvh]"><Reveal>
-          <p className="max-w-[20ch] text-[28px] leading-9 font-bold text-badger sm:text-[40px] sm:leading-[46px]">Google, Microsoft and X may have seen it.</p>
-        </Reveal></div>
-      </Beat>
-
       <Beat>
         <SearchDemo mode="leak" />
         <Reveal delay={0.1}>

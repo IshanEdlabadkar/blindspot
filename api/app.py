@@ -96,9 +96,9 @@ def make_app(servers=None, pipeline_factory=default_pipeline, plain_ask=default_
             except Exception:  # noqa: BLE001
                 out.append({"url": url, "ok": False, "name": url, "num_chunks": None, "corpus_version": None})
 
-        def up(url):
+        def up(url):  # generous timeout: a busy laptop answers slowly, and "off" would be a false alarm
             try:
-                return requests.get(url, timeout=3).ok
+                return requests.get(url, timeout=10).ok
             except requests.RequestException:
                 return False
         return {"servers": out, "helper": up(HELPER), "model": up(OLLAMA), "recording": wire_log.exists()}

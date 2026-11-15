@@ -123,6 +123,7 @@ export function Beats() {
   return (
     <>
       <Beat>
+        <h1 className="mx-auto mb-8 max-w-[22ch] text-center text-[30px] leading-[1.1] font-black tracking-[-0.02em] text-ink sm:text-[44px]">You looked up a symptom on your health plan's website.</h1>
         <SearchDemo mode="leak" />
         <Reveal delay={0.1}>
           <p className="mx-auto mt-10 max-w-[56ch] text-center text-[19px] leading-7 text-ink">

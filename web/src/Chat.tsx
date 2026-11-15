@@ -60,6 +60,10 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
   )
 }
 
+/** Demo order: the story first (typing demo, what was sent, the settlement), then the call slip as the last thing on the page.
+ *  Set to false for the product order: the call slip in the first viewport, the story below it. */
+const STORY_FIRST = true
+
 export function Landing({ status, examples, onAsk, children }: { status: Status | null; examples: string[]; onAsk: (q: string) => void; children: React.ReactNode }) {
   const libs = (status?.servers ?? []).filter((s) => s.ok).map((s) => short(s.name))
   const total = (status?.servers ?? []).filter((s) => s.ok).reduce((n, s) => n + (s.num_chunks ?? 0), 0)
@@ -67,45 +71,60 @@ export function Landing({ status, examples, onAsk, children }: { status: Status 
     window.scrollTo({ top: 0, behavior: 'smooth' })
     setTimeout(() => document.getElementById('q')?.focus({ preventScroll: true }), 500)
   }
-  return (
-    <>
-      <main id="ask" className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-10 px-5 pt-4 pb-12 md:grid-cols-[1fr_520px] md:gap-x-14">
-        <div className="md:self-center">
-          <h1 className="max-w-[16ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[58px]">
-            You looked up a symptom on your health plan's website.
-          </h1>
-          <p className="mt-5 max-w-[22ch] text-[26px] leading-[32px] font-bold text-badger sm:text-[34px] sm:leading-[40px]">
-            Google, Microsoft and X may have seen it.
-          </p>
-          <p className="mt-6 max-w-[46ch] text-[17px] leading-7 text-graphite">
+  const sealedList = libs.length > 1 ? `${libs.slice(0, -1).join(', ')} and ${libs[libs.length - 1]}` : libs[0]
+  const hero = (
+    <main id="ask" className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-10 px-5 pt-4 pb-12 md:grid-cols-[1fr_520px] md:gap-x-14">
+      <div className="md:self-center">
+        {STORY_FIRST ? (
+          <h2 className="max-w-[14ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[58px]">
             Blindspot can't leak your question. It never sees it.
-            {libs.length > 0 && <> Your question is sealed on this laptop, then {libs.length > 1 ? `${libs.slice(0, -1).join(', ')} and ${libs[libs.length - 1]}` : libs[0]} search all {total.toLocaleString()} of their passages for it without being able to read it.</>}
-          </p>
+          </h2>
+        ) : (
+          <>
+            <h1 className="max-w-[16ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[58px]">
+              You looked up a symptom on your health plan's website.
+            </h1>
+            <p className="mt-5 max-w-[22ch] text-[26px] leading-[32px] font-bold text-badger sm:text-[34px] sm:leading-[40px]">
+              Google, Microsoft and X may have seen it.
+            </p>
+          </>
+        )}
+        <p className="mt-6 max-w-[46ch] text-[17px] leading-7 text-graphite">
+          {!STORY_FIRST && <>Blindspot can't leak your question. It never sees it. </>}
+          {libs.length > 0 ? <>Your question is sealed on this laptop, then {sealedList} search all {total.toLocaleString()} of their passages for it without being able to read it.</> : <>Your question is sealed on this laptop before it goes anywhere.</>}
+          {' '}The answer is written here, from what they send back.
+        </p>
+        {!STORY_FIRST && (
           <a href="#why" onClick={(e) => { e.preventDefault(); document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' }) }}
             className="mt-6 inline-block text-[15px] text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">
             Why this matters, in four short steps
           </a>
-        </div>
-        <div className="relative md:self-center">
-          <div className="md:rotate-[-1.2deg]">{children}</div>
-          <div className="absolute -top-[84px] right-6 hidden md:block"><Burrow size={92} mood="idle" /></div>
-          {examples.length > 0 && (
-            <div className="mt-6 md:ml-2">
-              <p className="text-[14px] text-graphite">Or try one of these</p>
-              <ul className="mt-2 space-y-1.5">
-                {examples.map((s) => (
-                  <li key={s}>
-                    <button onClick={() => onAsk(s)} className="text-left text-[16px] leading-6 text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">{s}</button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </main>
+        )}
+      </div>
+      <div className="relative md:self-center">
+        <div className="md:rotate-[-1.2deg]">{children}</div>
+        <div className="absolute -top-[84px] right-6 hidden md:block"><Burrow size={92} mood="idle" /></div>
+        {examples.length > 0 && (
+          <div className="mt-6 md:ml-2">
+            <p className="text-[14px] text-graphite">Or try one of these</p>
+            <ul className="mt-2 space-y-1.5">
+              {examples.map((s) => (
+                <li key={s}>
+                  <button onClick={() => onAsk(s)} className="text-left text-[16px] leading-6 text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">{s}</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </main>
+  )
 
+  if (STORY_FIRST) return <><div id="why"><Beats /></div>{hero}</>
+  return (
+    <>
+      {hero}
       <div id="why" className="scroll-mt-4"><Beats /></div>
-
       <section className="relative z-[1] mx-auto max-w-[860px] px-5 pt-8 pb-28">
         <h2 className="max-w-[18ch] font-display text-[36px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[48px]">
           Same search. Nothing readable leaves.
@@ -196,7 +215,7 @@ function CarbonCopy({ plain, onXray, libraries }: { plain?: Plain; onXray: () =>
   const when = e && !Number.isNaN(Date.parse(e.time)) ? new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : e?.time
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="relative mt-6 max-w-[580px] bg-[#F6DDE1] px-5 pt-4 pb-5 shadow-paper sm:ml-20 sm:rotate-[0.7deg] sm:px-7">
+      className="paper relative mt-6 max-w-[580px] bg-[#F6DDE1] px-5 pt-4 pb-5 shadow-paper sm:ml-20 sm:rotate-[0.7deg] sm:px-7">
       <div className="flex items-baseline justify-between gap-4">
         <span className="font-display text-[15px] font-black text-ink">Carbon copy</span>
         <span className="typed text-[14px] text-[#2B3A8C]">unsealed</span>

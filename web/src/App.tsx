@@ -7,6 +7,7 @@ import { DeskObjects } from './DeskObjects'
 import { Simulation } from './Simulation'
 import type { Turn } from './turn'
 import { XRay } from './XRay'
+import { ThemePicker } from './Theme'
 
 function Health({ status }: { status: Status | null }) {
   if (!status) return <span className="text-sm text-graphite">Connecting</span>
@@ -103,6 +104,7 @@ export default function App() {
           ))}
         </nav>
         <div className="flex items-center gap-3 sm:gap-5">
+          <span className="hidden sm:inline"><ThemePicker /></span>
           <Libraries status={status} disabled={disabled} setDisabled={setDisabled} refresh={refresh} />
           <a href="http://localhost:8501" target="_blank" rel="noreferrer" title="Measured results, who sees what, and more"
             className="hidden text-sm text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger sm:inline">

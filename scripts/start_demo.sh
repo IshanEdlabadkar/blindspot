@@ -71,6 +71,10 @@ for e in json.load(open(sys.argv[1])):
 PY
 )
 fi
+# Wake every remote server at once (a sleeping free Render service takes ~1 min), then check each.
+for s in "${servers[@]}"; do
+  case "${s%%|*}" in http://127.0.0.1:*|http://localhost:*) ;; *) curl -s -o /dev/null --max-time 90 "${s%%|*}/v1/manifest" & ;; esac
+done
 urls=()
 for s in "${servers[@]}"; do
   url=${s%%|*}; dir=${s#*|}; urls+=("$url")

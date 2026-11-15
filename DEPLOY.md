@@ -53,19 +53,35 @@ curl https://<your-service>.onrender.com/v1/server_log
 
 If the build or startup fails, the last lines of the Render log say which step.
 
-## 3b. A second provider: the FMLA server
+## 3b. More providers: one server per corpus
 
-Each corpus is its own provider with its own server and storage. Same image, same code, different data:
+Each corpus is its own provider with its own server, in its own folder of the volume
+(`/Volumes/workspace/default/blindrag/<source_id>/`). Same image and code, different data:
 
-1. Publish the FMLA tables to their own folder in the volume:
+| source_id | corpus | chunks | Render service |
+|---|---|---|---|
+| `medlineplus` | MedlinePlus health topics | 2,101 | `blindspot` (existing) |
+| `fmla` | FMLA regulations, 29 CFR Part 825 | 310 | `blind-rag-fmla` |
+| `genetics` | MedlinePlus Genetics | 2,067 | `blind-rag-genetics` |
+| `myhealthfinder` | MyHealthfinder (health.gov) | 524 | `blind-rag-myhealthfinder` |
+
+1. Verify B's handoff folder, then publish each corpus to its own folder (token only in your shell):
    ```
-   export BLIND_RAG_VOLUME=/Volumes/workspace/default/blindrag/fmla
-   ./scripts/publish_corpus.sh artifacts/fmla
+   (cd blindrag-corpus && sha256sum -c SHA256SUMS)
+   for s in medlineplus fmla genetics myhealthfinder; do
+     BLIND_RAG_VOLUME=/Volumes/workspace/default/blindrag/$s ./scripts/publish_corpus.sh blindrag-corpus/$s
+   done
    ```
-2. Render: **New > Web Service**, this repo, branch `deploy/render`, runtime Docker, name `blindspot-fmla`. Environment:
-   - `BLIND_RAG_DATA_URL` = `https://<workspace>.cloud.databricks.com/api/2.0/fs/files/Volumes/workspace/default/blindrag/fmla/`
-   - `BLIND_RAG_DATA_AUTH` = `Bearer <token>` (the same read token works)
-3. Put its URL in `servers.remote.json`. `REMOTE=1 make demo` then searches both hosted servers; plain `make demo` runs both locally from `artifacts/medlineplus/` and `artifacts/fmla/`.
+2. Render, for each new service: **New > Web Service**, this repo, branch `deploy/render`, runtime Docker, region Oregon, plan Free. Environment:
+   - `BLIND_RAG_DATA_URL` = `https://<workspace>.cloud.databricks.com/api/2.0/fs/files/Volumes/workspace/default/blindrag/<source_id>/`
+   - `BLIND_RAG_DATA_AUTH` = `Bearer <token>` (the same read token)
+
+   The Dockerfile already sets hint mode, the public log and `/data`; nothing else is needed. (Created by hand rather than
+   as `render.yaml` entries: the existing service was not made from the Blueprint, so applying it would create a duplicate,
+   paid `blind-rag-server`.)
+3. Check: `curl https://<service>.onrender.com/v1/manifest` shows its `source_id`, `corpus_version`, `num_chunks`;
+   `/v1/server_log` shows only `ts, endpoint, response_bytes, latency_ms`.
+4. Put the URLs in `servers.remote.json`. `REMOTE=1 make demo` searches every hosted server (waking them in parallel).
 
 ## 4. The demo laptop
 

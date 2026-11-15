@@ -123,6 +123,9 @@ func NewScoreClient(seed *rand.PRGKey, info *pir.DBInfo) *ScoreClient {
 
 func (c *ScoreClient) Free() { c.c.Free() }
 
+// Dim is the query dimension d.
+func (c *ScoreClient) Dim() uint64 { return c.d }
+
 // Token makes a fresh secret key and returns its encryption for the server.
 // It does not depend on the question, so it can run while the user types.
 func (c *ScoreClient) Token() *underhood.HintQuery {

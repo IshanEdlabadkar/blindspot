@@ -108,12 +108,24 @@ func readVec(r io.Reader) (*matrix.Matrix[Elem], error) {
 }
 
 func (q *ScoreRequest) MarshalBinary() []byte {
+	return append(MarshalToken(q.Token), MarshalQuery(q.Query)...)
+}
+
+// MarshalToken encodes the token part of a score request. It does not depend
+// on the question, so the helper can encode it ahead of time.
+func MarshalToken(tok underhood.HintQuery) []byte {
 	var w bytes.Buffer
-	putU32(&w, uint32(len(q.Token)))
-	for _, c := range q.Token {
+	putU32(&w, uint32(len(tok)))
+	for _, c := range tok {
 		putBlob(&w, c)
 	}
-	putVec(&w, q.Query.Query)
+	return w.Bytes()
+}
+
+// MarshalQuery encodes the encrypted-query part; append it after MarshalToken.
+func MarshalQuery(q *pir.Query[Elem]) []byte {
+	var w bytes.Buffer
+	putVec(&w, q.Query)
 	return w.Bytes()
 }
 

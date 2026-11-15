@@ -34,15 +34,15 @@ def _compat_key(m: dict) -> tuple:
 
 
 def server_list_file() -> Path:
-    """servers.json (local servers, the default) or another list such as servers.remote.json."""
-    f = os.environ.get("BLIND_RAG_SERVERS_FILE", "servers.json")
+    """servers.remote.json (the hosted servers, the default) or another list such as servers.json (local)."""
+    f = os.environ.get("BLIND_RAG_SERVERS_FILE", "servers.remote.json")
     p = Path(f)
     return p if p.is_absolute() else ROOT / p
 
 
 def configured_servers() -> list[str]:
     """Servers offered to the user: BLIND_RAG_SERVERS (comma-separated), else BLIND_RAG_SERVER, else the
-    urls in the server list file (servers.json, or BLIND_RAG_SERVERS_FILE), else the local default."""
+    urls in the server list file (servers.remote.json, or BLIND_RAG_SERVERS_FILE), else the local default."""
     raw = os.environ.get("BLIND_RAG_SERVERS") or os.environ.get("BLIND_RAG_SERVER")
     if not raw:
         try:

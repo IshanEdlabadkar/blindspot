@@ -81,7 +81,9 @@ Each corpus is its own provider with its own server, in its own folder of the vo
    paid `blind-rag-server`.)
 3. Check: `curl https://<service>.onrender.com/v1/manifest` shows its `source_id`, `corpus_version`, `num_chunks`;
    `/v1/server_log` shows only `ts, endpoint, response_bytes, latency_ms`.
-4. Put the URLs in `servers.remote.json`. `REMOTE=1 make demo` searches every hosted server (waking them in parallel).
+4. Put the URLs in `servers.remote.json`. `make demo` searches every hosted server (waking them in parallel); one that
+   doesn't answer is replaced by a local server from its backup in `artifacts/<id>/`. `LOCAL=1 make demo` is fully offline.
+   Databricks is always the first source; the copies in the repo are the backup.
 
 ## 4. The demo laptop
 

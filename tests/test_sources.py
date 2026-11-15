@@ -4,6 +4,46 @@ from ingest import sources
 from ingest.extract import parse_topics
 from ingest.sources import fmla
 
+# Fixtures shaped like the real feeds (from C's former tests/test_sources.py).
+GENETICS_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<summaries>
+  <health-condition-summary>
+    <name>Alzheimer disease</name>
+    <ghr-page>https://medlineplus.gov/genetics/condition/alzheimer-disease</ghr-page>
+    <text-list>
+      <text><text-role>description</text-role>
+        <html>&lt;p&gt;Alzheimer disease is a degenerative disease of the brain that causes dementia.&lt;/p&gt;</html></text>
+      <text><text-role>frequency</text-role>
+        <html>&lt;p&gt;Alzheimer disease affects an estimated 6.5 million Americans.&lt;/p&gt;</html></text>
+    </text-list>
+    <synonym-list><synonym>AD</synonym><synonym>Alzheimer's disease</synonym></synonym-list>
+    <reviewed>2019-05</reviewed>
+    <published>2023-03-23</published>
+  </health-condition-summary>
+  <gene-summary>
+    <name>APOE gene</name>
+    <ghr-page>https://medlineplus.gov/genetics/gene/apoe</ghr-page>
+    <text-list><text><text-role>function</text-role><html>&lt;p&gt;The APOE gene makes a protein.&lt;/p&gt;</html></text></text-list>
+  </gene-summary>
+  <health-condition-summary>
+    <name>Empty condition</name>
+    <ghr-page>https://medlineplus.gov/genetics/condition/empty</ghr-page>
+    <text-list/>
+  </health-condition-summary>
+</summaries>
+"""
+
+MHF_TOPIC = {"Result": {"Error": "False", "Total": 1, "Resources": {"Resource": [{
+    "Type": "Topic", "Id": "30530", "Title": "Get Enough Calcium", "LastUpdate": "1789052471",
+    "AccessibleVersion": "https://odphp.health.gov/myhealthfinder/healthy-living/nutrition/get-enough-calcium",
+    "Sections": {"section": [
+        {"Title": "The Basics: Overview",
+         "Content": "&lt;p&gt;Calcium is important at every age, but many people don&#8217;t get enough.&lt;/p&gt;"},
+        {"Title": "Take Action: Vitamin D",
+         "Content": "&lt;p&gt;Get enough vitamin D.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Eat fish.&lt;/li&gt;&lt;/ul&gt;"},
+    ]}}]}}}
+
+
 ECFR = """<?xml version="1.0"?>
 <DIV5 N="825" TYPE="PART">
  <HEAD>PART 825—THE FAMILY AND MEDICAL LEAVE ACT OF 1993</HEAD>
@@ -41,7 +81,6 @@ def test_fmla_parse_one_page_per_section(tmp_path):
 
 def test_genetics_adapter_parses_c_fixture_with_a_date(tmp_path):
     import json as _json
-    from tests.test_sources_extra import GENETICS_XML
     p = tmp_path / "ghr-summaries.xml"
     p.write_text(GENETICS_XML)
     pages, date = sources.get("genetics").parse(p)
@@ -51,7 +90,6 @@ def test_genetics_adapter_parses_c_fixture_with_a_date(tmp_path):
 
 def test_myhealthfinder_adapter_reads_a_cached_folder(tmp_path):
     import json as _json
-    from tests.test_sources_extra import MHF_TOPIC
     d = tmp_path / "myhealthfinder"
     d.mkdir()
     (d / "itemlist.json").write_text("{}")

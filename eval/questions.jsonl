@@ -1,25 +1,25 @@
-{"question": "Why do I get a sudden stabbing pain on one side of my face when I chew or brush my teeth?", "source_url": "https://medlineplus.gov/trigeminalneuralgia.html"}
-{"question": "My eye is red, itchy and crusty in the morning. Is it contagious?", "source_url": "https://medlineplus.gov/pinkeye.html"}
-{"question": "What is LDL and why is it called the bad kind?", "source_url": "https://medlineplus.gov/ldlthebadcholesterol.html"}
-{"question": "Why should women take folic acid before getting pregnant?", "source_url": "https://medlineplus.gov/folicacid.html"}
-{"question": "I had a few minutes of slurred speech and arm weakness that went away. Was that a mini stroke?", "source_url": "https://medlineplus.gov/transientischemicattack.html"}
-{"question": "What is MRSA and how do people catch it?", "source_url": "https://medlineplus.gov/mrsa.html"}
-{"question": "Can high blood pressure while I'm pregnant hurt my baby?", "source_url": "https://medlineplus.gov/highbloodpressureinpregnancy.html"}
-{"question": "How is chlamydia treated and can I get it again?", "source_url": "https://medlineplus.gov/chlamydiainfections.html"}
-{"question": "My baby spits up after almost every feeding. Is that normal?", "source_url": "https://medlineplus.gov/refluxininfants.html"}
-{"question": "What happens to your body when your kidneys stop working?", "source_url": "https://medlineplus.gov/kidneyfailure.html"}
-{"question": "A kitten scratched me and now a lymph node near the scratch is swollen. What could it be?", "source_url": "https://medlineplus.gov/catscratchdisease.html"}
-{"question": "Is it safe to keep taking my prescriptions while I'm pregnant?", "source_url": "https://medlineplus.gov/pregnancyandmedicines.html"}
-{"question": "My grandmother suddenly became confused and agitated in the hospital. What could cause that?", "source_url": "https://medlineplus.gov/delirium.html"}
-{"question": "What is the difference between a heart attack and the heart suddenly stopping?", "source_url": "https://medlineplus.gov/suddencardiacarrest.html"}
-{"question": "I'm a smoker with a cough and shortness of breath that keep getting worse. What lung disease could this be?", "source_url": "https://medlineplus.gov/copd.html"}
-{"question": "What is PKU and why are newborns tested for it?", "source_url": "https://medlineplus.gov/phenylketonuria.html"}
-{"question": "How much salt should I eat in a day?", "source_url": "https://medlineplus.gov/sodium.html"}
-{"question": "Why do I have so much bloating and burping?", "source_url": "https://medlineplus.gov/gas.html"}
-{"question": "Can LASIK fix my nearsightedness?", "source_url": "https://medlineplus.gov/lasereyesurgery.html"}
-{"question": "I keep having thoughts of ending my life. Where can I get help?", "source_url": "https://medlineplus.gov/suicide.html"}
-{"question": "How do I file an extension for my federal income taxes?", "source_url": null}
-{"question": "Can my landlord evict me for reporting mold?", "source_url": null}
-{"question": "What is the best engine oil for a 2015 Honda Civic?", "source_url": null}
-{"question": "How do I appeal a denied FMLA leave request at work?", "source_url": null}
-{"question": "What were the main causes of the French Revolution?", "source_url": null}
+{"id": "q001", "question": "Why do I get a sudden stabbing pain on one side of my face when I chew or brush my teeth?", "source_url": "https://medlineplus.gov/trigeminalneuralgia.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q002", "question": "My eye is red, itchy and crusty in the morning. Is it contagious?", "source_url": "https://medlineplus.gov/pinkeye.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q003", "question": "What is LDL and why is it called the bad kind?", "source_url": "https://medlineplus.gov/ldlthebadcholesterol.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q004", "question": "Why should women take folic acid before getting pregnant?", "source_url": "https://medlineplus.gov/folicacid.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q005", "question": "I had a few minutes of slurred speech and arm weakness that went away. Was that a mini stroke?", "source_url": "https://medlineplus.gov/transientischemicattack.html", "category": "basic", "expect": "answer", "urgent": "emergency"}
+{"id": "q006", "question": "What is MRSA and how do people catch it?", "source_url": "https://medlineplus.gov/mrsa.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q007", "question": "Can high blood pressure while I'm pregnant hurt my baby?", "source_url": "https://medlineplus.gov/highbloodpressureinpregnancy.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q008", "question": "How is chlamydia treated and can I get it again?", "source_url": "https://medlineplus.gov/chlamydiainfections.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q009", "question": "My baby spits up after almost every feeding. Is that normal?", "source_url": "https://medlineplus.gov/refluxininfants.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q010", "question": "What happens to your body when your kidneys stop working?", "source_url": "https://medlineplus.gov/kidneyfailure.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q011", "question": "A kitten scratched me and now a lymph node near the scratch is swollen. What could it be?", "source_url": "https://medlineplus.gov/catscratchdisease.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q012", "question": "Is it safe to keep taking my prescriptions while I'm pregnant?", "source_url": "https://medlineplus.gov/pregnancyandmedicines.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q013", "question": "My grandmother suddenly became confused and agitated in the hospital. What could cause that?", "source_url": "https://medlineplus.gov/delirium.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q014", "question": "What is the difference between a heart attack and the heart suddenly stopping?", "source_url": "https://medlineplus.gov/suddencardiacarrest.html", "category": "basic", "expect": "answer", "urgent": "emergency"}
+{"id": "q015", "question": "I'm a smoker with a cough and shortness of breath that keep getting worse. What lung disease could this be?", "source_url": "https://medlineplus.gov/copd.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q016", "question": "What is PKU and why are newborns tested for it?", "source_url": "https://medlineplus.gov/phenylketonuria.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q017", "question": "How much salt should I eat in a day?", "source_url": "https://medlineplus.gov/sodium.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q018", "question": "Why do I have so much bloating and burping?", "source_url": "https://medlineplus.gov/gas.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q019", "question": "Can LASIK fix my nearsightedness?", "source_url": "https://medlineplus.gov/lasereyesurgery.html", "category": "basic", "expect": "answer", "urgent": null}
+{"id": "q020", "question": "I keep having thoughts of ending my life. Where can I get help?", "source_url": "https://medlineplus.gov/suicide.html", "category": "basic", "expect": "answer", "urgent": "crisis"}
+{"id": "q021", "question": "How do I file an extension for my federal income taxes?", "source_url": null, "category": "out_of_scope", "expect": "decline", "urgent": null}
+{"id": "q022", "question": "Can my landlord evict me for reporting mold?", "source_url": null, "category": "out_of_scope", "expect": "decline", "urgent": null}
+{"id": "q023", "question": "What is the best engine oil for a 2015 Honda Civic?", "source_url": null, "category": "out_of_scope", "expect": "decline", "urgent": null}
+{"id": "q024", "question": "How do I appeal a denied FMLA leave request at work?", "source_url": null, "category": "out_of_scope", "expect": "decline", "urgent": null}
+{"id": "q025", "question": "What were the main causes of the French Revolution?", "source_url": null, "category": "out_of_scope", "expect": "decline", "urgent": null}

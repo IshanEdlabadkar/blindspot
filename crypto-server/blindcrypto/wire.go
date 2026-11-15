@@ -234,3 +234,65 @@ func UnmarshalAnswer(r io.Reader) (*pir.Answer[Elem], error) {
 	}
 	return &pir.Answer[Elem]{Answer: m}, nil
 }
+
+// Batched fetch (POST /v1/fetch_batch): request = u32 count, then count
+// selectors (u32 len, u64s each); response = u32 count, then count columns.
+// Each selector is encrypted under its own fresh secret.
+
+const MaxFetchBatch = 64
+
+func MarshalFetchBatch(qs []*pir.Query[Elem]) []byte {
+	var w bytes.Buffer
+	putU32(&w, uint32(len(qs)))
+	for _, q := range qs {
+		putVec(&w, q.Query)
+	}
+	return w.Bytes()
+}
+
+func UnmarshalFetchBatch(r io.Reader) ([]*pir.Query[Elem], error) {
+	n, err := readU32(r)
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 || n > MaxFetchBatch {
+		return nil, errors.New("batch size out of range")
+	}
+	qs := make([]*pir.Query[Elem], n)
+	for i := range qs {
+		m, err := readVec(r)
+		if err != nil {
+			return nil, err
+		}
+		qs[i] = &pir.Query[Elem]{Query: m}
+	}
+	return qs, nil
+}
+
+func MarshalAnswers(as []*pir.Answer[Elem]) []byte {
+	var w bytes.Buffer
+	putU32(&w, uint32(len(as)))
+	for _, a := range as {
+		putVec(&w, a.Answer)
+	}
+	return w.Bytes()
+}
+
+func UnmarshalAnswers(r io.Reader) ([]*pir.Answer[Elem], error) {
+	n, err := readU32(r)
+	if err != nil {
+		return nil, err
+	}
+	if n > MaxFetchBatch {
+		return nil, errors.New("batch size out of range")
+	}
+	as := make([]*pir.Answer[Elem], n)
+	for i := range as {
+		m, err := readVec(r)
+		if err != nil {
+			return nil, err
+		}
+		as[i] = &pir.Answer[Elem]{Answer: m}
+	}
+	return as, nil
+}

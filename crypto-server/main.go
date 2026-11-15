@@ -19,6 +19,7 @@
 //	GET  /v1/fetch_store  the whole fetch store (trivial PIR: the client reads chunks locally)
 //	GET  /v1/fetch_hint   public PIR hint for the fetch store, downloaded once (real PIR)
 //	POST /v1/fetch        one encrypted selector in, one encrypted column out (real PIR)
+//	POST /v1/fetch_batch  up to 64 selectors in one round trip (real PIR, each its own secret)
 //	GET  /v1/server_log   recent log lines (only with -public-log)
 //
 // Logs one JSON line per request to -log, the fields fixed in contracts.py:
@@ -41,6 +42,7 @@ import (
 
 	"github.com/IshanEdlabadkar/blindspot/crypto-server/blindcrypto"
 	"github.com/ahenzinger/underhood/underhood"
+	"github.com/henrycg/simplepir/pir"
 )
 
 const (
@@ -160,6 +162,7 @@ func (s *server) routes(publicLog bool) *http.ServeMux {
 	mux.HandleFunc("GET /v1/fetch_store", s.logged("/v1/fetch_store", s.handleFetchStore))
 	mux.HandleFunc("GET /v1/fetch_hint", s.logged("/v1/fetch_hint", s.handleFetchHint))
 	mux.HandleFunc("POST /v1/fetch", s.logged("/v1/fetch", s.handleFetch))
+	mux.HandleFunc("POST /v1/fetch_batch", s.logged("/v1/fetch_batch", s.handleFetchBatch))
 	if publicLog {
 		// Not itself logged, so a UI polling it does not flood the log.
 		mux.HandleFunc("GET /v1/server_log", s.handleServerLog)
@@ -300,6 +303,39 @@ func (s *server) handleFetch(w http.ResponseWriter, r *http.Request) {
 	c.fetchMu.Unlock()
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(blindcrypto.MarshalAnswer(ans))
+}
+
+// handleFetchBatch answers several PIR selectors in one round trip. The client
+// always sends exactly k, so the batch size reveals nothing.
+func (s *server) handleFetchBatch(w http.ResponseWriter, r *http.Request) {
+	c := s.cur.Load()
+	if c.fetch == nil {
+		http.Error(w, "real PIR is off on this server", http.StatusNotFound)
+		return
+	}
+	if r.Header.Get("X-Corpus-Version") != c.version {
+		http.Error(w, "stale corpus_version", http.StatusConflict)
+		return
+	}
+	qs, err := blindcrypto.UnmarshalFetchBatch(http.MaxBytesReader(w, r.Body, 1<<24))
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	for _, q := range qs {
+		if q.Query.Rows() < c.fetch.Info.M {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+	}
+	as := make([]*pir.Answer[blindcrypto.Elem], len(qs))
+	c.fetchMu.Lock()
+	for i, q := range qs {
+		as[i] = c.fetch.Answer(q)
+	}
+	c.fetchMu.Unlock()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(blindcrypto.MarshalAnswers(as))
 }
 
 func (s *server) handleScore(w http.ResponseWriter, r *http.Request) {

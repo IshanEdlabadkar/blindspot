@@ -34,14 +34,15 @@ def ch(i, s):
     return {"id": i, "title": f"t{i}", "url": f"u{i}", "updated": "d", "text": f"x{i}", "score": s}
 
 
-def test_merges_by_score_and_answers_once_with_top_k():
+def test_merges_by_score_and_answers_once_with_every_fetched_passage():
     m, seen = make(["http://a", "http://b"], {"http://a": [ch(1, .9), ch(2, .5), ch(3, .4)],
                                               "http://b": [ch(7, .8), ch(8, .7), ch(9, .1)]})
     r, t = m.ask_traced("q")
-    assert [c["id"] for c in seen["chunks"]] == [1, 7, 8]
-    assert [c["server"] for c in seen["chunks"]] == ["http://a", "http://b", "http://b"]
-    assert t["multi"] and t["top_sources"] == [["http://a", 1], ["http://b", 7], ["http://b", 8]]
-    assert [(s["fetched"], s["used"]) for s in t["servers"]] == [(3, 1), (3, 2)]   # each fetched exactly k
+    # all S x k passages, by score: the answer step reranks them (contracts.md section 9)
+    assert [c["id"] for c in seen["chunks"]] == [1, 7, 8, 2, 3, 9]
+    assert [c["server"] for c in seen["chunks"]][:3] == ["http://a", "http://b", "http://b"]
+    assert t["multi"] and t["top_sources"][:3] == [["http://a", 1], ["http://b", 7], ["http://b", 8]]
+    assert [(s["fetched"], s["used"]) for s in t["servers"]] == [(3, 3), (3, 3)]   # each fetched exactly k
     assert {r["server"] for r in t["requests"]} == {"http://a", "http://b"}
 
 
@@ -99,3 +100,17 @@ def test_same_passage_from_two_servers_is_used_once():
     m.ask_traced("q")
     assert [c["id"] for c in seen["chunks"]] == [1, 2, 3]
     assert [c["server"] for c in seen["chunks"]] == ["http://local"] * 3
+
+
+def test_question_embedded_once_across_servers(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from client import embed as emb
+    monkeypatch.setenv("BLIND_RAG_EMBED", "fake")
+    calls = []
+    real = emb._fake
+    monkeypatch.setattr(emb, "_fake", lambda t: calls.append(t) or real(t))
+    with ThreadPoolExecutor(4) as ex:
+        vs = list(ex.map(lambda _: emb.embed("a question asked once, searched on four servers"), range(4)))
+    assert len(calls) == 1 and all((v == vs[0]).all() for v in vs)
+    vs[0][0] = 99.0                                  # callers get copies, never the cached array
+    assert emb.embed("a question asked once, searched on four servers")[0] != 99.0

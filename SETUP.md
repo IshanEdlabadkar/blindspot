@@ -131,6 +131,7 @@ Runs are not committed (`eval/results/bench/` is ignored); copy a report somewhe
 
 ## Changelog
 
+- **Nov 15 (`person-a/latest`):** **`make demo` starts one document server per entry in `servers.json`**: MedlinePlus on :8080 and FMLA on :8081, each from its own `artifacts/<id>/` folder, and the UI offers both. `REMOTE=1 make demo` uses the hosted servers in `servers.remote.json` instead. `BLIND_RAG_SERVER=<url>` still means just that one server. `make stop` also stops :8081 and :8082.
 - **Nov 15 (`bench`):** `make bench` / `make bench-quick`: accuracy, speed per stage and a clickable per-question trace (`eval/results/bench/<run>/report.html`). No setup beyond `make demo`; see "Benchmark" above.
 - **Nov 14, 21:45 (`integration`):** **search several document servers**: pick them in the sidebar, or set `BLIND_RAG_SERVERS=https://a,https://b`. Each selected server gets the same encrypted question and exactly 10 fetches; results merge on the device. See "Searching several document servers" in `docs/crypto.md`.
 - **Nov 14, 20:25:** **batched real PIR fetch:** `POST /v1/fetch_batch` carries all k selectors in one round trip (each still under its own fresh key), and the helper keeps a pool of prepared fetch keys. Real-PIR fetch for a question drops from ~0.5 s to ~25 ms locally, and saves ~1 s of round trips against Render. `crypto_client.make_selectors()` / `decrypt_records()`; `make measure --fetch pir` uses it. **C:** to use it in the pipeline, see "Batched PIR fetch" in `docs/crypto.md`. Restart `make helper` after pulling.

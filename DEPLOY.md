@@ -53,6 +53,20 @@ curl https://<your-service>.onrender.com/v1/server_log
 
 If the build or startup fails, the last lines of the Render log say which step.
 
+## 3b. A second provider: the FMLA server
+
+Each corpus is its own provider with its own server and storage. Same image, same code, different data:
+
+1. Publish the FMLA tables to their own folder in the volume:
+   ```
+   export BLIND_RAG_VOLUME=/Volumes/workspace/default/blindrag/fmla
+   ./scripts/publish_corpus.sh artifacts/fmla
+   ```
+2. Render: **New > Web Service**, this repo, branch `deploy/render`, runtime Docker, name `blindspot-fmla`. Environment:
+   - `BLIND_RAG_DATA_URL` = `https://<workspace>.cloud.databricks.com/api/2.0/fs/files/Volumes/workspace/default/blindrag/fmla/`
+   - `BLIND_RAG_DATA_AUTH` = `Bearer <token>` (the same read token works)
+3. Put its URL in `servers.remote.json`. `REMOTE=1 make demo` then searches both hosted servers; plain `make demo` runs both locally from `artifacts/medlineplus/` and `artifacts/fmla/`.
+
 ## 4. The demo laptop
 
 ```bash

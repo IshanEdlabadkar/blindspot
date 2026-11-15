@@ -3,7 +3,9 @@
 #   make demo            (Ctrl+C stops everything this script started)
 #   (B's plaintext "normal RAG" server on :8001 always starts too, for the log contrast;
 #    PLAIN=0 make demo skips it)
-#   BLIND_RAG_SERVER=https://host make demo   use a remote document server
+#   Document servers come from servers.json: one local server per entry, from artifacts/<id>/
+#   (MedlinePlus on :8080, FMLA on :8081). REMOTE=1 make demo uses servers.remote.json instead
+#   (the hosted servers on Render). BLIND_RAG_SERVER=https://host make demo   just that one server
 # Reuses a server or helper that is already running. Logs: data/server.out, data/helper.out
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -29,29 +31,57 @@ if [ "${1:-}" = "--preflight" ]; then shift; exec "$PY" demo/preflight.py "$@"; 
 echo "Building crypto binaries..."
 (cd crypto-server && go build -o crypto-server . && go build -o crypto-helper ./cmd/crypto-helper)
 
-SERVER="${BLIND_RAG_SERVER:-http://127.0.0.1:8080}"
-case "$SERVER" in
-  http://127.0.0.1:8080*|http://localhost:8080*)
-    if up http://127.0.0.1:8080/v1/manifest; then
-      echo "  server already running, reusing it (just pulled new code? run: make stop, then make demo)"
-    else ./crypto-server/crypto-server -data "$DATA" -log data/server.log > data/server.out 2>&1 & pids+=($!)
-         wait_for "document server (:8080)" http://127.0.0.1:8080/v1/manifest data/server.out; fi ;;
-  *)
-    # A hosted server may be asleep: the first request can take about a minute to wake it.
-    echo "  checking remote document server $SERVER (can take ~1 min if it was asleep)..."
-    code=000
-    for _ in $(seq 1 12); do
-      code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 "$SERVER/v1/manifest" 2>/dev/null || true)
-      [ "$code" = 200 ] && break
-      sleep 3
-    done
-    if [ "$code" = 200 ]; then echo "  using remote document server $SERVER"
-    else
-      echo "ERROR: document server $SERVER did not answer (last HTTP status: $code)."
-      echo "       Open $SERVER/v1/manifest in a browser: if it loads, run make demo again."
-      exit 1
-    fi ;;
-esac
+start_local() {  # url data_dir
+  local port=${1##*:}; port=${port%%/*}
+  local log=data/server.log; [ "$port" = 8080 ] || log="data/server-$port.log"
+  if up "$1/v1/manifest"; then
+    echo "  server on :$port already running, reusing it (just pulled new code? run: make stop, then make demo)"
+  else ./crypto-server/crypto-server -data "$2" -addr "127.0.0.1:$port" -log "$log" > "data/server-$port.out" 2>&1 & pids+=($!)
+       wait_for "document server (:$port, $2)" "$1/v1/manifest" "data/server-$port.out"; fi
+}
+check_remote() {  # url   (a free Render server may be asleep: the first request can take ~1 min)
+  echo "  checking remote document server $1 (can take ~1 min if it was asleep)..."
+  local code=000
+  for _ in $(seq 1 12); do
+    code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 "$1/v1/manifest" 2>/dev/null || true)
+    [ "$code" = 200 ] && { echo "  using remote document server $1"; return 0; }
+    sleep 3
+  done
+  echo "ERROR: document server $1 did not answer (last HTTP status: $code)."
+  echo "       Open $1/v1/manifest in a browser: if it loads, run make demo again."
+  exit 1
+}
+
+# Which document servers: BLIND_RAG_SERVER (one), DATA=<folder> (one local), else the server list:
+# servers.json (local, one server per artifacts/<id>/) or, with REMOTE=1, servers.remote.json.
+servers=()
+if [ -n "${BLIND_RAG_SERVER:-}" ]; then
+  servers=("${BLIND_RAG_SERVER%/}|$DATA")
+elif [ "$DATA" != artifacts ]; then
+  servers=("http://127.0.0.1:8080|$DATA")
+else
+  [ "${REMOTE:-0}" = 1 ] && export BLIND_RAG_SERVERS_FILE="${BLIND_RAG_SERVERS_FILE:-servers.remote.json}"
+  LIST="${BLIND_RAG_SERVERS_FILE:-servers.json}"
+  echo "Document servers from $LIST:"
+  while IFS= read -r line; do servers+=("$line"); done < <("$PY" - "$LIST" <<'PY'
+import json, os, sys
+for e in json.load(open(sys.argv[1])):
+    d = os.path.join("artifacts", e["id"])
+    print(f"{e['url'].rstrip('/')}|{d if os.path.isdir(d) else 'artifacts'}")
+PY
+)
+fi
+urls=()
+for s in "${servers[@]}"; do
+  url=${s%%|*}; dir=${s#*|}; urls+=("$url")
+  case "$url" in
+    http://127.0.0.1:*|http://localhost:*) start_local "$url" "$dir" ;;
+    *) check_remote "$url" ;;
+  esac
+done
+BLIND_RAG_SERVERS=$(IFS=,; echo "${urls[*]}"); export BLIND_RAG_SERVERS
+unset BLIND_RAG_SERVER
+echo "  the UI offers: $BLIND_RAG_SERVERS"
 
 if up http://127.0.0.1:8090/health; then echo "  helper already running, reusing it"
 else ./crypto-server/crypto-helper > data/helper.out 2>&1 & pids+=($!)

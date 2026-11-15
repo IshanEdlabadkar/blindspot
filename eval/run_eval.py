@@ -90,7 +90,9 @@ def load_pipeline(spec: str):
     return call
 
 
-def run_answers(questions: list[dict], ask, reference_ids: dict[str, list[int]] | None = None) -> list[dict]:
+def run_answers(questions: list[dict], ask, reference_ids: dict[str, list[int]] | None = None,
+                on_row=None) -> list[dict]:
+    """on_row(row) is called as each question finishes, so a crash mid-run keeps what was done."""
     rows = []
     for q in questions:
         t0 = time.perf_counter()
@@ -117,6 +119,8 @@ def run_answers(questions: list[dict], ask, reference_ids: dict[str, list[int]] 
             "timings": result.get("timings", {}),
             "grade": "",
         })
+        if on_row:
+            on_row(rows[-1])
     return rows
 
 
@@ -188,10 +192,13 @@ def main():
         reference_for = by_question.get
     else:
         ask = load_pipeline(spec)
-    out = run_answers(questions, ask, reference)
     with open(RESULTS / f"answers_{name}.jsonl", "w") as f:
-        for r in out:
+        def save(r):
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            f.flush()
+            print(f"  {r['id']} {r['seconds']:6.1f}s {r['status']:9} {'ok ' if r['behaved'] else 'MISS'} "
+                  f"{r['question'][:60]}", flush=True)
+        out = run_answers(questions, ask, reference, on_row=save)
     summary = {"pipeline": spec, **summarize(out)}
     (RESULTS / f"summary_{name}.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(f"\nAnswers via {spec}")

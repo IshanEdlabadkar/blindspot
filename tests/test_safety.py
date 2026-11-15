@@ -21,6 +21,10 @@ def test_crisis_wording_gets_988(q):
     "I think my friend took an overdose",
     "She passed out and is unconscious",
     "Was that a mini stroke?",
+    "My toddler swallowed a whole bottle of my pills. What do I do?",
+    "My son swallowed some bleach",
+    "Someone just collapsed in front of me and isn't breathing.",
+    "He stopped breathing for a moment",
 ])
 def test_emergency_signs_get_911(q):
     assert urgent_notice(q) == ("emergency", EMERGENCY_MESSAGE)
@@ -32,6 +36,8 @@ def test_emergency_signs_get_911(q):
     "I'm a smoker with a cough and shortness of breath that keep getting worse.",
     "How do I avoid food poisoning at a picnic?",
     "Why do I have so much bloating and burping?",
+    "My partner says I stop breathing for a few seconds while I sleep, and I wake up gasping.",
+    "Is it safe to swallow my pills with grapefruit juice?",
 ])
 def test_ordinary_questions_get_no_notice(q):
     assert urgent_notice(q) is None

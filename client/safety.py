@@ -12,7 +12,9 @@ _CRISIS = re.compile(
     r"(don'?t|do not) want to (live|be alive)|want to die)\b", re.I)
 _EMERGENCY = re.compile(
     r"\b(chest (pain|pressure|tightness)|crushing (pain|chest)|"
-    r"(can'?t|cannot|can not|struggling to|trouble) breath\w*|not breathing|"
+    r"(can'?t|cannot|can not|struggling to|trouble) breath\w*|not breathing|isn'?t breathing|"
+    r"stopped breathing|collapsed|"
+    r"swallowed\b[^.?!]{0,40}\b(pills?|medicines?|medications?|tablets?|bleach|poison\w*|detergent|batter(y|ies))|"
     r"face (is )?droop\w*|slurred speech|stroke|heart attack|"
     r"overdos\w*|unconscious|passed out|unresponsive|seizure|"
     r"(severe|heavy|uncontrolled) bleeding|bleeding (heavily|a lot|won'?t stop)|"

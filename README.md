@@ -19,6 +19,7 @@ Search a sensitive knowledge base without the server learning the question, the 
 - [x] Server accepts B's scale-127 tables (waiting on B's little-endian record fix for the full pipeline)
 - [x] Background key preparation: encrypt 1.2 s -> 0.05 s
 - [x] `make measure`: latency, bytes, CPU, log check
+- [x] Hint-mode scoring: 3 KB up, ~6 ms per question; every spec performance target met
 - [ ] Run `make measure` on the demo laptop (hours 13 to 16)
 
 ## Crypto design decisions
@@ -26,7 +27,8 @@ Search a sensitive knowledge base without the server learning the question, the 
 | Decision | Why |
 | --- | --- |
 | Tiptoe's `underhood` for scoring, P = 2^17 | Library's tuned setting. Normalized int8 scores (at most ~16,200) fit in ±65,536. |
-| Token sent inside `/v1/score` | One round trip; the server stays stateless. |
+| Hint mode by default | The scoring hint (DB x A) is public and the same for every user, so the device downloads it once per corpus (17 MB, low 32 bits dropped, error bound 2^42 vs a 2^46 limit). Each question is then a fresh secret, 3 KB up and 17 KB down, with no token. |
+| Token mode as fallback | Tiptoe's underhood: no hint download, but a ~33 MB token per question, sent inside `/v1/score`. Used automatically if the hint can't be loaded. |
 | Fresh secret key per question | Reusing an LWE key across questions leaks. `crypto_client` does this inside `encrypt_query`, so C's pipeline needs no change. The helper prepares the next key in the background and refuses to use any key twice. |
 | Fetch is trivial PIR (`GET /v1/fetch_store`) | Tiptoe's PIR needs a fresh ~33 MB key per fetch (~330 MB per question at k = 10). The whole store is 10 MB, downloaded once, and leaks nothing. |
 | Python calls Go through a local helper process | Works the same on Mac and on Windows (WSL2). Keys stay in the helper's memory. |

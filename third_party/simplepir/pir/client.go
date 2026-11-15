@@ -15,6 +15,21 @@ type Client[T matrix.Elem] struct {
 
 	matrixAseeds []rand.PRGKey
 	matrixArows  []uint64
+
+	// Blind RAG patch: the public matrix A, expanded once by ExpandA. Expanding it from
+	// the seed on every query is ~30x slower than multiplying by a stored copy.
+	matrixA      *matrix.Matrix[T]
+}
+
+// ExpandA (Blind RAG patch) stores the public matrix A, so PreprocessQuery multiplies by it
+// instead of regenerating it from the seed each time. A is public; the secret and error are
+// still fresh for every query. Costs M x N elements of memory. Single-seed clients only.
+func (c *Client[T]) ExpandA() {
+	if len(c.matrixAseeds) != 1 {
+		return
+	}
+	src := rand.NewBufPRG(rand.NewPRG(&c.matrixAseeds[0]))
+	c.matrixA = matrix.Rand[T](src, c.matrixArows[0], c.params.N, 0)
 }
 
 func NewClient[T matrix.Elem](hint *matrix.Matrix[T], matrixAseed *rand.PRGKey, dbinfo *DBInfo) *Client[T] {
@@ -63,16 +78,20 @@ func (c *Client[T]) PreprocessQueryGivenSecret(inSecret *matrix.Matrix[T]) *Secr
 		s.interm = matrix.Mul(c.hint, s.secret)
 	}
 
-	src := make([]matrix.IoRandSource, len(c.matrixAseeds))
-	for i, seed := range c.matrixAseeds {
-		src[i] = rand.NewBufPRG(rand.NewPRG(&seed))
-	}
-        matrixAseeded := matrix.NewSeeded[T](src, c.matrixArows, c.params.N)
-
 	err := matrix.Gaussian[T](c.prg, c.dbinfo.M, 1)
 
 	// Compure A * s + e
-	query := matrix.MulSeededLeft(matrixAseeded, s.secret)
+	var query *matrix.Matrix[T]
+	if c.matrixA != nil {
+		query = matrix.Mul(c.matrixA, s.secret)
+	} else {
+		src := make([]matrix.IoRandSource, len(c.matrixAseeds))
+		for i, seed := range c.matrixAseeds {
+			src[i] = rand.NewBufPRG(rand.NewPRG(&seed))
+		}
+		matrixAseeded := matrix.NewSeeded[T](src, c.matrixArows, c.params.N)
+		query = matrix.MulSeededLeft(matrixAseeded, s.secret)
+	}
 	query.Add(err)
 
 	// Pad the query to match the dimensions of the compressed DB

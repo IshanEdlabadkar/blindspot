@@ -94,7 +94,7 @@ func (f *FetchServer) Answer(q *pir.Query[Elem]) *pir.Answer[Elem] { return f.s.
 
 // FetchClient is the device side. Safe for concurrent use; every Query uses a fresh secret.
 //
-// Preparing a secret (A*s + e and H*s, ~45 ms) does not depend on which record
+// Preparing a secret (A*s + e and H*s, ~3 ms with A stored) does not depend on which record
 // is wanted, so a background goroutine keeps a small pool of prepared secrets.
 // Each is taken from the pool once and never reused.
 type FetchClient struct {
@@ -111,7 +111,11 @@ type FetchClient struct {
 const FetchPoolSize = 20
 
 func NewFetchClient(seed *rand.PRGKey, info *pir.DBInfo, hint *matrix.Matrix[Elem], n, recLen uint64) *FetchClient {
-	fc := &FetchClient{c: pir.NewClient[Elem](hint, seed, info), info: info, n: n, recLen: recLen,
+	c := pir.NewClient[Elem](hint, seed, info)
+	// Keep the public matrix A in memory (M x 2048 x 8 bytes: ~34 MB at 2,101 records):
+	// preparing a secret then takes ~3 ms instead of ~50 ms. Secrets and errors stay fresh.
+	c.ExpandA()
+	fc := &FetchClient{c: c, info: info, n: n, recLen: recLen,
 		pool: make(chan *pir.Secret[Elem], FetchPoolSize), done: make(chan struct{})}
 	go fc.fill()
 	return fc

@@ -123,7 +123,7 @@ The app runs the real encrypted path unless you ask for the mock like this, and 
 
 **Picking this project up? Read the [detailed handoff](docs/HANDOFF.md) first.** Presenting it? Use the [demo kit](demo/README.md).
 
-More detail: [crypto status and design decisions](docs/crypto.md), [setup](SETUP.md), [remote deployment](DEPLOY.md), [shared contracts](docs/contracts.md), [client and UI notes](README_C.md).
+More detail: [crypto status and design decisions](docs/crypto.md), [setup](SETUP.md), remote deployment (Render + Databricks, on the `deploy/render` branch), [shared contracts](docs/contracts.md), [client and UI notes](README_C.md).
 
 ## Limits
 

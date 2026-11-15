@@ -68,6 +68,7 @@ _STOP = {"about", "after", "also", "because", "been", "before", "being", "could"
 _CITE = re.compile(r"\[(\d+)\]")
 
 
+RERANK_MARGIN = 5.0  # keep sources within this many reranker points of the best (eval: 67/79 vs 68/79 kept)
 RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L6-v2"
 RERANK_REVISION = "233902d25c440f23af6f7d6e94d2946bac0bee0a"
 
@@ -151,7 +152,9 @@ _COVERAGE_NOTE = re.compile(r"^\s*(the )?(sources?|library|passages?) (do|does|d
 def _sentences(text: str) -> list[str]:
     """Split into sentences; a citation written after the full stop stays with its sentence."""
     out: list[str] = []
-    for part in re.split(r"(?<=[.!?])\s+|\n+", text):
+    # Never split after a single capital letter ("C. diff") or a common title ("Dr.").
+    boundary = r"(?<![\s(][A-Z]\.)(?<!\b(?:Dr|Mr|Ms|St|vs)\.)(?<!\bMrs\.)(?<=[.!?])\s+|\n+"
+    for part in re.split(boundary, text):
         part = part.strip()
         lead = re.match(r"^((?:\[\d+\]\s*)+)(.*)$", part, re.S)
         if lead and out:
@@ -219,6 +222,11 @@ def answer(question: str, chunks: list[dict], llm=ollama_chat,
     chunks = (rerank or _default_rerank)(question, chunks)
     t_rerank = (time.perf_counter() - t0) * 1000
     ctx = chunks[:n_context]
+    # Drop sources far below the best rerank score: a passage about another condition that shares
+    # common words (C. diff for a chlamydia question) otherwise ends up quoted in the answer.
+    if ctx and "rerank_score" in ctx[0]:
+        best = ctx[0]["rerank_score"]
+        ctx = [c for c in ctx if c["rerank_score"] >= best - RERANK_MARGIN]
 
     def result(status, text, citations, removed=0):
         body = f"{urgent[1]}\n\n{text}" if urgent else text

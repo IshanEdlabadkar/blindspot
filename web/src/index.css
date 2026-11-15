@@ -95,6 +95,27 @@ h1, h2 { font-family: var(--font-display); }
 .desk-object { animation: settle .3s ease-out both; }
 @keyframes settle { from { opacity: 0; } to { opacity: 1; } }
 
+/* 3D pipeline view: labels pinned to the scene, typed like the DESK demo. */
+.sim-label { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: var(--font-type); font-size: 15px; font-weight: 700;
+  color: #2B2926; transition: opacity .2s ease-out; will-change: transform; }
+.sim-label.sim-sealed { color: var(--color-sealed); }
+.sim-label.sim-red { color: var(--color-stamp); }
+.sim-label[data-typing="1"]::after { content: ""; display: inline-block; width: .55em; height: 1em; margin-left: 2px; vertical-align: -2px;
+  background: currentColor; animation: caret .8s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.sim-card { white-space: normal; width: 290px; padding: 12px 14px; background: var(--color-card); box-shadow: var(--shadow-paper);
+  font-weight: 400; font-size: 14px; line-height: 1.55; color: var(--color-ink); }
+.sim-card b { font-family: var(--font-display); font-weight: 900; }
+.sim-card mark { background: var(--color-highlighter); color: inherit; padding: 0 .1em; }
+.sim-lines line { stroke: #2B2926; stroke-width: 1; transition: opacity .2s ease-out; }
+.sim-lines circle { fill: #2B2926; transition: opacity .2s ease-out; }
+.sim-caption { text-shadow: 0 2px 22px rgba(30,28,26,.28); animation: caption-in .35s ease-out both; }
+@keyframes caption-in { from { opacity: 0; transform: translateY(8px); } }
+/* Explanation cards that scroll past the 3D stage, one per step. */
+.sim-step { padding: 18px 20px 20px; background: var(--color-card); box-shadow: var(--shadow-paper); border-top: 3px solid var(--color-badger); }
+
+@media (max-width: 640px) { .sim-label { font-size: 12px; white-space: normal; max-width: calc(100vw - 32px); } .sim-card { width: 220px; font-size: 12px; } }
+
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes dig { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg) translateY(2px); } }
 @keyframes clod { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 12% { opacity: 1; }
@@ -105,3 +126,27 @@ h1, h2 { font-family: var(--font-display); }
     transition-duration: 0.01ms !important; }
   .mark { background-size: 100% 100%; }
 }
+
+/* Text on a catalog card sits on its ruled lines: one 28px rhythm for everything typed on it. */
+.catalog p, .catalog li, .catalog ol { line-height: 28px; }
+
+/* The Ember theme is the only look: the desk goes dark; paper objects stay warm paper so the library idea holds and type on them keeps its contrast.
+   Ember = dark maroon desk, set on <html data-theme="ember">. */
+[data-theme="ember"]  { --color-blotter:#1C1112; --color-blotter-dark:#130A0B; --d-ink:#F6ECE8; --d-graphite:#C3AFA9; --d-badger:#FF7A6B; --d-sealed:#A9B8FF; --d-dot:rgba(255,200,180,.05); }
+:root:not([data-theme="paper"]) .desk {
+  --color-ink: var(--d-ink); --color-graphite: var(--d-graphite); --color-badger: var(--d-badger);
+  --color-stamp: var(--d-badger); --color-sealed: var(--d-sealed); --color-rule: #5C6F8A;
+  color: var(--color-ink);
+  background-image: radial-gradient(var(--d-dot) 1px, transparent 1.4px);
+}
+:root:not([data-theme="paper"]) :is(.slip, .catalog, .receipt, .paper, .bg-card) {
+  --color-ink:#1E1C1A; --color-graphite:#57524B; --color-badger:#C5050C; --color-stamp:#B10E16;
+  --color-sealed:#23408E; --color-rule:#A9C0DA; --color-blotter-dark:#B9C0B7; color:#1E1C1A;
+}
+:root:not([data-theme="paper"]) .bg-badger { background-color:#C5050C; color:#fff; }
+:root:not([data-theme="paper"]) .bg-badger:hover { background-color:#A8040A; }
+:root:not([data-theme="paper"]) .desk > header ~ * .press.bg-ink { background-color:#EDE6D3; color:#1E1C1A; }
+:root:not([data-theme="paper"]) .desk > header ~ * .slip .press.bg-ink { background-color:#1E1C1A; color:#FFFDF8; }
+:root:not([data-theme="paper"]) .desk-object svg [stroke="#1E1C1A"] { stroke:#CFC9B8; }
+:root:not([data-theme="paper"]) .desk-object { filter: drop-shadow(0 2px 5px rgba(0,0,0,.55)) !important; }
+:root:not([data-theme="paper"]) ::selection { background: var(--color-highlighter); color:#1E1C1A; }

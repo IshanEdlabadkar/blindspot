@@ -1,6 +1,6 @@
 # Security layers
 
-Blind RAG's core promise is that the document servers never see the question or which passages were
+Blindspot's core promise is that the document servers never see the question or which passages were
 fetched. These are the layers around that promise, what each protects against, and what is still open.
 
 ## In place
@@ -41,6 +41,6 @@ After publishing a new corpus version on purpose, update the pins: `python3 scri
   parameters with a lattice-estimator security level, pin the Docker base image by digest, run tests in CI.
 
 The rate limiting, header and CSP layers apply ideas from the MadHacks 2026 TDS workshop (penalty box,
-response-header policy, stripping client data) at the layer where they protect Blind RAG. Its WAF demo
+response-header policy, stripping client data) at the layer where they protect Blindspot. Its WAF demo
 (request inspection) adds little here: the servers take fixed-format encrypted bytes and never turn
 request data into file paths, and the size limits already cap requests.

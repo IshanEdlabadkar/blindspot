@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build Blind RAG's content side: MedlinePlus ingestion into the score table, fetch store and manifest; a plaintext baseline `ask_plain()`; the local-model `answer()` with citations and safe decline; and a retrieval and answer eval.
+**Goal:** Build Blindspot's content side: MedlinePlus ingestion into the score table, fetch store and manifest; a plaintext baseline `ask_plain()`; the local-model `answer()` with citations and safe decline; and a retrieval and answer eval.
 
-**Architecture:** Pure Python modules that talk through the files and shapes in `docs/contracts.md`. `common/` holds code shared with C (record format, embedding, table loading). `ingest/` turns the MedlinePlus XML into `artifacts/`. `baseline/` does plaintext int8 retrieval, which ranks exactly as Blind RAG will. `client/answer.py` calls Ollama. `eval/` measures recall and answer outcomes.
+**Architecture:** Pure Python modules that talk through the files and shapes in `docs/contracts.md`. `common/` holds code shared with C (record format, embedding, table loading). `ingest/` turns the MedlinePlus XML into `artifacts/`. `baseline/` does plaintext int8 retrieval, which ranks exactly as Blindspot will. `client/answer.py` calls Ollama. `eval/` measures recall and answer outcomes.
 
 **Tech Stack:** Python 3.12 (via `uv`), numpy, sentence-transformers (`BAAI/bge-small-en-v1.5`), requests, Ollama with `llama3.2:3b`, pytest.
 
-**Spec:** `docs/contracts.md` (agreed contracts) and the Blind RAG product spec (Nov 14, 2026), sections "Ingestion pipeline", "Client specification", "Accuracy and evaluation".
+**Spec:** `docs/contracts.md` (agreed contracts) and the Blindspot product spec (Nov 14, 2026), sections "Ingestion pipeline", "Client specification", "Accuracy and evaluation".
 
 ## Global Constraints
 
@@ -842,7 +842,7 @@ Run: `uv run pytest tests/test_retrieve.py -v` — Expected: FAIL, `No module na
 - [ ] **Step 3: Implement** (`baseline/__init__.py` empty; `baseline/retrieve.py`)
 
 ```python
-"""Plaintext top-k over the same tables Blind RAG uses. int8 mode ranks exactly as Blind RAG will."""
+"""Plaintext top-k over the same tables Blindspot uses. int8 mode ranks exactly as Blindspot will."""
 from pathlib import Path
 
 import numpy as np

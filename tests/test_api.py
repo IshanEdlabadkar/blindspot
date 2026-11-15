@@ -42,13 +42,13 @@ def wire_line(route, body, ts="2099-01-01T00:00:00.000Z"):
                        "status": 200, "response_bytes": 1}) + "\n"
 
 
-def client(tmp_path, fail=False, plain=None):
+def client(tmp_path, fail=False, plain=None, servers=None, factory=None, status_get=None):
     wire = tmp_path / "wire.jsonl"
-    app = make_app(servers=["http://127.0.0.1:9080"], wire_log=wire,
-                   pipeline_factory=lambda servers: FakePipeline(fail),
+    app = make_app(servers=servers or ["http://127.0.0.1:9080"], wire_log=wire, user_file=tmp_path / "user_servers.json",
+                   pipeline_factory=factory or (lambda servers: FakePipeline(fail)),
                    plain_ask=plain or (lambda url, q: {"entry": {"question": q, "returned": []}}),
-                   status_get=lambda url: {"source_name": "MedlinePlus", "num_chunks": 2101,
-                                           "corpus_version": "v"})
+                   status_get=status_get or (lambda url: {"source_name": "MedlinePlus", "num_chunks": 2101,
+                                                          "corpus_version": "v"}))
     return TestClient(app), wire
 
 
@@ -94,7 +94,7 @@ def test_status_lists_servers_with_names(tmp_path):
     c, _ = client(tmp_path)
     s = c.get("/api/status").json()
     assert s["servers"] == [{"url": "http://127.0.0.1:9080", "ok": True, "name": "MedlinePlus",
-                             "num_chunks": 2101, "corpus_version": "v"}]
+                             "num_chunks": 2101, "corpus_version": "v", "examples": []}]
 
 
 def test_wire_search_for_any_word(tmp_path):
@@ -102,3 +102,37 @@ def test_wire_search_for_any_word(tmp_path):
     wire.write_text(wire_line("plain", b'{"question": "my friend zebulon"}') + wire_line("fmla", b"\x01\x02\x03"))
     got = {r["route"]: r["found"] for r in c.get("/api/wire", params={"word": "Zebulon"}).json()["routes"]}
     assert got == {"plain": ["zebulon"], "fmla": []}
+
+
+def test_ask_searches_only_the_chosen_libraries(tmp_path):
+    seen = []
+    a, b = "http://127.0.0.1:9080", "http://127.0.0.1:9081"
+
+    def factory(servers):
+        seen.append(list(servers))
+        return FakePipeline()
+    c, _ = client(tmp_path, servers=[a, b], factory=factory)
+    r = c.post("/api/ask", json={"question": "q", "compare": False, "servers": [b]})
+    assert events(r.text)[0][1]["servers"] == [b] and seen == [[b]]
+    r = c.post("/api/ask", json={"question": "q", "compare": False})
+    assert events(r.text)[0][1]["servers"] == [a, b]
+
+
+def test_add_and_remove_a_library_and_it_survives_a_restart(tmp_path):
+    c, _ = client(tmp_path)
+    new = "http://127.0.0.1:9999"
+    assert c.post("/api/servers", json={"url": new + "/"}).json()["url"] == new
+    assert [s["url"] for s in c.get("/api/status").json()["servers"]] == ["http://127.0.0.1:9080", new]
+    c2, _ = client(tmp_path)   # same user file: a restart
+    assert new in [s["url"] for s in c2.get("/api/status").json()["servers"]]
+    assert c2.delete("/api/servers", params={"url": new}).status_code == 200
+    assert [s["url"] for s in c2.get("/api/status").json()["servers"]] == ["http://127.0.0.1:9080"]
+
+
+def test_add_rejects_bad_or_unreachable_addresses_and_keeps_the_last_library(tmp_path):
+    def down(url):
+        raise OSError("down")
+    c, _ = client(tmp_path, status_get=down)
+    assert c.post("/api/servers", json={"url": "not a url"}).status_code == 400
+    assert c.post("/api/servers", json={"url": "http://127.0.0.1:9999"}).status_code == 400
+    assert c.delete("/api/servers", params={"url": "http://127.0.0.1:9080"}).status_code == 400

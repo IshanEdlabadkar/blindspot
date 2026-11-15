@@ -1,6 +1,35 @@
 [
-  {"id": "medlineplus", "name": "MedlinePlus (National Library of Medicine)", "url": "http://127.0.0.1:8080"},
-  {"id": "fmla", "name": "Federal FMLA regulations (29 CFR Part 825, eCFR)", "url": "http://127.0.0.1:8081"},
-  {"id": "genetics", "name": "MedlinePlus Genetics (National Library of Medicine)", "url": "http://127.0.0.1:8082"},
-  {"id": "myhealthfinder", "name": "MyHealthfinder (ODPHP, health.gov)", "url": "http://127.0.0.1:8083"}
+  {
+    "id": "medlineplus",
+    "name": "MedlinePlus (National Library of Medicine)",
+    "url": "http://127.0.0.1:8080",
+    "examples": [
+      "How is chlamydia treated, and can I get it again?",
+      "What are the symptoms of depression?"
+    ]
+  },
+  {
+    "id": "fmla",
+    "name": "Federal FMLA regulations (29 CFR Part 825, eCFR)",
+    "url": "http://127.0.0.1:8081",
+    "examples": [
+      "Can I take FMLA leave for a pregnancy complication?"
+    ]
+  },
+  {
+    "id": "genetics",
+    "name": "MedlinePlus Genetics (National Library of Medicine)",
+    "url": "http://127.0.0.1:8082",
+    "examples": [
+      "Is Huntington disease passed down from my parents?"
+    ]
+  },
+  {
+    "id": "myhealthfinder",
+    "name": "MyHealthfinder (ODPHP, health.gov)",
+    "url": "http://127.0.0.1:8083",
+    "examples": [
+      "How much salt should I eat in a day?"
+    ]
+  }
 ]

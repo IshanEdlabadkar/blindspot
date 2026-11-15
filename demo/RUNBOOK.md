@@ -44,10 +44,10 @@ The app never falls back to a weaker mode by itself. It shows a red box naming t
 
 | Symptom | Fix |
 | --- | --- |
-| Red dot: Document server | `make stop`, then `make demo-compare` |
+| Red dot: Document server | `make stop`, then `make demo` |
 | Red dot: Key helper | same |
 | Red dot: Local model | `brew services start ollama`; if the model is missing, `ollama pull llama3.2:3b` |
-| "No module named streamlit" | Use `make demo`, not `python3 -m streamlit`. On this Mac `python3` is the wrong Python; `python3.12` has the packages |
+| "No module named fastapi" or "numpy" | Use `make demo`. On this Mac `python3` is the wrong Python; `python3.12` has the packages |
 | "Refusing to send an unencrypted question" | You started the UI in mock mode against the real server. Use `make demo` |
 | Server says 409 or scores look wrong after a pull | `make stop`, then `make demo`: an old server was still running |
 | "document server ... did not answer" with the hosted server | It was asleep and took over a minute to wake. Open its `/v1/manifest` in a browser, wait until it loads, run the command again |

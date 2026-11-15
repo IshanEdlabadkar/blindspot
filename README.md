@@ -1,20 +1,20 @@
-# Blind RAG
+# Blindspot
 
 **Ask a sensitive question and get a sourced answer, while the server never learns the question, the relevance scores, or which documents you read.**
 
-Blind RAG pairs encrypted search (linearly homomorphic encryption) and private retrieval with a language model that runs on your own device. The server computes on locked data it cannot open. A breach, an insider or a court order can only recover what the server has, and it never had your question.
+Blindspot pairs encrypted search (linearly homomorphic encryption) and private retrieval with a language model that runs on your own device. The server computes on locked data it cannot open. A breach, an insider or a court order can only recover what the server has, and it never had your question.
 
-Built at MadHacks 2026 over a public-domain subset of [MedlinePlus](https://medlineplus.gov/) health topics.
+Built at MadHacks 2026. The demo searches four public-domain document servers (MedlinePlus, MedlinePlus Genetics, MyHealthfinder and the federal FMLA regulations), but Blindspot works with any document server: in the app, open **Libraries** to choose which ones a question goes to, add one by its address, or remove one.
 
 | The asker sees a simple chat | One toggle shows what each server kept |
 | --- | --- |
 | ![Chat view](docs/img/ui-default.png) | ![Server view](docs/img/ui-server-view.png) |
 
-*Screenshots from the real encrypted server with the language model switched off, so the answer text there is a stand-in. The normal server's receipt is read from a plaintext test server. Burrow the badger is Blind RAG's own original mascot.*
+*Screenshots from the real encrypted server with the language model switched off, so the answer text there is a stand-in. The normal server's receipt is read from a plaintext test server. Burrow the badger is Blindspot's own original mascot.*
 
 ## Why
 
-People bring their most private questions to AI and health sites, and every one is stored in readable form. Privacy policies, deletion settings and "anonymized" logs are promises that breaches, subpoenas and policy changes can override. Blind RAG replaces the promise with math: a server cannot leak, sell or hand over a question it never had.
+People bring their most private questions to AI and health sites, and every one is stored in readable form. Privacy policies, deletion settings and "anonymized" logs are promises that breaches, subpoenas and policy changes can override. Blindspot replaces the promise with math: a server cannot leak, sell or hand over a question it never had.
 
 ## How it works
 
@@ -61,11 +61,10 @@ The server still sees that a query happened, when, from which IP address, and ho
 | Retrieval recall at 10 | 1.00 for both float and int8 embeddings (20 answerable questions) | `eval/results/retrieval.csv` |
 | Answers | 19 of 20 answerable questions answered; 5 of 5 unanswerable ones declined | `eval/results/answers.jsonl` |
 | Encrypted ranking vs plaintext | Identical top 10 on every question checked | `make integration` |
-| Crypto cost per question | About 6 ms, 3.1 KB up, 16.8 KB down | [SETUP.md](SETUP.md), measured by A |
-| One-time download per corpus version | 17.2 MB public scoring hint + 4.3 MB fetch store | [SETUP.md](SETUP.md) |
+| Crypto compute per question | About 6 ms | [SETUP.md](SETUP.md), measured by A |
 | Local answer generation | About 3 to 6 s warm | B's eval run |
 
-The retrieval and answer figures come from the plaintext baseline. Encryption adds no error, so the int8 ranking is the ranking Blind RAG produces. Full end-to-end numbers on the demo laptop come from `make measure`.
+The retrieval and answer figures come from the plaintext baseline. Encryption adds no error, so the int8 ranking is the ranking Blindspot produces. Full end-to-end numbers on the demo laptop come from `make measure`.
 
 ## Quick start
 
@@ -76,10 +75,10 @@ git clone https://github.com/IshanEdlabadkar/blindspot && cd blindspot
 pip install -r requirements-c.txt
 make seal                          # one time, builds Microsoft SEAL (~5 min)
 brew install ollama && brew services start ollama && ollama pull llama3.2:3b
-make demo                          # server + key helper + UI, real crypto
+make demo                          # the Vault web UI (React) on :8600, opens in your browser; needs FastAPI + Node 20.19+ (see web/README.md)
 ```
 
-`make demo` opens the app in your browser. Ask a question, then flip **Show what the server saw**.
+`make demo` opens the app in your browser. Ask a question, tick the unsealed-copy box, then open the receipt (**what left this laptop**). The **Chat** tab is the plain assistant; **Live demo** has the story, the side-by-side receipts, the scoreboard and the 100-people simulation.
 
 ### Without the crypto toolchain
 
@@ -87,7 +86,7 @@ The plaintext mock has the same endpoints and needs only Python. It is for devel
 
 ```bash
 python3 -m mock_server.server --data artifacts --port 8080
-BLIND_RAG_CRYPTO=mock BLIND_RAG_ANSWER=stub BLIND_RAG_EMBED=fake python3 -m streamlit run ui/app.py
+BLIND_RAG_CRYPTO=mock BLIND_RAG_ANSWER=stub BLIND_RAG_EMBED=fake BLIND_RAG_SERVERS=http://127.0.0.1:8080 python3 -m uvicorn api.app:app --port 8600
 ```
 
 The app runs the real encrypted path unless you ask for the mock like this, and it labels every answer with what actually ran. It never falls back to the mock by itself.
@@ -96,8 +95,7 @@ The app runs the real encrypted path unless you ask for the mock like this, and 
 
 | Command | What it does |
 | --- | --- |
-| `make demo` | Everything in one terminal with real crypto |
-| `make demo-compare` | The same, plus a plaintext "normal RAG" server for the side-by-side log contrast |
+| `make demo` | Everything in one terminal with real crypto, React UI on :8600 (opens itself) |
 | `make preflight` | 8-step smoke test before presenting |
 | `make stop` | Stop any server or helper left running (do this after `git pull`) |
 | `make corpus-expanded` | Build a larger library with MedlinePlus Genetics and MyHealthfinder ([docs/corpus.md](docs/corpus.md)) |
@@ -118,7 +116,7 @@ The app runs the real encrypted path unless you ask for the mock like this, and 
 | `client/answer.py` | Local-model answer with citations and safe decline | B |
 | `baseline/`, `eval/` | Plaintext RAG for comparison, and the evaluation | B |
 | `client/pipeline.py` | The client flow: embed, encrypt, score, rank, fetch, answer | C |
-| `ui/` | Streamlit app with the server-view toggle and attacker console | C |
+| `web/` | The React app: Chat tab, Live demo tab, receipts, scoreboard, 100-people simulation | C |
 | `mock_server/`, `client/mock_crypto_client.py` | Plaintext stand-ins for development | C |
 | `contracts.py` | Shared formats: record layout, wire format, answer shape | all |
 
@@ -137,7 +135,7 @@ More detail: [crypto status and design decisions](docs/crypto.md), [setup](SETUP
 
 ## Built on
 
-Blind RAG does not introduce a new cryptographic technique. It turns published private-search research into a working end-to-end product.
+Blindspot does not introduce a new cryptographic technique. It turns published private-search research into a working end-to-end product.
 
 - [Tiptoe](https://github.com/ahenzinger/underhood) (`underhood`) for encrypted scoring, and [SimplePIR](https://github.com/henrycg/simplepir) for private fetch
 - [Microsoft SEAL](https://github.com/microsoft/SEAL)

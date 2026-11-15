@@ -75,7 +75,7 @@ Three processes, each in its own terminal:
 ```bash
 make server      # A's document server :8080 on artifacts/, ~3 s to start, log at data/server.log
 make helper      # asker-side key holder :8090 (on the demo laptop)
-BLIND_RAG_CRYPTO=real BLIND_RAG_FETCH=download streamlit run ui/app.py
+./web/demo.sh   # or: make demo, which starts all of this for you
 ```
 
 - **`BLIND_RAG_FETCH=download` is required with real crypto.** Fetch is trivial PIR: the client downloads the whole 10 MB store once and reads chunks locally.

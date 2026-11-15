@@ -1,4 +1,4 @@
-# Blind RAG web UI ("Vault")
+# Blindspot web UI ("Vault")
 
 The demo front end: ask anything, get a cited answer written on this laptop, then open
 "See what left this laptop" to watch what happened to the question and see the traffic proof.
@@ -10,9 +10,9 @@ The demo front end: ask anything, get a cited answer written on this laptop, the
 LOCAL=1 ./web/demo.sh    # all local (servers.json), offline
 ```
 
-Open http://localhost:8600 . C's Streamlit UI keeps running on http://localhost:8501 as the fallback.
+Open http://localhost:8600 .
 
-Needs: Node 20+ (the first run builds `web/dist`), a Python with `streamlit numpy requests sentence-transformers
+Needs: Node 20+ (the first run builds `web/dist`), a Python with `numpy requests sentence-transformers
 fastapi uvicorn`, Ollama with `llama3.2:3b`, and A's crypto toolchain (`make seal`). On a Mac whose SEAL is
 installed outside `/usr/local`, export `CGO_CXXFLAGS`/`CGO_LDFLAGS` first.
 
@@ -29,6 +29,7 @@ cd web && npm run dev                     # Vite on :5173, proxies /api to :8600
 |---|---|
 | `src/App.tsx` | Shell, status, streams each question's events |
 | `src/Chat.tsx` | Landing, composer, answers with sources and safety notices |
+| `src/Simulation.tsx`, `src/sim.ts` | The "100 people" tab: a hundred made-up patrons, a typical library ledger beside a Blindspot ledger |
 | `src/XRay.tsx` | The five-step view of one question and the traffic proof |
 | `src/api.ts` | Typed client for `api/app.py` (Server-Sent Events over POST) |
 | `../api/app.py` | Thin FastAPI wrapper over C's pipeline, B's wiretap search and the plaintext server |

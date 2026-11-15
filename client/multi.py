@@ -1,4 +1,4 @@
-"""Search several Blind RAG document servers with one question, then answer once on the device.
+"""Search several Blindspot document servers with one question, then answer once on the device.
 
     MultiPipeline(["https://health.example", "https://hr.example"]).ask_traced(question)
 

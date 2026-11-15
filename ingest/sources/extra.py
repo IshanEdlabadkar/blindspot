@@ -4,7 +4,7 @@ Each collector returns pages in the same shape as ingest.extract.parse_topics:
     {"title", "url", "updated", "also_called": [...], "sections": [(heading or None, [paragraphs])],
      "source": short source name}
 
-Only sources whose text we may copy and redistribute are here (Blind RAG ships every
+Only sources whose text we may copy and redistribute are here (Blindspot ships every
 passage to every asker). Reuse terms checked Nov 14, 2026:
 
   genetics      MedlinePlus Genetics condition summaries. Listed as public domain by NLM:

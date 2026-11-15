@@ -1,4 +1,4 @@
-// Package blindcrypto wraps Tiptoe's underhood library for Blind RAG's
+// Package blindcrypto wraps Tiptoe's underhood library for Blindspot's
 // encrypted scoring: the server multiplies an N x d int8 matrix by an
 // encrypted d-dim int8 query and returns N encrypted scores.
 //

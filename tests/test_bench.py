@@ -62,7 +62,7 @@ def test_single_server_trace_and_summary(tmp_path, servers, questions):
     assert s["speed"]["stages_seconds"]["scoring"]["n"] == 3          # warm runs: all but the first
     assert s["privacy"]["fetched_per_server_always_k"] is True
     html = (out / "report.html").read_text()
-    assert "Blind RAG benchmark" in html and '"rows"' in html and "</script>" in html
+    assert "Blindspot benchmark" in html and '"rows"' in html and "</script>" in html
     assert "## Accuracy" in (out / "report.md").read_text()
 
 

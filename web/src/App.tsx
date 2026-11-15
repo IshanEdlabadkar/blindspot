@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ask, getStatus, type Status } from './api'
+import { useCallback, useEffect, useState } from 'react'
+import { getStatus, type Status } from './api'
 import { Burrow } from './Burrow'
-import { Composer, Landing, TurnView } from './Chat'
-import { DeskObjects } from './DeskObjects'
-import type { Turn } from './turn'
-import { XRay } from './XRay'
-
+import { Libraries } from './Libraries'
+import { Workspace } from './Workspace'
 function Health({ status }: { status: Status | null }) {
   if (!status) return <span className="text-sm text-graphite">Connecting</span>
   const up = status.servers.filter((s) => s.ok).length
@@ -17,85 +14,58 @@ function Health({ status }: { status: Status | null }) {
   return (
     <span className={`text-sm ${ok ? 'text-graphite' : 'font-medium text-stamp'}`} title={issues || 'All systems ready'}>
       <span className="hidden sm:inline">{up} of {status.servers.length} libraries open{issues ? `, ${issues}` : ''}</span>
-      <span className="sm:hidden">{up} of {status.servers.length} open{issues ? ', check' : ''}</span>
+      <span className="sm:hidden">{issues ? `${up}/${status.servers.length} open, check` : ''}</span>
     </span>
   )
 }
 
+type Mode = 'chat' | 'demo'
+
 export default function App() {
   const [status, setStatus] = useState<Status | null>(null)
-  const [turns, setTurns] = useState<Turn[]>([])
-  const [compare, setCompare] = useState(true)
-  const [xray, setXray] = useState<number | null>(null)
-  const nextId = useRef(1)
-  const bottom = useRef<HTMLDivElement>(null)
-  const busy = turns.some((t) => t.phase === 'working' || t.phase === 'answered')
-
+  const [mode, setModeRaw] = useState<Mode>(() => (location.hash === '#demo' ? 'demo' : 'chat'))
+  const [homeTick, setHomeTick] = useState(0)
+  const [disabled, setDisabledRaw] = useState<Set<string>>(() => {
+    try { return new Set<string>(JSON.parse(localStorage.getItem('blindspot.disabled') ?? '[]')) } catch { return new Set<string>() }
+  })
+  const setDisabled = (s: Set<string>) => {
+    setDisabledRaw(s)
+    try { localStorage.setItem('blindspot.disabled', JSON.stringify([...s])) } catch { /* private mode */ }
+  }
+  const toggle = (u: string) => {
+    const servers = status?.servers ?? []
+    const next = new Set(disabled)
+    if (next.has(u)) next.delete(u)
+    else if (servers.filter((s) => !next.has(s.url)).length > 1) next.add(u)   // always keep one library on
+    setDisabled(next)
+  }
+  const setMode = (m: Mode) => { setModeRaw(m); history.replaceState(null, '', m === 'demo' ? '#demo' : location.pathname); window.scrollTo({ top: 0 }) }
+  const refresh = useCallback(() => { void getStatus().then(setStatus).catch(() => setStatus(null)) }, [])
   useEffect(() => {
-    let alive = true
-    const load = () => getStatus().then((s) => alive && setStatus(s)).catch(() => alive && setStatus(null))
-    void load()
-    const t = setInterval(load, 20000)
-    return () => { alive = false; clearInterval(t) }
-  }, [])
-
-  useEffect(() => { window.scrollTo({ top: 0 }) }, [xray])
-  const nameOf = (url?: string) => status?.servers.find((s) => s.url === url)?.name.replace(/ \(.*\)$/, '')
-
-  const update = (id: number, f: (t: Turn) => Turn) => setTurns((ts) => ts.map((t) => (t.id === id ? f(t) : t)))
-
-  const onAsk = useCallback(async (question: string) => {
-    const id = nextId.current++
-    setXray(null)
-    setTurns((ts) => [...ts, { id, question, compare, stages: {}, phase: 'working' }])
-    setTimeout(() => bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 50)
-    try {
-      await ask(question, compare, (e) => {
-        if (e.type === 'start') update(id, (t) => ({ ...t, since: e.data.since }))
-        else if (e.type === 'stage') update(id, (t) => ({ ...t, stages: { ...t.stages, [e.data.name]: e.data.seconds } }))
-        else if (e.type === 'answer') update(id, (t) => ({ ...t, result: e.data.result, trace: e.data.trace, phase: 'answered' }))
-        else if (e.type === 'plain') update(id, (t) => ({ ...t, plain: e.data }))
-        else if (e.type === 'proof') update(id, (t) => ({ ...t, proof: e.data }))
-        else if (e.type === 'done') update(id, (t) => ({ ...t, phase: 'done' }))
-        else if (e.type === 'error') update(id, (t) => ({ ...t, error: e.data, phase: 'error' }))
-      })
-    } catch (err) {
-      update(id, (t) => ({ ...t, phase: 'error', error: { stage: 'connection', message: String(err), fix: 'Start the API: ./web/demo.sh' } }))
-    }
-  }, [compare])
-
-  const xrayTurn = turns.find((t) => t.id === xray)
-  const composer = (compact: boolean) => (
-    <Composer onAsk={onAsk} busy={busy} compare={compare} setCompare={setCompare} status={status}
-      number={nextId.current} compact={compact} autoFocus={!compact} />
-  )
+    refresh()
+    const t = setInterval(refresh, 5000)
+    return () => clearInterval(t)
+  }, [refresh])
 
   return (
     <div className="desk relative min-h-dvh">
-      <DeskObjects viewKey={xrayTurn ? `xray-${xrayTurn.id}` : turns.length ? 'chat' : 'landing'}
-        version={turns.map((t) => `${t.phase}${t.proof ? 'p' : ''}`).join(',')} />
-      <header className="relative z-[1] mx-auto flex h-16 max-w-[1120px] items-center justify-between px-5">
-        <button onClick={() => setXray(null)} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
-          <Burrow size={32} mood="peek" /> Blind RAG
+      <header className="relative z-30 mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-4 whitespace-nowrap sm:px-5">
+        <button aria-label="Blindspot, back to the start" onClick={() => setHomeTick((n) => n + 1)} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
+          <Burrow size={32} mood="peek" /> <span className="hidden sm:inline">Blindspot</span>
         </button>
-        <Health status={status} />
+        <div role="tablist" aria-label="Mode" className="inline-flex overflow-hidden rounded-[2px] border-2 border-ink font-display text-[14px] font-bold">
+          {([['chat', 'Chat'], ['demo', 'Live demo']] as const).map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
+              className={`h-9 px-4 sm:px-5 ${mode === k ? 'bg-ink text-card' : 'text-ink hover:bg-ink/10'}`}>{label}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 sm:gap-5">
+          <Libraries status={status} disabled={disabled} setDisabled={setDisabled} refresh={refresh} />
+          <Health status={status} />
+        </div>
       </header>
-
-      {xrayTurn ? (
-        <XRay turn={xrayTurn} number={xrayTurn.id} status={status} onBack={() => setXray(null)} />
-      ) : turns.length === 0 ? (
-        <Landing status={status} onAsk={onAsk}>{composer(false)}</Landing>
-      ) : (
-        <>
-          <main className="relative z-[1] mx-auto max-w-[760px] px-5 pb-64">
-            {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} onXray={() => setXray(t.id)} />)}
-            <div ref={bottom} />
-          </main>
-          <div data-fixed className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4">
-            <div className="mx-auto max-w-[760px] px-5">{composer(true)}</div>
-          </div>
-        </>
-      )}
+      <div className={mode === 'chat' ? '' : 'hidden'}><Workspace mode="chat" status={status} disabled={disabled} toggle={toggle} homeTick={homeTick} /></div>
+      <div className={mode === 'demo' ? '' : 'hidden'}><Workspace mode="demo" status={status} disabled={disabled} toggle={toggle} homeTick={homeTick} /></div>
     </div>
   )
 }

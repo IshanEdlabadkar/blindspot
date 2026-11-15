@@ -22,7 +22,7 @@ const OBJECTS: Record<string, Draw> = {
     <svg viewBox="0 0 150 20">
       <rect x="18" y="3" width="118" height="14" fill="#E9B949" stroke={INK} strokeWidth="1.2" />
       <line x1="18" y1="10" x2="136" y2="10" stroke="#C99A2E" strokeWidth=".8" />
-      <text x="34" y="9" fontFamily="Courier Prime" fontSize="5.5" fill="#5A3E1B">BLIND RAG LIBRARY  No. 2</text>
+      <text x="34" y="9" fontFamily="Courier Prime" fontSize="5.5" fill="#5A3E1B">BLINDSPOT LIBRARY  No. 2</text>
       <rect x="136" y="3" width="6" height="14" fill="#A7ADB3" stroke={INK} strokeWidth="1.2" />
       <rect x="142" y="3" width="7" height="14" rx="2" fill="#E58A8A" stroke={INK} strokeWidth="1.2" />
       <path d="M18 3 L2 10 L18 17 Z" fill="#E8C9A0" stroke={INK} strokeWidth="1.2" strokeLinejoin="round" />
@@ -124,9 +124,11 @@ const OBJECTS: Record<string, Draw> = {
 
 type Placed = { id: number; kind: string; v: number; x: number; y: number; w: number; h: number; rot: number; box: DOMRect }
 
-const CLEAR = 'header, h1, h2, main p, main ul, main ol, label, button, form, .slip, .catalog, .receipt, img, [data-clear]'
+const CLEAR = 'header, h1, h2, main p, main ul, main ol, section p, section ul, section li, label, button, form, .slip, .catalog, .receipt, img, [data-clear]'
 
-export function DeskObjects({ viewKey, version }: { viewKey: string; version: string }) {
+export function DeskObjects({ viewKey, version, calm }: { viewKey: string; version: string; calm?: boolean }) {
+  const calmRef = useRef(Boolean(calm))
+  calmRef.current = Boolean(calm)
   const layer = useRef<HTMLDivElement>(null)
   const [items, setItems] = useState<Placed[]>([])
   const current = useRef<Placed[]>([])
@@ -157,8 +159,11 @@ export function DeskObjects({ viewKey, version }: { viewKey: string; version: st
     const hits = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
     const inside = (b: DOMRect) => b.top >= 0 && b.bottom <= H && b.left > -b.width * 0.4 && b.right < W + b.width * 0.4
 
-    const keep = reset ? [] : current.current.filter((p) => inside(p.box) && !blocked.some((b) => hits(b, p.box)))
-    const target = narrow ? Math.max(2, Math.min(5, Math.round((W * H) / 160000))) : Math.max(4, Math.min(14, Math.round((W * H) / 190000)))
+    const keep = reset ? [] : current.current.filter((p) => inside(p.box) && (!calmRef.current || (p.box.right <= (W - 1120) / 2 + 24 || p.box.left >= W - (W - 1120) / 2 - 24)) && !blocked.some((b) => hits(b, p.box)))
+    const quiet = calmRef.current
+    const gutter = (W - 1120) / 2
+    const inMargin = (b: DOMRect) => b.right <= gutter + 24 || b.left >= W - gutter - 24
+    const target = quiet ? (narrow || gutter < 100 ? 0 : 3) : narrow ? Math.max(2, Math.min(5, Math.round((W * H) / 160000))) : Math.max(4, Math.min(14, Math.round((W * H) / 190000)))
     const used: Record<string, number> = {}
     keep.forEach((p) => { used[p.kind] = (used[p.kind] ?? 0) + 1 })
     const out = [...keep]
@@ -178,7 +183,7 @@ export function DeskObjects({ viewKey, version }: { viewKey: string; version: st
         const cx = -bw * 0.3 + Math.random() * (W + bw * 0.6)
         const cy = bh / 2 + Math.random() * Math.max(H - bh, 1)
         const box = new DOMRect(cx - bw / 2, cy - bh / 2, bw, bh)
-        if (!inside(box) || blocked.some((b) => hits(b, box)) || out.some((p) => hits(p.box, box))) continue
+        if (!inside(box) || (quiet && !inMargin(box)) || blocked.some((b) => hits(b, box)) || out.some((p) => hits(p.box, box))) continue
         out.push({ id: nextId.current++, kind, v: Math.floor(Math.random() * 60), x: cx - w / 2, y: cy - h / 2, w, h, rot, box })
         used[kind] = (used[kind] ?? 0) + 1
         break

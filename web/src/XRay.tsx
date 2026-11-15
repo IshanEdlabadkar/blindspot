@@ -1,8 +1,9 @@
 import { useReducedMotion } from 'motion/react'
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { fmtBytes, searchWire, type Route, type ServerTrace, type Status } from './api'
+import { searchWire, type Route, type ServerTrace, type Status } from './api'
 import { Burrow } from './Burrow'
 import { short, slipNo } from './Chat'
+import { Scoreboard } from './Scoreboard'
 import { libraryName, type Turn } from './turn'
 
 const HEX = '0123456789abcdef'
@@ -113,7 +114,6 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
   const words = turn.proof?.words ?? []
   const routes = [...(turn.proof?.routes ?? [])].sort((a, b) => Number(a.route === 'plain') - Number(b.route === 'plain'))
   const blind = routes.filter((r) => r.route !== 'plain')
-  const upOf = (x: ServerTrace) => x.requests.reduce((n, r) => n + r.request_bytes, 0)
   const when = turn.since && !Number.isNaN(Date.parse(turn.since)) ? new Date(turn.since) : new Date()
   const t = (v?: number, d = 2) => (v === undefined ? '...' : `${v.toFixed(d)} s`)
 
@@ -121,7 +121,7 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
   const entry = turn.plain?.entry
   const compared = Boolean(turn.compare || entry || plainRoute)
   const stamp = (d: Date) => `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-  const sealedTotal = blind.reduce((n, r) => n + r.bytes, 0) || servers.reduce((n, x) => n + upOf(x), 0)
+  const searched = servers.reduce((n, x) => n + x.num_chunks, 0)
   const waiting = <p className="text-graphite">Searching the recording...</p>
   const off = <p>Recording is off. Start the demo with <span className="font-bold">./web/demo.sh</span> to print this part.</p>
   const proofPart = (body: React.ReactNode) => !turn.proof ? waiting : !turn.proof.recording ? off : body
@@ -146,7 +146,7 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
       <div className="mt-10 flex flex-col gap-8 md:grid md:grid-cols-2 md:grid-rows-[repeat(7,auto)] md:gap-x-10 md:gap-y-0 lg:gap-x-14">
         <div className={paper}>
           <Sec>
-            <p className="text-center font-display text-[20px] font-black">Blind RAG</p>
+            <p className="text-center font-display text-[20px] font-black">Blindspot</p>
             <p className="text-center text-graphite">Sealed, receipt {slipNo(number)}</p>
             <p className="text-center text-graphite">{stamp(when)}</p>
           </Sec>
@@ -160,7 +160,7 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
           <Sec title={`Sent to ${servers.length} ${servers.length === 1 ? 'library' : 'libraries'}`}>
             {servers.map((x) => (
               <div key={x.server}>
-                <Line left={nameOf(x.server)} right={`${fmtBytes(upOf(x))} sealed`} />
+                <Line left={nameOf(x.server)} right="sealed" />
                 <p className="text-graphite">{`  scored ${x.num_chunks.toLocaleString()}, sent back ${x.fetched}`}</p>
               </div>
             ))}
@@ -185,7 +185,7 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
             </>)}
           </Sec>
           <Sec last>
-            <Line strong left="Total sent" right={`${fmtBytes(sealedTotal)} sealed`} />
+            <Line strong left="Passages searched" right={searched.toLocaleString()} />
             <Line left="Read on this laptop" right={t(s.embedding)} />
             <Line left="Sealed" right={t(s.encrypting)} />
             <Line left="Searched without reading" right={t(s.scoring)} />
@@ -209,7 +209,7 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
               <p className="text-[14px]"><Highlight text={turn.question} words={words} /></p>
             </Sec>
             <Sec title="Sent to 1 service">
-              <Line left="A normal AI service" right={plainRoute ? `${fmtBytes(plainRoute.bytes)} plain` : '...'} />
+              <Line left="A normal AI service" right="plain" />
               <p className="text-graphite">  as readable text</p>
             </Sec>
             <Sec title="What it wrote down">
@@ -235,8 +235,8 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
               </> : <p className="text-graphite">Its traffic wasn't recorded.</p>)}
             </Sec>
             <Sec last>
-              <Line strong left="Total sent" right={plainRoute ? `${fmtBytes(plainRoute.bytes)} plain` : '...'} />
-              <p className="mt-1 text-graphite">Smaller, because nothing was sealed. It is also the only one that can read it, and it kept it.</p>
+              <Line strong left="Who can read it" right="the service" />
+              <p className="mt-1 text-graphite">Nothing was sealed. The service read it in full, and it kept it.</p>
             </Sec>
           </div>
         ) : (
@@ -247,6 +247,8 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
           </div>
         )}
       </div>
+
+      <Scoreboard proof={turn.proof} />
 
       <div className="mt-10 grid gap-8 md:grid-cols-2 md:gap-x-10 lg:gap-x-14">
         {turn.proof?.recording && <div className="slip typed self-start px-6 pt-6 pb-5 text-[15px] leading-6 text-ink"><SecretWord since={turn.since} /></div>}

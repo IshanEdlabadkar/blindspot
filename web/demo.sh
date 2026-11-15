@@ -3,7 +3,7 @@
 #   ./web/demo.sh            hosted document servers (servers.remote.json); any that doesn't wake falls
 #                            back to a local server on its repo backup in artifacts/<id>/
 #   LOCAL=1 ./web/demo.sh    all local (servers.json), offline
-# Open http://localhost:8600 . C's Streamlit UI still runs on :8501 as the fallback.
+# This is the default demo (`make demo`): it opens http://localhost:8600 by itself (NO_OPEN=1 to skip).
 # Every byte the app sends to a document server goes through a recording relay (:9080+, plain :9001), so the
 # X-ray view can search that traffic for the asker's words. Ctrl+C stops everything this script started.
 set -euo pipefail
@@ -20,6 +20,8 @@ up() { curl -fsS -o /dev/null --max-time "${2:-3}" "$1" 2>/dev/null; }
 wait_up() { for _ in $(seq 1 "${3:-120}"); do up "$1" && return 0; sleep 0.5; done; echo "ERROR: $2 did not start"; return 1; }
 
 LIST=servers.remote.json; [ "${LOCAL:-0}" = 1 ] && LIST=servers.json
+# Libraries added or removed in the app last time are forgotten at each start (KEEP_LIBRARIES=1 keeps them).
+[ "${KEEP_LIBRARIES:-0}" = 1 ] || rm -f data/user_servers.json 2>/dev/null || true
 ENTRIES=()   # macOS bash 3.2 has no mapfile
 while IFS= read -r line; do ENTRIES+=("$line"); done < <("$PY" -c 'import json,sys; [print(s["id"], s["url"]) for s in json.load(open(sys.argv[1]))]' "$LIST")
 echo "Document servers from $LIST:"
@@ -63,9 +65,9 @@ WIRE=$(IFS=,; echo "${relays[*]}")
 wait_up "http://127.0.0.1:9080/v1/manifest" "recording relay" 40
 cat data/wiretap.out
 
-# Key helper, plaintext "normal" server and C's Streamlit UI (fallback, :8501); servers come from the relays.
+# Key helper and plaintext "normal" server; servers come from the relays.
 WIRETAP_SERVERS="$WIRE" BLIND_RAG_SERVERS="$WIRE" BLIND_RAG_PLAIN_SERVER=http://127.0.0.1:9001 \
-  make demo > data/streamlit-demo.out 2>&1 & pids+=($!)
+  ./scripts/start_demo.sh > data/backends.out 2>&1 & pids+=($!)
 wait_up http://127.0.0.1:8090/health "key helper" 240
 wait_up http://127.0.0.1:8001/health "plaintext demo server" 240
 
@@ -81,8 +83,15 @@ if [ ! -f web/dist/index.html ] || [ -n "$(find web/src web/index.html -newer we
   echo "Building the web UI..."; (cd web && npm install --silent && npm run build --silent) >/dev/null
 fi
 echo
-echo "  Blind RAG is ready:  http://localhost:8600     (fallback UI: http://localhost:8501)"
+echo "  Blindspot is ready:  http://localhost:8600"
 echo
+# Open the app in the browser once the API answers (NO_OPEN=1 skips this).
+if [ "${NO_OPEN:-0}" != 1 ]; then
+  ( for _ in $(seq 1 60); do
+      if up http://127.0.0.1:8600/api/status 2; then
+        { open http://localhost:8600 || xdg-open http://localhost:8600; } >/dev/null 2>&1; break
+      fi; sleep 1; done ) &
+fi
 BLIND_RAG_SERVERS="$WIRE" BLIND_RAG_PLAIN_SERVER=http://127.0.0.1:9001 BLIND_RAG_CRYPTO=real BLIND_RAG_ANSWER=real \
-  BLIND_RAG_FETCH="${BLIND_RAG_FETCH:-download}" \
+  BLIND_RAG_FETCH="${BLIND_RAG_FETCH:-pir}" \
   "$PY" -m uvicorn api.app:app --host 127.0.0.1 --port 8600 --log-level warning

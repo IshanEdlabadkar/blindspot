@@ -1,4 +1,4 @@
-# Blind RAG web UI ("Vault"): design
+# Blindspot web UI ("Vault"): design
 
 Date: 2026-11-15 · Owner: B · Replaces C's Streamlit UI as the main demo; `ui/` stays untouched as the fallback.
 
@@ -31,7 +31,7 @@ Document servers come from `BLIND_RAG_SERVERS` (the wiretap relay ports when sta
 
 **Chat.** Empty state: "Ask anything. Your words stay on this laptop.", input, three suggestion chips, live server chips. Answer cards: inline citation markers with the exact source sentence, source name and link on hover/expand; 988/911 notice pinned on top; kind decline state; "X-ray this answer".
 
-**X-ray.** Five stages, all real data from that question: ① on your laptop (question → 384 numbers → locked, hex scramble) ② on the wire (packets with real byte counts per server) ③ at each server (passages scored without reading; exactly 10 fetched) ④ back on the laptop (unlock, rerank, answer) ⑤ the proof (0/N words per Blind RAG server vs N/N at the normal server with its log highlighted; secret-word search). Closing honest line: servers still see that you asked, when, and your IP.
+**X-ray.** Five stages, all real data from that question: ① on your laptop (question → 384 numbers → locked, hex scramble) ② on the wire (packets with real byte counts per server) ③ at each server (passages scored without reading; exactly 10 fetched) ④ back on the laptop (unlock, rerank, answer) ⑤ the proof (0/N words per Blindspot server vs N/N at the normal server with its log highlighted; secret-word search). Closing honest line: servers still see that you asked, when, and your IP.
 
 ## Visual system ("Vault")
 

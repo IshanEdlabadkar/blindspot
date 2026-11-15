@@ -1,24 +1,20 @@
 import { motion } from 'motion/react'
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useId, useRef, useState } from 'react'
 import type { Citation, Plain, Status } from './api'
 import { Burrow } from './Burrow'
+import { Beats, SearchDemo } from './Story'
 import { STAGES, splitAnswer, type Turn } from './turn'
-
-const SUGGESTIONS = [
-  'How is chlamydia treated, and can I get it again?',
-  'Can I take FMLA leave for a pregnancy complication?',
-  'Is Huntington disease passed down from my parents?',
-]
 
 export const short = (name: string) => name.replace(/ \(.*\)$/, '').replace(/^Federal /, '')
 export const slipNo = (n: number) => `No. ${String(n).padStart(4, '0')}`
 
 /** The call slip: where a question is written and handed in. */
-export function Composer({ onAsk, busy, compare, setCompare, status, number, compact, autoFocus }: {
-  onAsk: (q: string) => void; busy: boolean; compare: boolean; setCompare: (v: boolean) => void
-  status: Status | null; number: number; compact?: boolean; autoFocus?: boolean
+export function Composer({ onAsk, busy, compare, setCompare, status, number, compact, autoFocus, disabled, plain, onToggle }: {
+  onAsk: (q: string) => void; busy: boolean; compare: boolean; setCompare: (v: boolean) => void; plain?: boolean
+  status: Status | null; number: number; compact?: boolean; autoFocus?: boolean; disabled?: Set<string>; onToggle?: (url: string) => void
 }) {
   const [q, setQ] = useState('')
+  const qid = useId()
   const box = useRef<HTMLTextAreaElement>(null)
   const submit = () => {
     const t = q.trim()
@@ -31,8 +27,8 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
       <div className="flex items-baseline justify-between font-display text-[15px] font-black text-ink">
         <span>Call slip</span><span className="typed text-[15px] font-normal text-graphite">{slipNo(number)}</span>
       </div>
-      <label htmlFor="q" className="typed mt-2 block text-[14px] leading-6 text-graphite">Your question</label>
-      <textarea id="q" ref={box} rows={compact ? 1 : 3} value={q} autoFocus={autoFocus}
+      <label htmlFor={qid} className="typed mt-2 block text-[14px] leading-6 text-graphite">Your question</label>
+      <textarea id={qid} data-composer ref={box} rows={compact ? 1 : 3} value={q} autoFocus={autoFocus}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() } }}
         placeholder="Write it the way you'd say it"
@@ -42,20 +38,27 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
           <p className="typed text-[14px] leading-6 text-graphite">Send sealed to</p>
           <ul className="mt-1 grid gap-x-6 text-[15px] leading-7 sm:grid-cols-2">
             {libs.map((s) => (
-              <li key={s.url} className={`flex items-baseline gap-2 ${s.ok ? 'text-ink' : 'text-graphite line-through'}`}>
-                <span aria-hidden className="typed">{s.ok ? '[x]' : '[ ]'}</span>
-                <span>{short(s.name)}</span>
-                {s.num_chunks != null && <span className="typed text-[13px] text-graphite">{s.num_chunks.toLocaleString()}</span>}
+              <li key={s.url}>
+                <button type="button" role="checkbox" aria-checked={!disabled?.has(s.url)} onClick={() => onToggle?.(s.url)} disabled={!onToggle}
+                  className={`flex w-full cursor-pointer items-baseline gap-2 text-left hover:text-badger ${s.ok && !disabled?.has(s.url) ? 'text-ink' : 'text-graphite line-through'}`}>
+                  <span aria-hidden className="typed">{!disabled?.has(s.url) ? '[x]' : '[ ]'}</span>
+                  <span>{short(s.name)}{!s.ok && ' (offline)'}</span>
+                  {s.num_chunks != null && <span className="typed text-[13px] text-graphite">{s.num_chunks.toLocaleString()}</span>}
+                </button>
               </li>
             ))}
           </ul>
         </div>
       )}
       <div className={`flex flex-wrap items-end justify-between gap-x-6 gap-y-3 ${compact ? 'mt-3' : 'mt-4'}`}>
-        <label className="flex max-w-[44ch] cursor-pointer items-start gap-2.5 text-[14px] leading-5 text-graphite select-none">
-          <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="mt-0.5 size-4 accent-[#1E1C1A]" />
-          Also send an unsealed copy to a normal AI service, to compare what each one keeps
-        </label>
+        {plain ? (
+          <p className="typed max-w-[40ch] text-[13px] leading-5 text-graphite">Sealed on this laptop before it leaves. The libraries never read it.</p>
+        ) : (
+          <label className="flex max-w-[44ch] cursor-pointer items-start gap-2.5 text-[14px] leading-5 text-graphite select-none">
+            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="mt-0.5 size-4 accent-[#1E1C1A]" />
+            Also send an unsealed copy to a normal AI service, to compare what each one keeps
+          </label>
+        )}
         <button type="submit" aria-disabled={busy || undefined}
           className={`press h-11 shrink-0 rounded-[2px] px-5 font-display text-[15px] font-bold text-white ${busy ? 'cursor-wait bg-graphite' : 'bg-badger hover:bg-stamp'}`}>
           {busy ? 'Searching' : 'Hand it in'}
@@ -65,36 +68,89 @@ export function Composer({ onAsk, busy, compare, setCompare, status, number, com
   )
 }
 
-export function Landing({ status, onAsk, children }: { status: Status | null; onAsk: (q: string) => void; children: React.ReactNode }) {
-  const libs = (status?.servers ?? []).map((s) => short(s.name))
-  const total = (status?.servers ?? []).reduce((n, s) => n + (s.num_chunks ?? 0), 0)
-  return (
-    <main className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-8 px-5 pt-6 pb-16 md:grid-cols-[1fr_540px] md:gap-x-16">
-      <div className="md:self-end">
-        <h1 className="max-w-[16ch] text-[40px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[56px]">
-          Ask the library something private.
-        </h1>
-        <p className="mt-5 max-w-[48ch] text-[17px] leading-7 text-graphite">
-          Your question is sealed on this laptop before it goes anywhere.
-          {libs.length > 0 && <> {libs.slice(0, -1).join(', ')} and {libs[libs.length - 1]} search all {total.toLocaleString()} of their passages for it without being able to read it.</>}
+/** Demo order: the story first (typing demo, what was sent, the settlement), then the call slip as the last thing on the page.
+ *  Set to false for the product order: the call slip in the first viewport, the story below it. */
+const STORY_FIRST = true
+
+export function Landing({ status, examples, onAsk, children, product }: { status: Status | null; examples: string[]; onAsk: (q: string) => void; children: React.ReactNode; product?: boolean }) {
+  const libs = (status?.servers ?? []).filter((s) => s.ok).map((s) => short(s.name))
+  const total = (status?.servers ?? []).filter((s) => s.ok).reduce((n, s) => n + (s.num_chunks ?? 0), 0)
+  const toSlip = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setTimeout(() => document.querySelectorAll<HTMLElement>('[data-composer]').forEach((el) => { if (el.offsetParent) el.focus({ preventScroll: true }) }), 500)
+  }
+  const sealedList = libs.length > 1 ? `${libs.slice(0, -1).join(', ')} and ${libs[libs.length - 1]}` : libs[0]
+  const hero = (
+    <main className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-10 px-5 pt-4 pb-12 md:grid-cols-[1fr_520px] md:gap-x-14">
+      <div className="md:self-center">
+        {product ? (
+          <h1 className="max-w-[14ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[58px]">
+            Ask something private.
+          </h1>
+        ) : STORY_FIRST ? (
+          <h2 className="max-w-[14ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[58px]">
+            Blindspot can't leak your question. It never sees it.
+          </h2>
+        ) : (
+          <>
+            <h1 className="max-w-[16ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[58px]">
+              You looked up a symptom on your health plan's website.
+            </h1>
+            <p className="mt-5 max-w-[22ch] text-[26px] leading-[32px] font-bold text-badger sm:text-[34px] sm:leading-[40px]">
+              Google, Microsoft and X may have seen it.
+            </p>
+          </>
+        )}
+        <p className="mt-6 max-w-[46ch] text-[17px] leading-7 text-graphite">
+          {!STORY_FIRST && <>Blindspot can't leak your question. It never sees it. </>}
+          {libs.length > 0 ? <>Your question is sealed on this laptop, then {sealedList} search all {total.toLocaleString()} of their passages for it without being able to read it.</> : <>Your question is sealed on this laptop before it goes anywhere.</>}
           {' '}The answer is written here, from what they send back.
         </p>
+        {!STORY_FIRST && (
+          <a href="#why" onClick={(e) => { e.preventDefault(); document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' }) }}
+            className="mt-6 inline-block text-[15px] text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">
+            Why this matters, in four short steps
+          </a>
+        )}
       </div>
-      <div className="relative md:col-start-2 md:row-span-2 md:row-start-1 md:self-center">
+      <div className="relative md:self-center">
         <div className="md:rotate-[-1.2deg]">{children}</div>
         <div className="absolute -top-[84px] right-6 hidden md:block"><Burrow size={92} mood="idle" /></div>
-      </div>
-      <div className="md:self-start">
-        <p className="text-[14px] text-graphite">Or try one of these</p>
-        <ul className="mt-2 space-y-1.5">
-          {SUGGESTIONS.map((s) => (
-            <li key={s}>
-              <button onClick={() => onAsk(s)} className="text-left text-[16px] leading-6 text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">{s}</button>
-            </li>
-          ))}
-        </ul>
+        {examples.length > 0 && (
+          <div className="mt-6 md:ml-2">
+            <p className="text-[14px] text-graphite">Or try one of these</p>
+            <ul className="mt-2 space-y-1.5">
+              {examples.map((s) => (
+                <li key={s}>
+                  <button onClick={() => onAsk(s)} className="text-left text-[16px] leading-6 text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">{s}</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </main>
+  )
+
+  if (product) return hero
+  if (STORY_FIRST) return <><div id="why"><Beats /></div>{hero}</>
+  return (
+    <>
+      {hero}
+      <div id="why" className="scroll-mt-4"><Beats /></div>
+      <section className="relative z-[1] mx-auto max-w-[860px] px-5 pt-8 pb-28">
+        <h2 className="max-w-[18ch] font-display text-[36px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[48px]">
+          Same search. Nothing readable leaves.
+        </h2>
+        <p className="mt-4 max-w-[52ch] text-[17px] leading-7 text-graphite">
+          Here is the same kind of search, sealed on this laptop first. Google, Microsoft and X would receive nothing they can read.
+        </p>
+        <div className="mt-8"><SearchDemo mode="sealed" /></div>
+        <button onClick={toSlip} className="press mt-10 h-12 rounded-[2px] bg-badger px-6 font-display text-[16px] font-bold text-white hover:bg-stamp">
+          Hand in your own question
+        </button>
+      </section>
+    </>
   )
 }
 
@@ -125,7 +181,7 @@ function FiledSlip({ turn, number }: { turn: Turn; number: number }) {
           })}
         </ol>
         {turn.result && (
-          <span className="stamp absolute top-7 right-6 text-[14px] text-stamp" style={{ ['--r' as string]: '-7deg' }}>Answered</span>
+          <span className="stamp absolute top-1.5 right-[104px] text-[12px] text-stamp" style={{ ['--r' as string]: '-7deg' }}>Answered</span>
         )}
       </div>
       {working && <Burrow size={64} mood="dig" className="hidden shrink-0 sm:inline-block" />}
@@ -172,7 +228,7 @@ function CarbonCopy({ plain, onXray, libraries }: { plain?: Plain; onXray: () =>
   const when = e && !Number.isNaN(Date.parse(e.time)) ? new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : e?.time
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="relative mt-6 max-w-[580px] bg-[#F6DDE1] px-5 pt-4 pb-5 shadow-paper sm:ml-20 sm:rotate-[0.7deg] sm:px-7">
+      className="paper relative mt-6 max-w-[580px] bg-[#F6DDE1] px-5 pt-4 pb-5 shadow-paper sm:ml-20 sm:rotate-[0.7deg] sm:px-7">
       <div className="flex items-baseline justify-between gap-4">
         <span className="font-display text-[15px] font-black text-ink">Carbon copy</span>
         <span className="typed text-[14px] text-[#2B3A8C]">unsealed</span>
@@ -205,7 +261,7 @@ function CarbonCopy({ plain, onXray, libraries }: { plain?: Plain; onXray: () =>
   )
 }
 
-export function TurnView({ turn, number, onXray, nameOf }: { turn: Turn; number: number; onXray: () => void; nameOf: (url?: string) => string | undefined }) {
+export function TurnView({ turn, number, onXray, onSim, onRetry, nameOf, plain }: { turn: Turn; number: number; onXray: () => void; onSim?: () => void; onRetry?: () => void; nameOf: (url?: string) => string | undefined; plain?: boolean }) {
   const [open, setOpen] = useState<number | null>(null)
   const r = turn.result
   const { body, disclaimer } = r ? splitAnswer(r) : { body: '', disclaimer: '' }
@@ -218,6 +274,11 @@ export function TurnView({ turn, number, onXray, nameOf }: { turn: Turn; number:
           <p className="mt-1 text-ink">{turn.error.message}</p>
           {turn.error.fix && <p className="mt-1.5 text-graphite">To fix it: <span className="typed text-ink">{turn.error.fix}</span></p>}
           <p className="mt-1.5 text-graphite">Nothing was retried in a less private mode.</p>
+          {onRetry && (
+            <button onClick={onRetry} className="press mt-3 h-10 rounded-[2px] bg-badger px-4 font-display text-sm font-bold text-white hover:bg-stamp">
+              Try this question again
+            </button>
+          )}
         </div>
       )}
       {r && (
@@ -242,10 +303,21 @@ export function TurnView({ turn, number, onXray, nameOf }: { turn: Turn; number:
             </p>
           )}
           <div className="mt-7 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-            <p className="typed text-[13px] text-graphite">{disclaimer || 'General information, not medical or legal advice.'}</p>
-            <button onClick={onXray} className="press typed text-[15px] font-bold text-badger underline underline-offset-4 hover:text-stamp">
-              {turn.proof ? 'Print the receipt: what left this laptop' : 'Checking what left this laptop…'}
-            </button>
+            <p className="typed text-[13px] text-graphite">{disclaimer || 'General information from the connected libraries, not professional advice.'}</p>
+            {plain ? (
+              <span className="typed text-[13px] font-bold text-sealed">Sealed: the libraries never saw this question</span>
+            ) : (
+              <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <button onClick={onXray} className="press typed text-[15px] font-bold text-badger underline underline-offset-4 hover:text-stamp">
+                  {turn.proof ? 'Print the receipt: what left this laptop' : 'Checking what left this laptop…'}
+                </button>
+                {onSim && (
+                  <button onClick={onSim} disabled={!turn.proof} className="press h-9 rounded-[2px] bg-ink px-3.5 font-display text-[14px] font-bold text-card disabled:opacity-40">
+                    Watch it run in 3D
+                  </button>
+                )}
+              </span>
+            )}
           </div>
         </motion.div>
       )}

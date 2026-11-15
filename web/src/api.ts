@@ -1,6 +1,6 @@
 // Typed client for api/app.py. /api/ask streams Server-Sent Events over a POST, read here with fetch.
 
-export type Server = { url: string; ok: boolean; name: string; num_chunks: number | null; corpus_version: string | null }
+export type Server = { url: string; ok: boolean; name: string; num_chunks: number | null; corpus_version: string | null; examples?: string[] }
 export type Status = { servers: Server[]; helper: boolean; model: boolean; recording: boolean }
 
 export type Citation = {
@@ -46,9 +46,9 @@ export async function getStatus(): Promise<Status> {
   return r.json()
 }
 
-export async function ask(question: string, compare: boolean, onEvent: (e: Event) => void, signal?: AbortSignal) {
+export async function ask(question: string, compare: boolean, servers: string[], onEvent: (e: Event) => void, signal?: AbortSignal) {
   const r = await fetch('/api/ask', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, compare }), signal,
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, compare, servers }), signal,
   })
   if (!r.ok || !r.body) throw new Error((await r.text()) || `ask failed (${r.status})`)
   const reader = r.body.getReader()
@@ -81,3 +81,18 @@ export async function searchWire(word: string, since?: string): Promise<{ words:
 
 export const fmtBytes = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : n >= 1000 ? `${(n / 1000).toFixed(1)} KB` : `${n} B`
+
+async function failure(r: Response): Promise<string> {
+  try { const j = await r.json(); return typeof j.detail === 'string' ? j.detail : `Request failed (${r.status})` } catch { return `Request failed (${r.status})` }
+}
+
+export async function addServer(url: string): Promise<Server> {
+  const r = await fetch('/api/servers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
+  if (!r.ok) throw new Error(await failure(r))
+  return r.json()
+}
+
+export async function removeServer(url: string): Promise<void> {
+  const r = await fetch(`/api/servers?${new URLSearchParams({ url })}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(await failure(r))
+}

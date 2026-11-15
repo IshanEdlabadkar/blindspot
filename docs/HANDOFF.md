@@ -1,4 +1,4 @@
-# Blind RAG: detailed handoff
+# Blindspot: detailed handoff
 
 For a person or an AI agent picking this project up cold. Read this once, top to bottom, before changing anything. The short public overview is [`README.md`](../README.md).
 
@@ -6,7 +6,7 @@ Last updated: Nov 14, 2026, about 20:00 Central, on branch `person-c-client-ui`.
 
 ## 1. What this is, in one paragraph
 
-Blind RAG answers a sensitive question from a document library without the document server learning the question, the relevance scores, or which passages were read. The device embeds the question, encrypts it, and sends ciphertext. The server multiplies that ciphertext against every chunk's embedding and returns encrypted scores. The device decrypts, ranks, privately fetches the top 10 chunks, and a local language model writes a cited answer. It is a hackathon project (MadHacks 2026) over 2,101 chunks of public-domain MedlinePlus health topics.
+Blindspot answers a sensitive question from a document library without the document server learning the question, the relevance scores, or which passages were read. The device embeds the question, encrypts it, and sends ciphertext. The server multiplies that ciphertext against every chunk's embedding and returns encrypted scores. The device decrypts, ranks, privately fetches the top 10 chunks, and a local language model writes a cited answer. It is a hackathon project (MadHacks 2026) over 2,101 chunks of public-domain MedlinePlus health topics.
 
 ## 2. Current state
 
@@ -80,7 +80,7 @@ The **trace** returned next to the result is what the UI's server panel shows: `
 | Document server (A, Go) | `make server` | 8080 | Reads `artifacts/` by default (`make server DATA=data` for dummy tables). Logs to `data/server.log`. About 3 s startup. |
 | Crypto-helper (A, Go) | `make helper` | 8090 | Runs on the asker's device. Holds secret keys in memory only. Python talks to it over localhost. |
 | Ollama (B's dependency) | `brew services start ollama` | 11434 | Model `llama3.2:3b`. |
-| UI (C, Streamlit) | `make demo` or `python3.12 -m streamlit run ui/app.py` | 8501 | |
+| UI (C, React) | `make demo` | 8600 | |
 | Mock server (C, Python) | `python3.12 -m mock_server.server --data artifacts --port 8080` | 8080 | Plaintext. Same endpoints. **Not private.** |
 | Plaintext demo server (B) | `python -m baseline.server` | 8001 | The "normal RAG server" for demo step 1. Logs questions in the clear. Not wired into the UI yet. |
 
@@ -157,7 +157,7 @@ Run the Python tests and `make integration` after every merge from A or B.
 
 ## 11. The UI
 
-`ui/app.py`, one Streamlit file, rendered mostly as custom HTML and CSS (classes prefixed `br-`). The layout follows directions G and D on the team's design canvas: a conversation with **Burrow** (Blind RAG's own original badger character, inline SVG in `locket()`; name in `MASCOT`), who greets the user and delivers each answer as a chat message, and a two-receipt comparison when the server toggle is on.
+`ui/app.py`, one Streamlit file, rendered mostly as custom HTML and CSS (classes prefixed `br-`). The layout follows directions G and D on the team's design canvas: a conversation with **Burrow** (Blindspot's own original badger character, inline SVG in `locket()`; name in `MASCOT`), who greets the user and delivers each answer as a chat message, and a two-receipt comparison when the server toggle is on.
 
 - **Real by default.** The UI sets `BLIND_RAG_CRYPTO=real` and `BLIND_RAG_ANSWER=real` unless you set them. The mock must be asked for.
 - **Status pill** in the header: green when every system is up, amber in mock or canned mode, red when something is down (problems are then listed with their fixes, never hidden). Full mode text and health rows are in **System details**.
@@ -166,7 +166,7 @@ Run the Python tests and `make integration` after every merge from A or B.
 - **Health strip.** Document server, key helper and local model, each with a fix command when down (`client.pipeline.health`, cached 8 s).
 - **Ask tab.** Chat turns with an answer card. Each source shows title, link, date, similarity, the closest sentence from the source (`client/evidence.py`, a word-overlap pointer, verbatim) and the full passage. Declines get an amber "No reliable source found" card.
 - **Failures.** A `PipelineError` becomes a red box naming the stage and the fix. Nothing is retried in a weaker mode.
-- **Toggle "Show what the server saw".** Two receipts above the conversation: what a normal server kept (from B's plaintext server's log, only when **Also ask a normal server** is ticked) and what Blind RAG's server kept (its own log lines for that question, the question as redaction bars, the ciphertext sample, bytes). Both are read from the servers; nothing is drawn by hand.
+- **Toggle "Show what the server saw".** Two receipts above the conversation: what a normal server kept (from B's plaintext server's log, only when **Also ask a normal server** is ticked) and what Blindspot's server kept (its own log lines for that question, the question as redaction bars, the ciphertext sample, bytes). Both are read from the servers; nothing is drawn by hand.
 - **Attacker console**, under the panel: guess which of five questions was asked.
 - **Evidence tab.** Live numbers from this session, A's `data/measurements.md` if `make measure` has run (otherwise "Not measured yet"), and B's eval files with denominators.
 - **Who sees what tab.** Device, network and server views, what stays visible, how fetch works, and what is not claimed.
@@ -198,7 +198,7 @@ Other open items:
 ## 13. Demo script (3 minutes, from the spec)
 
 1. **The problem (20 s).** Ask a normal RAG server a sensitive question. Its log shows the full question and the documents returned.
-2. **Same question, Blind RAG (40 s).** Same quality answer with citations. Flip the toggle: the server log shows only sizes and timings.
+2. **Same question, Blindspot (40 s).** Same quality answer with citations. Flip the toggle: the server log shows only sizes and timings.
 3. **Attacker console (40 s).** Hand a judge the server's view. They cannot tell which of five questions was asked.
 4. **Numbers (40 s).** Recall at 10 versus plaintext, latency, bytes per query, all measured.
 5. **Close (20 s).** "The server can't leak, sell or hand over a question it never had."
@@ -207,7 +207,7 @@ Record a backup video of every step.
 
 ## 14. Things not to claim
 
-- Do not call Blind RAG the first private RAG system. It builds on Tiptoe, SimplePIR and related research.
+- Do not call Blindspot the first private RAG system. It builds on Tiptoe, SimplePIR and related research.
 - Do not demo the mock as private. The UI shows a banner in mock mode for this reason.
 - Do not say the server learns nothing at all. It sees timing, IP address and sizes.
 - Breach statistics in the pitch come from healthcare organizations, not from AI chatbots.

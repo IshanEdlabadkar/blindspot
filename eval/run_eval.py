@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from baseline.ask_plain import ask_plain, default_index
+from client.answer import N_CONTEXT, rerank_chunks
 from common.embedding import embed_query_float
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,6 +27,8 @@ def load_questions() -> list[dict]:
 
 
 def run_retrieval(questions: list[dict]) -> list[dict]:
+    """Per question: rank of the right page (float, int8), and whether it reaches the model's
+    N_CONTEXT sources with and without the local reranker ("evidence hit")."""
     idx = default_index()
     rows = []
     for q in questions:
@@ -36,6 +39,11 @@ def run_retrieval(questions: list[dict]) -> list[dict]:
             urls = [c["url"] for c in idx.chunks(hits)]
             row[f"{mode}_rank"] = first_rank(urls, q["source_url"]) if q["source_url"] else None
             row[f"{mode}_top1"] = round(hits[0][1], 4)
+        fetched = idx.chunks(idx.search_vec(qvec, 10, "int8"))
+        reranked = rerank_chunks(q["question"], fetched)
+        gold = q["source_url"]
+        row["evidence_top5"] = any(c["url"] == gold for c in fetched[:N_CONTEXT]) if gold else None
+        row["evidence_rerank5"] = any(c["url"] == gold for c in reranked[:N_CONTEXT]) if gold else None
         rows.append(row)
     return rows
 
@@ -70,6 +78,9 @@ def main():
     for mode in ("float", "int8"):
         rec = recall_table([r[f"{mode}_rank"] for r in pos])
         print(f"{mode:6} " + "  ".join(f"{rec[k]:.2f} " for k in KS))
+    for key, label in (("evidence_top5", "search order"), ("evidence_rerank5", "after rerank")):
+        print(f"Right page among the model's {N_CONTEXT} sources ({label}): "
+              f"{sum(r[key] for r in pos)}/{len(pos)}")
     print(f"int8 top-1 score: answerable min {min(r['int8_top1'] for r in pos):.3f}, "
           f"unanswerable max {max(r['int8_top1'] for r in neg):.3f}")
 

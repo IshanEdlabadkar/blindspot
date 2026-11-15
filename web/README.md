@@ -29,6 +29,7 @@ cd web && npm run dev                     # Vite on :5173, proxies /api to :8600
 |---|---|
 | `src/App.tsx` | Shell, status, streams each question's events |
 | `src/Chat.tsx` | Landing, composer, answers with sources and safety notices |
+| `src/Simulation.tsx`, `src/sim.ts` | The "100 people" tab: a hundred made-up patrons, a typical library ledger beside a Blind RAG ledger |
 | `src/XRay.tsx` | The five-step view of one question and the traffic proof |
 | `src/api.ts` | Typed client for `api/app.py` (Server-Sent Events over POST) |
 | `../api/app.py` | Thin FastAPI wrapper over C's pipeline, B's wiretap search and the plaintext server |

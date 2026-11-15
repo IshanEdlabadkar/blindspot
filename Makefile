@@ -22,10 +22,10 @@ measure:       ## with server + helper running: latency, bytes, CPU, log check -
 integration:   ## after merging A + C: real crypto vs mock, same top-k (~1 min)
 	python3 scripts/integration_check.py
 
-demo:          ## everything in one terminal: server + helper + UI with real crypto (Ctrl+C stops all)
+demo:          ## everything in one terminal: server + helper + plaintext demo server + UI (Ctrl+C stops all; PLAIN=0 skips the plaintext server)
 	./scripts/start_demo.sh
 
-demo-compare:  ## make demo plus B's plaintext server (:8001), for the side-by-side log contrast
+demo-compare:  ## same as make demo (which now always starts B's plaintext server on :8001)
 	PLAIN=1 ./scripts/start_demo.sh
 
 stop:          ## stop the server, helper, plaintext server and UI left running (do this after git pull)

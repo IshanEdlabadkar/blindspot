@@ -5,7 +5,7 @@ services:
     runtime: docker
     plan: 0.5c-512mb          # ~210 MB with hint mode + real PIR; the free plan sleeps when idle
     region: oregon
-    branch: main
+    branch: deploy/render
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /v1/manifest

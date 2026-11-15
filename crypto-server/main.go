@@ -4,9 +4,13 @@
 //
 // Endpoints:
 //
-//	GET  /v1/manifest     manifest.json plus the public scoring seed
-//	POST /v1/score        encrypted query in, encrypted scores out (see blindcrypto/wire.go)
+//	GET  /v1/manifest     manifest.json plus public scoring parameters (seed, mode, hint URL)
+//	GET  /v1/score_hint   public scoring hint, downloaded once per corpus version (hint mode)
+//	POST /v1/score        encrypted query in, encrypted scores out (see blindcrypto/wire.go).
+//	                      A request with no token is hint mode; with a token, token mode.
 //	GET  /v1/fetch_store  the whole fetch store (trivial PIR: the client reads chunks locally)
+//	GET  /v1/fetch_hint   public PIR hint for the fetch store, downloaded once (real PIR)
+//	POST /v1/fetch        one encrypted selector in, one encrypted column out (real PIR)
 //
 // Logs one JSON line per request to -log (default <data>/server.log), the
 // fields fixed in contracts.py: ts, endpoint, response_bytes, latency_ms.
@@ -14,6 +18,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -25,32 +30,58 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/IshanEdlabadkar/blindspot/crypto-server/blindcrypto"
+	"github.com/ahenzinger/underhood/underhood"
 )
 
 const maxScoreBody = 64 << 20 // token is ~33 MB
 
 type server struct {
 	version  string
-	manifest []byte
+	manifest map[string]any
+	hint     []byte
+	fetch    *blindcrypto.FetchServer // nil when real PIR is off
+	fetchHnt []byte
+	fetchMu  sync.Mutex
 	store    []byte
 	score    *blindcrypto.ScoreServer
 	mu       sync.Mutex // underhood's thread safety is undocumented; serialize
 	logOut   *json.Encoder
 	logMu    sync.Mutex
+	recent   [][]byte // last log lines, for GET /v1/server_log
+}
+
+const recentMax = 200
+
+func envBool(name string, def bool) bool {
+	switch os.Getenv(name) {
+	case "1", "true", "yes":
+		return true
+	case "0", "false", "no":
+		return false
+	}
+	return def
 }
 
 func main() {
 	dataDir := flag.String("data", "../data", "directory with manifest.json, score_table.bin, fetch_store.bin")
-	addr := flag.String("addr", "127.0.0.1:8080", "listen address (use 0.0.0.0:8080 to serve other machines)")
+	defAddr := "127.0.0.1:8080"
+	if port := os.Getenv("PORT"); port != "" { // set by Docker and Render
+		defAddr = "0.0.0.0:" + port
+	}
+	addr := flag.String("addr", defAddr, "listen address (use 0.0.0.0:8080 to serve other machines; $PORT sets 0.0.0.0:$PORT)")
+	tokenMode := flag.Bool("token-mode", envBool("BLIND_RAG_TOKEN_MODE", true), "also serve token mode (~650 MB RAM at 2,101 chunks; hint mode alone ~100 MB)")
+	realPIR := flag.Bool("pir", envBool("BLIND_RAG_PIR", true), "also serve real PIR fetch at /v1/fetch (~50 MB RAM, ~2 s startup at 2,101 chunks)")
+	publicLog := flag.Bool("public-log", envBool("BLIND_RAG_PUBLIC_LOG", false), "serve recent log lines at GET /v1/server_log (for the UI's server panel when the server is remote)")
 	logPath := flag.String("log", "", "request log file (default <data>/server.log)")
 	allowWrap := flag.Bool("allow-wrap", false, "start even if scores can exceed the modulus (random dummy tables only)")
 	flag.Parse()
 
-	s, err := load(*dataDir, *allowWrap)
+	s, err := load(*dataDir, *allowWrap, *tokenMode, *realPIR)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,13 +99,26 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/manifest", s.logged("/v1/manifest", s.handleManifest))
+	mux.HandleFunc("GET /v1/score_hint", s.logged("/v1/score_hint", s.handleHint))
 	mux.HandleFunc("POST /v1/score", s.logged("/v1/score", s.handleScore))
 	mux.HandleFunc("GET /v1/fetch_store", s.logged("/v1/fetch_store", s.handleFetchStore))
+	if s.fetch != nil {
+		mux.HandleFunc("GET /v1/fetch_hint", s.logged("/v1/fetch_hint", s.handleFetchHint))
+		mux.HandleFunc("POST /v1/fetch", s.logged("/v1/fetch", s.handleFetch))
+	}
+	if *publicLog {
+		// Not itself logged, so a UI polling it does not flood the log.
+		mux.HandleFunc("GET /v1/server_log", s.handleServerLog)
+		log.Printf("public log enabled: GET /v1/server_log")
+	}
+	if !*tokenMode {
+		log.Printf("token mode off: hint mode only")
+	}
 	log.Printf("serving corpus %s on http://%s", s.version, *addr)
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 
-func load(dir string, allowWrap bool) (*server, error) {
+func load(dir string, allowWrap, tokenMode, realPIR bool) (*server, error) {
 	raw, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	if err != nil {
 		return nil, err
@@ -123,8 +167,12 @@ func load(dir string, allowWrap bool) (*server, error) {
 	hash := sha256.Sum256(tableBytes)
 	seed := blindcrypto.SeedFromTable(hash)
 	start := time.Now()
-	ss := blindcrypto.NewScoreServer(db, seed)
-	log.Printf("precomputed score table (%d x %d) in %v", n, d, time.Since(start))
+	ss := blindcrypto.NewScoreServerHintOnly(db, seed)
+	if tokenMode {
+		ss = blindcrypto.NewScoreServer(db, seed)
+	}
+	hint := blindcrypto.EncodeHint(ss.Hint())
+	log.Printf("precomputed score table (%d x %d) and %.1f MB hint in %v", n, d, float64(len(hint))/1e6, time.Since(start))
 
 	// Publish what the client needs: the public seed and the fetch mode.
 	scoring, _ := m["scoring"].(map[string]any)
@@ -133,12 +181,45 @@ func load(dir string, allowWrap bool) (*server, error) {
 	}
 	scoring["seed"] = hex.EncodeToString(seed[:])
 	scoring["modulus"] = blindcrypto.P
+	scoring["library"] = "underhood (Tiptoe) + SimplePIR LHE"
+	scoring["params"] = fmt.Sprintf("logq=64 n=2048 p=2^17 d=%d", d)
+	scoring["mode"] = "hint" // clients may still send a token (token mode) instead, if enabled
+	scoring["token_mode"] = tokenMode
+	scoring["hint_path"] = "/v1/score_hint"
+	scoring["hint_bytes"] = len(hint)
+	scoring["hint_sha256"] = blindcrypto.HintSHA256(hint)
 	m["scoring"] = scoring
-	pirM["mode"] = "trivial"
-	out, _ := json.MarshalIndent(m, "", "  ")
+	pirM["mode"] = "trivial" // default; "simplepir" is offered below when enabled
+	pirM["modes"] = []string{"trivial"}
+	pirM["library"] = "trivial PIR (whole store)"
+	pirM["params"] = "none"
+
+	var fs *blindcrypto.FetchServer
+	var fetchHint []byte
+	if realPIR {
+		start := time.Now()
+		fdb, err := blindcrypto.NewFetchDB(store, n, recLen)
+		if err != nil {
+			return nil, err
+		}
+		sh := sha256.Sum256(store)
+		fseed := blindcrypto.SeedFromTable(sh)
+		fs = blindcrypto.NewFetchServer(fdb, fseed)
+		fetchHint = blindcrypto.EncodeHint(fs.Hint())
+		pirM["modes"] = []string{"trivial", "simplepir"}
+		pirM["library"] = "trivial PIR (whole store) or SimplePIR"
+		pirM["params"] = fmt.Sprintf("simplepir: logq=64 n=2048 p=2^16 L=%d M=%d", fs.Info.L, fs.Info.M)
+		pirM["seed"] = hex.EncodeToString(fseed[:])
+		pirM["hint_path"] = "/v1/fetch_hint"
+		pirM["hint_bytes"] = len(fetchHint)
+		pirM["hint_sha256"] = blindcrypto.HintSHA256(fetchHint)
+		log.Printf("precomputed PIR fetch store (L=%d x M=%d) and %.1f MB hint in %v",
+			fs.Info.L, fs.Info.M, float64(len(fetchHint))/1e6, time.Since(start))
+	}
 
 	return &server{
-		version: version, manifest: out, store: store, score: ss,
+		version: version, manifest: m, hint: hint, store: store, score: ss,
+		fetch: fs, fetchHnt: fetchHint,
 		logOut: json.NewEncoder(io.Discard),
 	}, nil
 }
@@ -172,8 +253,89 @@ func checkScoreRange(table []int8, n, d uint64, allowWrap bool) error {
 }
 
 func (s *server) handleManifest(w http.ResponseWriter, r *http.Request) {
+	// hint_url is absolute, built from the address the client used, so the
+	// client needs no extra configuration to find it.
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	m := make(map[string]any, len(s.manifest))
+	for k, v := range s.manifest {
+		m[k] = v
+	}
+	sc := make(map[string]any)
+	for k, v := range s.manifest["scoring"].(map[string]any) {
+		sc[k] = v
+	}
+	sc["hint_url"] = scheme + "://" + r.Host + "/v1/score_hint"
+	m["scoring"] = sc
+	if s.fetch != nil {
+		pm := make(map[string]any)
+		for k, v := range s.manifest["pir"].(map[string]any) {
+			pm[k] = v
+		}
+		pm["hint_url"] = scheme + "://" + r.Host + "/v1/fetch_hint"
+		m["pir"] = pm
+	}
+	out, _ := json.MarshalIndent(m, "", "  ")
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(s.manifest)
+	w.Write(out)
+}
+
+// handleServerLog returns the last ?n= log lines (default 50) as JSON lines:
+// the same records as the log file, which hold only what any network observer
+// could see anyway (time, endpoint, response size, latency).
+func (s *server) handleServerLog(w http.ResponseWriter, r *http.Request) {
+	n := 50
+	if v, err := strconv.Atoi(r.URL.Query().Get("n")); err == nil && v > 0 && v <= recentMax {
+		n = v
+	}
+	s.logMu.Lock()
+	lines := s.recent
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	var b bytes.Buffer
+	for _, ln := range lines {
+		b.Write(ln)
+		b.WriteByte('\n')
+	}
+	s.logMu.Unlock()
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(b.Bytes())
+}
+
+func (s *server) handleFetchHint(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("X-Corpus-Version", s.version)
+	w.Write(s.fetchHnt)
+}
+
+// handleFetch: real PIR. The server multiplies every record by the encrypted
+// selector, so it touches all of them equally and learns nothing about which
+// one was wanted.
+func (s *server) handleFetch(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("X-Corpus-Version") != s.version {
+		http.Error(w, "stale corpus_version", http.StatusConflict)
+		return
+	}
+	q, err := blindcrypto.UnmarshalFetchRequest(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err != nil || q.Query.Rows() < s.fetch.Info.M {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	s.fetchMu.Lock()
+	ans := s.fetch.Answer(q)
+	s.fetchMu.Unlock()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(blindcrypto.MarshalAnswer(ans))
+}
+
+func (s *server) handleHint(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("X-Corpus-Version", s.version)
+	w.Write(s.hint)
 }
 
 func (s *server) handleFetchStore(w http.ResponseWriter, r *http.Request) {
@@ -192,6 +354,10 @@ func (s *server) handleScore(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+	if len(req.Token) > 0 && !s.score.TokenMode() {
+		http.Error(w, "token mode is off on this server; use hint mode", http.StatusBadRequest)
+		return
+	}
 	if req.Query.Query.Rows() < s.score.DB.Info.M {
 		http.Error(w, "bad query size", http.StatusBadRequest)
 		return
@@ -204,10 +370,11 @@ func (s *server) handleScore(w http.ResponseWriter, r *http.Request) {
 func (s *server) compute(req *blindcrypto.ScoreRequest) *blindcrypto.ScoreResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &blindcrypto.ScoreResponse{
-		TokenAnswer: s.score.HintAnswer(&req.Token),
-		Scores:      s.score.Answer(req.Query),
+	ta := &underhood.HintAnswer{} // hint mode: the client already has the hint
+	if len(req.Token) > 0 && s.score.TokenMode() {
+		ta = s.score.HintAnswer(&req.Token) // token mode
 	}
+	return &blindcrypto.ScoreResponse{TokenAnswer: ta, Scores: s.score.Answer(req.Query)}
 }
 
 // countingWriter records status and response size for the log line.
@@ -233,13 +400,18 @@ func (s *server) logged(endpoint string, h http.HandlerFunc) http.HandlerFunc {
 			if rec := recover(); rec != nil {
 				http.Error(cw, "bad request", http.StatusBadRequest)
 			}
-			s.logMu.Lock()
-			s.logOut.Encode(map[string]any{
+			line, _ := json.Marshal(map[string]any{
 				"ts":             start.UTC().Format("2006-01-02T15:04:05.000Z"),
 				"endpoint":       endpoint,
 				"response_bytes": cw.n,
 				"latency_ms":     math.Round(float64(time.Since(start).Microseconds())/10) / 100,
 			})
+			s.logMu.Lock()
+			s.logOut.Encode(json.RawMessage(line))
+			s.recent = append(s.recent, line)
+			if len(s.recent) > recentMax {
+				s.recent = s.recent[len(s.recent)-recentMax:]
+			}
 			s.logMu.Unlock()
 		}()
 		h(cw, r)

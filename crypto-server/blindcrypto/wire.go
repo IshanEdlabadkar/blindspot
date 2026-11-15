@@ -108,12 +108,24 @@ func readVec(r io.Reader) (*matrix.Matrix[Elem], error) {
 }
 
 func (q *ScoreRequest) MarshalBinary() []byte {
+	return append(MarshalToken(q.Token), MarshalQuery(q.Query)...)
+}
+
+// MarshalToken encodes the token part of a score request. It does not depend
+// on the question, so the helper can encode it ahead of time.
+func MarshalToken(tok underhood.HintQuery) []byte {
 	var w bytes.Buffer
-	putU32(&w, uint32(len(q.Token)))
-	for _, c := range q.Token {
+	putU32(&w, uint32(len(tok)))
+	for _, c := range tok {
 		putBlob(&w, c)
 	}
-	putVec(&w, q.Query.Query)
+	return w.Bytes()
+}
+
+// MarshalQuery encodes the encrypted-query part; append it after MarshalToken.
+func MarshalQuery(q *pir.Query[Elem]) []byte {
+	var w bytes.Buffer
+	putVec(&w, q.Query)
 	return w.Bytes()
 }
 
@@ -188,4 +200,37 @@ func UnmarshalScoreResponse(r io.Reader) (*ScoreResponse, error) {
 		TokenAnswer: &underhood.HintAnswer{MatrixRows: rows, HintCts: cts},
 		Scores:      &pir.Answer[Elem]{Answer: a},
 	}, nil
+}
+
+// Fetch wire format (POST /v1/fetch): request = one encrypted selector
+// (u32 len, u64s); response = the encrypted column (u32 len, u64s).
+
+type pirQuery struct{ m *matrix.Matrix[Elem] }
+
+func (p pirQuery) q() *pir.Query[Elem] { return &pir.Query[Elem]{Query: p.m} }
+
+type pirAnswer struct{ m *matrix.Matrix[Elem] }
+
+func (p pirAnswer) a() *pir.Answer[Elem] { return &pir.Answer[Elem]{Answer: p.m} }
+
+func UnmarshalFetchRequest(r io.Reader) (*pir.Query[Elem], error) {
+	m, err := readVec(r)
+	if err != nil {
+		return nil, err
+	}
+	return &pir.Query[Elem]{Query: m}, nil
+}
+
+func MarshalAnswer(a *pir.Answer[Elem]) []byte {
+	var w bytes.Buffer
+	putVec(&w, a.Answer)
+	return w.Bytes()
+}
+
+func UnmarshalAnswer(r io.Reader) (*pir.Answer[Elem], error) {
+	m, err := readVec(r)
+	if err != nil {
+		return nil, err
+	}
+	return &pir.Answer[Elem]{Answer: m}, nil
 }

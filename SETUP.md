@@ -82,18 +82,30 @@ BLIND_RAG_CRYPTO=real BLIND_RAG_FETCH=download streamlit run ui/app.py
 - The UI reads `data/server.log` by default, which is where the real server writes too.
 - To check everything at once after merging: `make integration`. It runs C's pipeline with real crypto and with the mock, and checks that both return the same top 10 chunks. Last run: ALL PASS, about 4 s per question.
 
-## What to expect (measured, N = 5,000, 2-vCPU cloud VM)
+## Measuring (hours 13 to 16)
+
+With `make server` and `make helper` running, `make measure` asks 10 random questions (5 s apart, like a user reading), prints timings, and writes `data/measurements.md` in the spec's format. It also fails if the server log holds anything but the four agreed fields. Run it on the demo laptop for the real numbers.
+
+Last run, on B's corpus (2,101 chunks), a 2-vCPU cloud VM, medians, hint mode (the default):
 
 | | Value |
 | --- | --- |
-| Server startup precompute | ~5 s |
-| Per question: encrypt on device | ~1.1 s |
-| Per question: `/v1/score` round trip | ~3.0 s |
-| Upload per question | ~34 MB |
-| Download per question | ~0.8 MB, plus 10 MB fetch store once per corpus version |
+| Crypto part of a question (encrypt + score + decrypt + fetch) | ~6 ms |
+| Upload / download per question | 3.1 KB / 16.8 KB |
+| Server CPU per question | < 10 ms |
+| One-time per corpus version | 17.2 MB scoring hint (cached in `~/.cache/blind-rag/`) + 4.3 MB fetch store |
+| Server log | only the four agreed fields, no query data |
+
+Every spec performance target is met. With real PIR fetch (`BLIND_RAG_FETCH=pir`, or `make measure` with `--fetch pir`): about 0.55 s and 171 KB up / 99 KB down per question, plus an 8.4 MB fetch hint once. Every fetched chunk is checked byte for byte.
+
+Token mode (`BLIND_RAG_SCORE_MODE=token`) is the old path: 34 MB up and ~2.7 s per question, kept as a fallback.
 
 ## Changelog
 
+- **Nov 14, 19:20:** **real PIR fetch** (optional): `POST /v1/fetch` (one encrypted selector per call, as in `contracts.py`) and `GET /v1/fetch_hint` (8.4 MB, once). C's pipeline uses it with `BLIND_RAG_FETCH=pir`, with no code change. Trivial PIR stays the default, since it's cheaper at this size. Server switch: `BLIND_RAG_PIR=0` turns it off.
+- **Nov 14, 19:15:** remote deployment: `Dockerfile`, `render.yaml` and **[DEPLOY.md](DEPLOY.md)**. New server switches: `BLIND_RAG_TOKEN_MODE=0` (hint mode only, ~100 MB RAM instead of ~650 MB) and `BLIND_RAG_PUBLIC_LOG=1` (`GET /v1/server_log`). The server honors `$PORT`. **C:** see "What C needs to change" in DEPLOY.md.
+- **Nov 14, 19:05:** **hint mode** is the default: the client downloads a 17 MB public scoring hint once per corpus (cached on disk), then each question is 3 KB up, 17 KB down, ~6 ms. The client falls back to the old token mode automatically if anything goes wrong. Pull and restart `make server` and `make helper`; C's code is unchanged.
+- **Nov 14, 18:15:** the helper prepares the next question's key in the background (`BLIND_RAG_PREPARE=0` turns it off), so encrypting takes 0.05 s instead of 1.2 s. Added `make measure`. No changes needed in C's code; restart `make helper` after pulling.
 - **Nov 14, 17:40:** server reads `artifacts/` by default (`make server DATA=data` for dummy tables) and logs to `data/server.log`. It refuses tables whose scale can overflow. **B: rebuild with scale 127 and a little-endian length prefix** (see Data files).
 - **Nov 14, 17:20:** `make test` verified on A's Windows laptop (WSL2). Added the WSL "Catastrophic failure" fix.
 - **Nov 14, 17:10:** aligned with C's `contracts.py`: `X-Corpus-Version` header, log to `data/server.log` with the four agreed fields. Added the crypto-helper and real `client/crypto_client`, plus `make helper` and `make integration`.

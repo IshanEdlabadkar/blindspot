@@ -66,8 +66,8 @@ def main():
             _, tm = mock.ask_traced(q)
             same = tr["top_ids"] == tm["top_ids"]
             ok &= same
-            print(f"{'PASS' if same else 'FAIL'}  {q[:40]:40}  {tr['total_seconds']:.1f}s  "
-                  f"up {tr['upload_bytes']/1e6:.1f} MB  down {tr['download_bytes']/1e6:.1f} MB")
+            print(f"{'PASS' if same else 'FAIL'}  {q[:40]:40}  {tr['total_seconds']*1000:6.0f} ms  "
+                  f"up {tr['upload_bytes']/1e3:8.1f} KB  down {tr['download_bytes']/1e3:8.1f} KB")
         print("ALL PASS" if ok else "MISMATCH between real and mock rankings")
         sys.exit(0 if ok else 1)
     finally:

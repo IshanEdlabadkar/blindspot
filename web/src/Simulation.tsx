@@ -198,7 +198,7 @@ export function Simulation({ lastQuestion }: { lastQuestion?: string; trace?: Tr
           <Tally label="Questions written down" value={0} strong />
           <Tally label="Patrons with a file" value={0} />
           <Tally label="Sensitive labels filed" value={0} />
-          <Tally label="Requests logged (time, address, size)" value={tl.requests} />
+          <Tally label="Requests logged (time, address)" value={tl.requests} />
           <Cut />
           <Grid people={people} side="blind" tl={tl} selected={selected} last={running ? lastPid : null} onPick={setSelected} />
           <p className="mt-2 text-[13px] text-graphite">
@@ -265,7 +265,7 @@ export function Simulation({ lastQuestion }: { lastQuestion?: string; trace?: Tr
                     <p><span className="text-graphite">filed under </span>no label can be made{sensitive.length ? `, where the other file has ${sensitive.length}` : ''}</p>
                     <p><span className="text-graphite">guessed </span>nothing</p>
                     <p><span className="text-graphite">ads next </span>nothing aimed from this library's data</p>
-                    <p><span className="text-graphite">still on file </span>{selEvents.length * 2} request lines: time, address {sel.ip}, size</p>
+                    <p><span className="text-graphite">still on file </span>{selEvents.length * 2} request lines: time and address {sel.ip}</p>
                     <p><span className="text-graphite">could be </span>breached or subpoenaed, and hands over only that</p>
                     <span className="stamp absolute right-6 bottom-9 text-[14px] text-sealed" style={{ ['--r' as string]: '5deg', ['--d' as string]: '.3s' }}>Not read</span>
                   </article>
@@ -320,7 +320,7 @@ export function Simulation({ lastQuestion }: { lastQuestion?: string; trace?: Tr
 
       <p className="mt-14 max-w-[70ch] text-[13px] leading-5 text-graphite">
         The hundred patrons, their questions, addresses and sealed requests are made up. Labels and ads come from a simple word-matching rule, a stand-in for real ad tech.
-        The Blind RAG library still sees that a request happened, when, from which address and how big. It cannot see what was asked, how passages scored or which were fetched.
+        The Blind RAG library still sees that a request happened, when, from which address. It cannot see what was asked, how passages scored or which were fetched.
       </p>
     </main>
   )

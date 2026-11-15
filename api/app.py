@@ -63,6 +63,30 @@ def default_status_get(url: str) -> dict:
     return r.json()
 
 
+def scorecard() -> dict:
+    """Quality numbers from the plaintext evaluation (eval/results). Blind RAG's top 10 is the int8 ranking: the
+    encrypted ranking matches it, so these are the answer-quality figures for both sides."""
+    import csv
+    res = ROOT / "eval" / "results"
+    out: dict = {"source": "eval/results"}
+    try:
+        rows = [r for r in csv.DictReader(open(res / "retrieval.csv", newline="", encoding="utf-8")) if r.get("gold")]
+        top10 = lambda col: sum(1 for r in rows if (r.get(col) or "").isdigit() and int(r[col]) <= 10)  # noqa: E731
+        out.update(retrieval_n=len(rows), top10_float=top10("float_rank"), top10_int8=top10("int8_rank"))
+    except OSError:
+        pass
+    try:
+        ans = [json.loads(x) for x in open(res / "answers_plaintext.jsonl", encoding="utf-8") if x.strip()]
+        want, skip = [r for r in ans if r.get("expect") == "answer"], [r for r in ans if r.get("expect") == "decline"]
+        out.update(answerable=len(want), answered=sum(r["status"] == "answered" for r in want),
+                   cited=sum(bool(r.get("gold_cited")) for r in want), should_decline=len(skip),
+                   declined=sum(r["status"] == "declined" for r in skip),
+                   wrong=sum(r["status"] == "answered" for r in skip))
+    except OSError:
+        pass
+    return out
+
+
 class Ask(BaseModel):
     question: str
     compare: bool = True
@@ -142,6 +166,10 @@ def make_app(servers=None, pipeline_factory=default_pipeline, plain_ask=default_
 
         return StreamingResponse(stream(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    @app.get("/api/scorecard")
+    def scorecard_route():
+        return scorecard()
 
     @app.get("/api/wire")
     def wire(word: str, since: str | None = None):

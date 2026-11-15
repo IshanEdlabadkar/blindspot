@@ -61,9 +61,9 @@ Each corpus is its own provider with its own server, in its own folder of the vo
 | source_id | corpus | chunks | Render service |
 |---|---|---|---|
 | `medlineplus` | MedlinePlus health topics | 2,101 | `blindspot` (existing) |
-| `fmla` | FMLA regulations, 29 CFR Part 825 | 310 | `blind-rag-fmla` |
-| `genetics` | MedlinePlus Genetics | 2,067 | `blind-rag-genetics` |
-| `myhealthfinder` | MyHealthfinder (health.gov) | 524 | `blind-rag-myhealthfinder` |
+| `fmla` | FMLA regulations, 29 CFR Part 825 | 310 | `blindspot-fmla` |
+| `genetics` | MedlinePlus Genetics | 2,067 | `blindspot-genetics` |
+| `myhealthfinder` | MyHealthfinder (health.gov) | 524 | `blindspot-myhealthfinder` |
 
 1. Verify B's handoff folder, then publish each corpus to its own folder (token only in your shell):
    ```

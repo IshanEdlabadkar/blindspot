@@ -117,11 +117,17 @@ def test_source_selection_variants(monkeypatch):
         monkeypatch.delenv(k, raising=False)
     cs = [{"url": "p1", "rerank_score": 9.0}, {"url": "p1", "rerank_score": 8.0}, {"url": "p2", "rerank_score": 3.5},
           {"url": "p3", "rerank_score": 2.0}, {"url": "p4", "rerank_score": 1.0}, {"url": "p5", "rerank_score": 0.5}]
-    assert [c["url"] for c in A.select_sources(cs)] == ["p1", "p1"]          # default: margin 5 keeps 2
+    assert [c["url"] for c in A.select_sources(cs)] == ["p1"]                # default: one per page, margin 5
+    monkeypatch.setenv("BLIND_RAG_ONE_PER_PAGE", "0")
+    assert [c["url"] for c in A.select_sources(cs)] == ["p1", "p1"]          # the old behavior
     monkeypatch.setenv("BLIND_RAG_MIN_SOURCES", "3")
     assert [c["url"] for c in A.select_sources(cs)] == ["p1", "p1", "p2"]
     monkeypatch.setenv("BLIND_RAG_ONE_PER_PAGE", "1")
     assert [c["url"] for c in A.select_sources(cs)] == ["p1", "p2", "p3"]
+    cs2 = [{"url": "a", "rerank_score": 9.0}, {"url": "a", "rerank_score": 8.5}, {"url": "b", "rerank_score": 6.0}]
+    monkeypatch.delenv("BLIND_RAG_MIN_SOURCES")
+    monkeypatch.delenv("BLIND_RAG_ONE_PER_PAGE")
+    assert [c["url"] for c in A.select_sources(cs2)] == ["a", "b"]           # a second page now fits
     monkeypatch.setenv("BLIND_RAG_RERANK_MARGIN", "8.6")
     monkeypatch.setenv("BLIND_RAG_N_CONTEXT", "8")
     assert [c["url"] for c in A.select_sources(cs)] == ["p1", "p2", "p3", "p4", "p5"]

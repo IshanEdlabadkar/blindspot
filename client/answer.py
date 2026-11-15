@@ -227,20 +227,22 @@ def _env_num(name: str, default):
 def select_sources(chunks: list[dict], n_context: int = N_CONTEXT) -> list[dict]:
     """Which reranked passages become the model's sources.
 
-    Default (unchanged): the best n_context, minus any more than RERANK_MARGIN reranker points below
-    the best one (a passage about another condition that shares common words, C. diff for a chlamydia
-    question, otherwise ends up quoted in the answer).
+    Default: one slot per page (the best-ranked piece of each page), then the best n_context, minus any
+    more than RERANK_MARGIN reranker points below the best one (a passage about another condition that
+    shares common words, C. diff for a chlamydia question, otherwise ends up quoted in the answer).
+    One slot per page frees slots that two pieces of the same page used to take, so answers can draw on
+    more pages without loosening the relevance cutoff (and the same page is no longer cited twice).
 
-    Opt-in variants, for measuring more synthesis (eval.bench --sources ...); all off by default:
+    Variants, for measuring (eval.bench --sources ...):
       BLIND_RAG_N_CONTEXT=8        more slots
       BLIND_RAG_RERANK_MARGIN=7    a looser margin
       BLIND_RAG_MIN_SOURCES=2      always keep at least this many, margin or not
-      BLIND_RAG_ONE_PER_PAGE=1     a page fills one slot (two pieces of one page don't crowd out others)
+      BLIND_RAG_ONE_PER_PAGE=0     back to several pieces of one page in separate slots
     """
     n_context = _env_num("BLIND_RAG_N_CONTEXT", n_context)
     margin = _env_num("BLIND_RAG_RERANK_MARGIN", RERANK_MARGIN)
     min_keep = _env_num("BLIND_RAG_MIN_SOURCES", 1)
-    one_per_page = os.environ.get("BLIND_RAG_ONE_PER_PAGE") == "1"
+    one_per_page = os.environ.get("BLIND_RAG_ONE_PER_PAGE", "1") != "0"
     pool = chunks
     if one_per_page:
         seen, pool = set(), []

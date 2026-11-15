@@ -16,7 +16,7 @@ curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:8090/health 2>/dev/null || 
   echo "starting the key helper"; mkdir -p data; (cd crypto-server && go build -o crypto-helper ./cmd/crypto-helper)
   nohup ./crypto-server/crypto-helper > data/helper.out 2>&1 & sleep 2; }
 runs=()
-for cfg in "" "min=2" "pages=1,min=2" "pages=1,min=3,margin=7" "pages=1,n=8,margin=7,min=3"; do
+for cfg in "pages=0" "" "min=2" "min=3,margin=7" "n=8,margin=7,min=3"; do
   name="$STAMP-sources-${cfg:-default}"; name=${name//[=,]/-}
   echo; echo "=== source setting: ${cfg:-default (current)} ==="
   python3 -m eval.bench --answer real --sources "$cfg" --llm-cache "$CACHE" --name "$name" $ARGS | grep -E '^ +[^ ]+ r0 ' || true

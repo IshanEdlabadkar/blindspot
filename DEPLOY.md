@@ -1,5 +1,7 @@
 # Deploying the document server remotely
 
+This lives on the `deploy/render` branch; `main` runs locally only. Render deploys from this branch.
+
 Three separate pieces, owned the way a real provider would own them:
 
 | Piece | Where | Who |

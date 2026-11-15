@@ -141,6 +141,15 @@ def test_sentence_supported_by_its_cited_sources_together():
     assert r["status"] == "answered" and [c["id"] for c in r["citations"]] == [40, 41]
 
 
+def test_citations_name_their_source_when_chunks_have_one():
+    fmla = {**A1C, "id": 7, "source": "fmla", "source_name": "Federal FMLA regulations"}
+    r = answer("q?", [fmla, KNEE], llm=lambda p: "A1C measures your average blood sugar [1].")
+    assert r["citations"][0]["source"] == "fmla"
+    assert r["citations"][0]["source_name"] == "Federal FMLA regulations"
+    r = answer("q?", [A1C, KNEE], llm=lambda p: "A1C measures your average blood sugar [1].")
+    assert "source" not in r["citations"][0]
+
+
 def test_each_citation_carries_its_supporting_excerpt():
     r = answer("q?", [A1C, KNEE], llm=lambda p: "It measures average blood sugar over 3 months [1].")
     assert r["citations"][0]["excerpt"] == "It measures your average blood sugar level over the past 3 months."

@@ -17,6 +17,13 @@
 //	POST /encrypt?handle=<id>     body: d int8 -> body for /v1/score (uses the prepared key once)
 //	POST /encrypt?P               body: d int8 -> same, one shot, header X-Handle
 //	POST /decrypt?handle=<id>     body: /v1/score response -> N int32 scores; wipes the key
+//
+// Real PIR fetch (optional; F = seed=<pir.seed hex>&n=<N>&rec=<record_bytes>):
+//
+//	GET  /fetch_hint?F            200 if loaded, else 404
+//	POST /fetch_hint?F            body: hint from /v1/fetch_hint -> loads it
+//	POST /fetch_query?F&index=<i> -> body for /v1/fetch, header X-Handle (fresh key)
+//	POST /fetch_decrypt?handle=   body: /v1/fetch response -> the record's bytes; wipes the key
 //	GET  /health
 //
 // Every question gets a fresh secret key: reusing one would leak. Unused keys
@@ -96,17 +103,25 @@ type corpus struct {
 }
 
 type helper struct {
-	mu    sync.Mutex
-	infos map[[2]uint64]*pir.DBInfo
-	hints map[corpus]*blindcrypto.HintClient
-	keys  map[string]*pending
+	mu      sync.Mutex
+	infos   map[[2]uint64]*pir.DBInfo
+	hints   map[corpus]*blindcrypto.HintClient
+	keys    map[string]*pending
+	fetches map[corpus]*blindcrypto.FetchClient // corpus.d holds the record length here
+	fkeys   map[string]*fetchPending
+}
+
+type fetchPending struct {
+	key     *blindcrypto.FetchKey
+	created time.Time
 }
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8090", "listen address (keep it on 127.0.0.1)")
 	flag.Parse()
 	h := &helper{infos: map[[2]uint64]*pir.DBInfo{}, hints: map[corpus]*blindcrypto.HintClient{},
-		keys: map[string]*pending{}}
+		keys: map[string]*pending{}, fetches: map[corpus]*blindcrypto.FetchClient{},
+		fkeys: map[string]*fetchPending{}}
 	go h.expireLoop()
 
 	mux := http.NewServeMux()
@@ -116,6 +131,10 @@ func main() {
 	mux.HandleFunc("POST /prepare", h.handlePrepare)
 	mux.HandleFunc("POST /encrypt", h.handleEncrypt)
 	mux.HandleFunc("POST /decrypt", h.handleDecrypt)
+	mux.HandleFunc("GET /fetch_hint", h.handleFetchHintStatus)
+	mux.HandleFunc("POST /fetch_hint", h.handleFetchHintLoad)
+	mux.HandleFunc("POST /fetch_query", h.handleFetchQuery)
+	mux.HandleFunc("POST /fetch_decrypt", h.handleFetchDecrypt)
 	log.Printf("crypto-helper on http://%s (keys in memory only)", *addr)
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
@@ -344,9 +363,123 @@ func (h *helper) drop(id string) {
 	h.mu.Unlock()
 }
 
+func parseFetchCorpus(r *http.Request) (corpus, error) {
+	q := r.URL.Query()
+	q.Set("d", q.Get("rec"))
+	r2 := *r
+	u := *r.URL
+	u.RawQuery = q.Encode()
+	r2.URL = &u
+	return parseCorpus(&r2)
+}
+
+func (h *helper) fetchClient(c corpus) *blindcrypto.FetchClient {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.fetches[c]
+}
+
+func (h *helper) handleFetchHintStatus(w http.ResponseWriter, r *http.Request) {
+	c, err := parseFetchCorpus(r)
+	if err != nil {
+		http.Error(w, "need seed, n, rec", http.StatusBadRequest)
+		return
+	}
+	if h.fetchClient(c) == nil {
+		http.Error(w, "fetch hint not loaded", http.StatusNotFound)
+		return
+	}
+	w.Write([]byte("loaded"))
+}
+
+func (h *helper) handleFetchHintLoad(w http.ResponseWriter, r *http.Request) {
+	c, err := parseFetchCorpus(r)
+	if err != nil {
+		http.Error(w, "need seed, n, rec", http.StatusBadRequest)
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxHintLen))
+	if err != nil {
+		http.Error(w, "read error", http.StatusBadRequest)
+		return
+	}
+	info, err := blindcrypto.FetchDBInfo(c.n, c.d)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	hint, err := blindcrypto.DecodeHint(body, info.L, hintCols)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	seed := c.seed
+	fc := blindcrypto.NewFetchClient(&seed, info, hint, c.n, c.d)
+	h.mu.Lock()
+	h.fetches[c] = fc
+	h.mu.Unlock()
+	log.Printf("loaded fetch hint for n=%d rec=%d (%.1f MB)", c.n, c.d, float64(len(body))/1e6)
+	w.Write([]byte("loaded"))
+}
+
+func (h *helper) handleFetchQuery(w http.ResponseWriter, r *http.Request) {
+	c, err := parseFetchCorpus(r)
+	idx, err2 := strconv.ParseUint(r.URL.Query().Get("index"), 10, 64)
+	if err != nil || err2 != nil {
+		http.Error(w, "need seed, n, rec, index", http.StatusBadRequest)
+		return
+	}
+	fc := h.fetchClient(c)
+	if fc == nil {
+		http.Error(w, "fetch hint not loaded; POST /fetch_hint first", http.StatusConflict)
+		return
+	}
+	k, q, err := fc.Query(idx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	id := newHandle()
+	h.mu.Lock()
+	h.fkeys[id] = &fetchPending{key: k, created: time.Now()}
+	h.mu.Unlock()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("X-Handle", id)
+	w.Write(blindcrypto.MarshalQuery(q))
+}
+
+func (h *helper) handleFetchDecrypt(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("handle")
+	h.mu.Lock()
+	p := h.fkeys[id]
+	delete(h.fkeys, id) // one use only
+	h.mu.Unlock()
+	if p == nil {
+		http.Error(w, "unknown or expired handle", http.StatusNotFound)
+		return
+	}
+	a, err := blindcrypto.UnmarshalAnswer(io.LimitReader(r.Body, 1<<24))
+	if err != nil {
+		http.Error(w, "bad fetch response", http.StatusBadRequest)
+		return
+	}
+	rec, err := p.key.Decrypt(a)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(rec)
+}
+
 func (h *helper) expireLoop() {
 	for range time.Tick(time.Minute) {
 		h.mu.Lock()
+		for id, p := range h.fkeys {
+			if time.Since(p.created) > keyTTL {
+				delete(h.fkeys, id)
+			}
+		}
 		for id, p := range h.keys {
 			if time.Since(p.created) > keyTTL {
 				p.key.free()

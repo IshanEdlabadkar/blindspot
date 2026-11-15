@@ -22,8 +22,12 @@ Scoring modes (the server's manifest says which it prefers):
   token no hint; each question uploads a ~33 MB token. Used if the hint can't
         be loaded, or with BLIND_RAG_SCORE_MODE=token.
 
-Fetch is trivial PIR, so make_selector() and decrypt_record() are not used.
-Run the pipeline with BLIND_RAG_FETCH=download.
+Fetch: trivial PIR by default (FETCH_MODE = "download": the whole store is
+downloaded once, so make_selector/decrypt_record are not called). Real PIR is
+optional: run the pipeline with BLIND_RAG_FETCH=pir and, if the server offers
+"simplepir", each make_selector() builds a fresh encrypted selector and
+decrypt_record() recovers the chunk. The public fetch hint (~8 MB for 2,101
+chunks) is downloaded once and cached like the scoring hint.
 """
 from __future__ import annotations
 
@@ -64,6 +68,10 @@ class Key:
         self.http = requests.Session()
         self.mode = SCORE_MODE or scoring.get("mode", "token")
         self._scoring = scoring
+        self._pir = manifest.get("pir", {})
+        self.rec = int(self._pir.get("record_bytes", 2048))
+        self._fetch_loaded = False
+        self._fetch_handle: str | None = None
         self._pool = ThreadPoolExecutor(max_workers=1) if PREPARE else None
         self._next = None            # Future -> handle of a prepared, unused key
         self._lock = threading.Lock()
@@ -127,11 +135,14 @@ def keygen(manifest=None) -> Key:
 
 
 def _load_hint(key: Key):
-    """Make sure the helper holds this corpus's public hint (download once, cache on disk)."""
-    corpus = {"seed": key.seed, "n": key.n, "d": key.d}
-    if key.http.get(HELPER_URL + "/hint", params=corpus, timeout=10).status_code == 200:
+    """Make sure the helper holds this corpus's public scoring hint."""
+    _ensure_hint(key, "/hint", {"seed": key.seed, "n": key.n, "d": key.d}, key._scoring)
+
+
+def _ensure_hint(key: Key, endpoint: str, corpus: dict, sc: dict):
+    """Load a public hint into the helper: from the helper, the disk cache, or the server."""
+    if key.http.get(HELPER_URL + endpoint, params=corpus, timeout=10).status_code == 200:
         return
-    sc = key._scoring
     want = sc.get("hint_sha256", "")
     path = HINT_CACHE / (want.replace("sha256:", "") + ".hint") if want else None
     blob = path.read_bytes() if path and path.exists() else None
@@ -147,9 +158,9 @@ def _load_hint(key: Key):
                 path.write_bytes(blob)
             except OSError:
                 pass  # caching is optional
-    r = key.http.post(HELPER_URL + "/hint", params=corpus, data=blob, timeout=120)
+    r = key.http.post(HELPER_URL + endpoint, params=corpus, data=blob, timeout=120)
     if r.status_code != 200:
-        raise RuntimeError(f"helper /hint: {r.status_code} {r.text.strip()}")
+        raise RuntimeError(f"helper {endpoint}: {r.status_code} {r.text.strip()}")
 
 
 def encrypt_query(key: Key, int8_vec) -> bytes:
@@ -190,9 +201,33 @@ def decrypt_scores(key: Key, blob: bytes):
     return np.frombuffer(r.content, dtype=SCORE_DTYPE)
 
 
+def _fetch_corpus(key: Key) -> dict:
+    return {"seed": key._pir["seed"], "n": key.n, "rec": key.rec}
+
+
 def make_selector(key: Key, index: int, N: int) -> bytes:
-    raise RuntimeError("Fetch is trivial PIR with the real server: set BLIND_RAG_FETCH=download")
+    """Real PIR: a fresh encrypted selector for chunk `index` (body for POST /v1/fetch)."""
+    if "simplepir" not in key._pir.get("modes", []):
+        raise RuntimeError("this server offers only trivial PIR: use BLIND_RAG_FETCH=download")
+    if not key._fetch_loaded:
+        _ensure_hint(key, "/fetch_hint", _fetch_corpus(key), key._pir)
+        key._fetch_loaded = True
+    r = key.http.post(HELPER_URL + "/fetch_query", params={**_fetch_corpus(key), "index": int(index)}, timeout=60)
+    if r.status_code == 409:  # helper restarted and lost the hint
+        _ensure_hint(key, "/fetch_hint", _fetch_corpus(key), key._pir)
+        r = key.http.post(HELPER_URL + "/fetch_query", params={**_fetch_corpus(key), "index": int(index)}, timeout=60)
+    if r.status_code != 200:
+        raise RuntimeError(f"crypto-helper /fetch_query: {r.status_code} {r.text.strip()}")
+    key._fetch_handle = r.headers["X-Handle"]
+    return r.content
 
 
 def decrypt_record(key: Key, blob: bytes) -> bytes:
-    raise RuntimeError("Fetch is trivial PIR with the real server: set BLIND_RAG_FETCH=download")
+    """Real PIR: /v1/fetch response -> exactly record_bytes bytes. Wipes that fetch's key."""
+    if key._fetch_handle is None:
+        raise RuntimeError("decrypt_record called before make_selector")
+    handle, key._fetch_handle = key._fetch_handle, None
+    r = key.http.post(HELPER_URL + "/fetch_decrypt", params={"handle": handle}, data=blob, timeout=60)
+    if r.status_code != 200:
+        raise RuntimeError(f"crypto-helper /fetch_decrypt: {r.status_code} {r.text.strip()}")
+    return r.content

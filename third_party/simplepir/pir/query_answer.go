@@ -35,3 +35,9 @@ func (q *Query[T]) SelectRows(start, num, squishing uint64) *Query[T] {
 
 	return res
 }
+
+// Interm returns H * s (computed in PreprocessQuery when the client has the
+// hint). Added for Blind RAG's multi-element record decoding.
+func (s *Secret[T]) Interm() *matrix.Matrix[T] {
+	return s.interm
+}

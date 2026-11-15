@@ -25,7 +25,8 @@ COPY --from=build /out/crypto-server /usr/local/bin/crypto-server
 COPY artifacts/manifest.json artifacts/score_table.bin artifacts/fetch_store.bin /data/
 USER blindrag
 # The server binds 0.0.0.0:$PORT. Render sets PORT (default 10000).
-# Hint mode only (~100 MB RAM); set BLIND_RAG_TOKEN_MODE=1 for the 33 MB-per-question fallback (~650 MB).
+# Hint-mode scoring + real PIR fetch (~210 MB RAM). BLIND_RAG_TOKEN_MODE=1 adds the 33 MB-per-question
+# fallback (~650 MB more); BLIND_RAG_PIR=0 turns off real PIR fetch.
 ENV PORT=8080 BLIND_RAG_TOKEN_MODE=0 BLIND_RAG_PUBLIC_LOG=1
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s CMD curl -fsS "http://127.0.0.1:${PORT}/v1/manifest" >/dev/null || exit 1

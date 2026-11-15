@@ -96,10 +96,13 @@ Last run, on B's corpus (2,101 chunks), a 2-vCPU cloud VM, medians, hint mode (t
 | One-time per corpus version | 17.2 MB scoring hint (cached in `~/.cache/blind-rag/`) + 4.3 MB fetch store |
 | Server log | only the four agreed fields, no query data |
 
-Every spec performance target is met. Token mode (`BLIND_RAG_SCORE_MODE=token`) is the old path: 34 MB up and ~2.7 s per question, kept as a fallback.
+Every spec performance target is met. With real PIR fetch (`BLIND_RAG_FETCH=pir`, or `make measure` with `--fetch pir`): about 0.55 s and 171 KB up / 99 KB down per question, plus an 8.4 MB fetch hint once. Every fetched chunk is checked byte for byte.
+
+Token mode (`BLIND_RAG_SCORE_MODE=token`) is the old path: 34 MB up and ~2.7 s per question, kept as a fallback.
 
 ## Changelog
 
+- **Nov 14, 19:20:** **real PIR fetch** (optional): `POST /v1/fetch` (one encrypted selector per call, as in `contracts.py`) and `GET /v1/fetch_hint` (8.4 MB, once). C's pipeline uses it with `BLIND_RAG_FETCH=pir`, with no code change. Trivial PIR stays the default, since it's cheaper at this size. Server switch: `BLIND_RAG_PIR=0` turns it off.
 - **Nov 14, 19:15:** remote deployment: `Dockerfile`, `render.yaml` and **[DEPLOY.md](DEPLOY.md)**. New server switches: `BLIND_RAG_TOKEN_MODE=0` (hint mode only, ~100 MB RAM instead of ~650 MB) and `BLIND_RAG_PUBLIC_LOG=1` (`GET /v1/server_log`). The server honors `$PORT`. **C:** see "What C needs to change" in DEPLOY.md.
 - **Nov 14, 19:05:** **hint mode** is the default: the client downloads a 17 MB public scoring hint once per corpus (cached on disk), then each question is 3 KB up, 17 KB down, ~6 ms. The client falls back to the old token mode automatically if anything goes wrong. Pull and restart `make server` and `make helper`; C's code is unchanged.
 - **Nov 14, 18:15:** the helper prepares the next question's key in the background (`BLIND_RAG_PREPARE=0` turns it off), so encrypting takes 0.05 s instead of 1.2 s. Added `make measure`. No changes needed in C's code; restart `make helper` after pulling.

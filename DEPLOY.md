@@ -1,6 +1,6 @@
 # Deploying the document server remotely (Render)
 
-The server runs in hint mode only on Render: ~100 MB RAM, about 1 s startup, and about 3 KB uploaded per question. The asker's device still runs the crypto-helper and the UI locally. Keys never leave the device.
+On Render the server runs hint-mode scoring plus real PIR fetch, with token mode off: ~210 MB RAM, about 3 s startup, and about 3 KB uploaded per question (171 KB with real PIR fetch). The asker's device still runs the crypto-helper and the UI locally. Keys never leave the device.
 
 **Status:** the Dockerfile's build steps are the same ones verified on Linux and WSL (SEAL 4.1.1, a portable build without `-march=native`, offline Go build). The image itself has not been built yet, because the workspace it was written in can't reach Docker Hub. The first Render build is its first real test. If it fails, the build log shows exactly which step.
 

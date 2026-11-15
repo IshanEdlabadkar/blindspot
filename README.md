@@ -10,7 +10,7 @@ Built at MadHacks 2026 over a public-domain subset of [MedlinePlus](https://medl
 | --- | --- |
 | ![Chat view](docs/img/ui-default.png) | ![Server view](docs/img/ui-server-view.png) |
 
-*Screenshots are from the development mock (note the banner). In real mode the banner is gone and the left box holds ciphertext.*
+*Screenshots are from an earlier build running on the development mock. The current app labels every answer with the mode that really ran, and adds Evidence and Who-sees-what tabs.*
 
 ## Why
 
@@ -87,14 +87,19 @@ The plaintext mock has the same endpoints and needs only Python. It is for devel
 
 ```bash
 python3 -m mock_server.server --data artifacts --port 8080
-BLIND_RAG_EMBED=fake python3 -m streamlit run ui/app.py
+BLIND_RAG_CRYPTO=mock BLIND_RAG_ANSWER=stub BLIND_RAG_EMBED=fake python3 -m streamlit run ui/app.py
 ```
+
+The app runs the real encrypted path unless you ask for the mock like this, and it labels every answer with what actually ran. It never falls back to the mock by itself.
 
 ### Useful commands
 
 | Command | What it does |
 | --- | --- |
 | `make demo` | Everything in one terminal with real crypto |
+| `make demo-compare` | The same, plus a plaintext "normal RAG" server for the side-by-side log contrast |
+| `make preflight` | 8-step smoke test before presenting |
+| `make stop` | Stop any server or helper left running (do this after `git pull`) |
 | `make integration` | Checks the encrypted top 10 equals the plaintext top 10 |
 | `make test` | Crypto unit and HTTP tests |
 | `make measure` | Latency, bytes and CPU per question, written to `data/measurements.md` |
@@ -116,7 +121,7 @@ BLIND_RAG_EMBED=fake python3 -m streamlit run ui/app.py
 | `mock_server/`, `client/mock_crypto_client.py` | Plaintext stand-ins for development | C |
 | `contracts.py` | Shared formats: record layout, wire format, answer shape | all |
 
-**Picking this project up? Read the [detailed handoff](docs/HANDOFF.md) first.**
+**Picking this project up? Read the [detailed handoff](docs/HANDOFF.md) first.** Presenting it? Use the [demo kit](demo/README.md).
 
 More detail: [crypto status and design decisions](docs/crypto.md), [setup](SETUP.md), [remote deployment](DEPLOY.md), [shared contracts](docs/contracts.md), [client and UI notes](README_C.md).
 

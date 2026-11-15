@@ -8,7 +8,7 @@ Everything here runs today on the plaintext mock. **The mock is not private. Nev
 pip install -r requirements-c.txt
 python tools/make_dummy_tables.py --out data          # dummy tables + manifest (share with A)
 python -m mock_server.server --data data --port 8080  # mock of A's server
-BLIND_RAG_EMBED=fake streamlit run ui/app.py          # UI (drop EMBED=fake once the model is pinned)
+BLIND_RAG_CRYPTO=mock BLIND_RAG_ANSWER=stub BLIND_RAG_EMBED=fake streamlit run ui/app.py   # UI on the mock
 python -m pytest tests -q                             # 6 checks, should all pass
 ```
 
@@ -69,6 +69,6 @@ ollama serve                      # B: local model (skip if the Ollama app is al
 BLIND_RAG_CRYPTO=real BLIND_RAG_ANSWER=real python3 -m streamlit run ui/app.py
 ```
 
-To develop without crypto: `python3 -m mock_server.server --data artifacts --port 8080`, then run the UI without `BLIND_RAG_CRYPTO`.
+To develop without crypto: `python3 -m mock_server.server --data artifacts --port 8080`, then run the UI with `BLIND_RAG_CRYPTO=mock BLIND_RAG_ANSWER=stub`. The UI defaults to the real path.
 
 `eval/questions.jsonl` is B's set (the eval ran on it). C's 25 are in `eval/questions_c.jsonl`.

@@ -2,7 +2,7 @@
 
 For a person or an AI agent picking this project up cold. Read this once, top to bottom, before changing anything. The short public overview is [`README.md`](../README.md).
 
-Last updated: Nov 14, 2026, about 19:30 Central, at commit `e06c906` plus this file, on branch `person-c-client-ui`.
+Last updated: Nov 14, 2026, about 20:00 Central, on branch `person-c-client-ui`. The team's expanded task plan (C1 to C8) is tracked in section 12.
 
 ## 1. What this is, in one paragraph
 
@@ -16,8 +16,8 @@ Blind RAG answers a sensitive question from a document library without the docum
 | Private fetch (A) | Trivial PIR by default (download the whole 4.3 MB store once). Real PIR is optional. | Same integration run; real PIR only by A. |
 | Corpus and tables (B) | Built: 2,101 chunks, scale 127, little-endian records, corpus version `2026-11-14.2`. | A's server accepts them ("score range OK"). |
 | Local answers (B) | `client/answer.py` with safe decline, via Ollama `llama3.2:3b`. | B's eval. Through the pipeline only with a stand-in model. |
-| Client pipeline (C) | Works on the mock and on real crypto. | 37 Python tests; integration check. |
-| UI (C) | Works. Chat by default, server view behind a toggle. | Driven end to end on the mock with screenshots. |
+| Client pipeline (C) | Works on the mock and on real crypto. Fails loudly, never falls back. | 44 Python tests; integration check; `demo/preflight.py`. |
+| UI (C) | Works. Real path by default, mode badge on every answer, server view with plaintext contrast, Evidence and Who-sees-what tabs. | Driven end to end against the real crypto server (models off) with screenshots; failure cases exercised. |
 | **Full system on the demo Mac with the real embedding model and the real LLM** | **Not yet run successfully.** | Last attempt failed on a Python path problem, since fixed in `make demo`. This is the next thing to do. |
 
 All three people's work is merged on `person-c-client-ui`. `main` only has B's work so far.
@@ -95,11 +95,13 @@ Read by C's code:
 | Variable | Values | Default | Effect |
 | --- | --- | --- | --- |
 | `BLIND_RAG_SERVER` | URL | `http://127.0.0.1:8080` | Document server the pipeline talks to. |
-| `BLIND_RAG_CRYPTO` | `mock`, `real` | `mock` | `real` imports A's `client.crypto_client`. |
-| `BLIND_RAG_ANSWER` | `stub`, `real` | `stub` | `real` imports B's `client.answer`. |
+| `BLIND_RAG_CRYPTO` | `mock`, `real` | `mock` in the pipeline library, **`real` in the UI** | `real` imports A's `client.crypto_client`. |
+| `BLIND_RAG_ANSWER` | `stub`, `real` | `stub` in the pipeline library, **`real` in the UI** | `real` imports B's `client.answer`. |
 | `BLIND_RAG_FETCH` | `pir`, `download` | from the crypto module's `FETCH_MODE`, else `pir` | A's client declares `download`. Set `pir` to use real PIR fetch. |
 | `BLIND_RAG_EMBED` | `real`, `fake` | `real` | `fake` is a hash-based embedding: no model download, meaningless retrieval, fine for plumbing tests. |
-| `BLIND_RAG_SERVER_LOG` | file path | `data/server.log` | Where the UI reads the server's log. |
+| `BLIND_RAG_SERVER_LOG` | file path or URL | `data/server.log` for a local server, `<server>/v1/server_log` for a remote one | Where the UI reads the server's log. |
+| `BLIND_RAG_PLAIN_SERVER` | URL | `http://127.0.0.1:8001` | B's plaintext demo server, for the log contrast. |
+| `PLAIN` | `1` | off | `start_demo.sh` also starts the plaintext server (`make demo-compare`). |
 | `PYTHON` | interpreter path | auto-detected | Used by `scripts/start_demo.sh` only. |
 | `DATA` | folder | `artifacts` | Used by `make server` and `start_demo.sh`. |
 
@@ -132,7 +134,7 @@ Run modes, from least to most real:
 
 | Check | Command | What it proves |
 | --- | --- | --- |
-| Python tests | `python3.12 -m pytest -q` | 37 tests. C's are in `tests/test_c_flow.py`: record round trip, pipeline ranking equals plaintext, exactly k fixed-size fetches, log has no request data, stale-version recovery, download fallback, canned output. Two slow tests are deselected by default (model download, Ollama). |
+| Python tests | `python3.12 -m pytest -q` | 44 tests. C's are in `tests/test_c_flow.py`: record round trip, pipeline ranking equals plaintext, exactly k fixed-size fetches, log has no request data, stale-version recovery, download fallback, canned output. Two slow tests are deselected by default (model download, Ollama). |
 | Crypto tests | `make test` | A's Go unit and HTTP tests. Should print `ok` twice. |
 | Integration | `make integration` | Starts real server, helper and mock on a normalized dummy corpus and checks the encrypted top 10 equals the plaintext top 10. Should end `ALL PASS`. |
 | Measurements | `make measure` | With server and helper running: latency, bytes, CPU, and that the log holds only the four fields. Writes `data/measurements.md`. |
@@ -143,7 +145,7 @@ Run the Python tests and `make integration` after every merge from A or B.
 ## 10. Gotchas that have already cost time
 
 1. **`python3` on the demo Mac is the wrong Python.** Installing Ollama through Homebrew added Python 3.15 and repointed `python3` at it. The packages live in Python 3.12 from python.org (`/Library/Frameworks/Python.framework/Versions/3.12`). Use `python3.12`, or `make demo`, which detects this. There is no `python` command at all.
-2. **`make demo` reuses a server or helper already on :8080 or :8090.** After pulling changes to A's code, stop the old ones first or you will test old binaries. This matters right now: the Mac may still be running a pre-hint-mode server and helper.
+2. **`make demo` reuses a server or helper already on :8080 or :8090.** After pulling changes to A's code, run `make stop` first or you will test old binaries. This matters right now: the Mac may still be running a pre-hint-mode server and helper.
 3. **A long-running command holds its terminal.** `make server` and `make helper` never return. Use separate terminal tabs, or `make demo`.
 4. **A's real server rejects C's dummy tables.** `tools/make_dummy_tables.py` writes random rows, which can overflow the score limit. Use the mock for dummy data, or start A's server with `-allow-wrap`. `scripts/integration_check.py` normalizes the dummy table itself.
 5. **The first B merge needed adapting.** B originally used a big-endian length prefix, scale 278.67, `bge-small` instead of the placeholder model, a `status` field instead of `declined`, and expected a cosine score. All are resolved (B rebuilt; C's pipeline adapted). If B changes `answer()` or the manifest again, re-check these five points.
@@ -157,25 +159,39 @@ Run the Python tests and `make integration` after every merge from A or B.
 
 `ui/app.py`, one Streamlit file, rendered mostly as custom HTML and CSS (classes prefixed `br-`).
 
-- **Default view:** brand header, optional mock banner, chat turns (question bubble, status chips, answer card with expandable sources), input form.
-- **Toggle "Show what the server saw":** adds a dark right-hand panel (`st.container(key="server_pane")`) with the ciphertext sample, bytes sent and received, total time, and the tail of the server log. Under it, a collapsed **attacker console**: guess which of five questions was asked from what the server holds.
-- **Sidebar (collapsed):** backend (Pipeline or Canned), server URL, current modes, and "New session", which wipes the key and history.
-- A `Pipeline` is kept in `st.session_state` per browser session.
-- Colours and the Streamlit theme are in `.streamlit/config.toml`. The design source is a Claude design canvas (direction A, "Split screen"); the two alternatives were not built.
+- **Real by default.** The UI sets `BLIND_RAG_CRYPTO=real` and `BLIND_RAG_ANSWER=real` unless you set them. The mock must be asked for.
+- **Mode badge.** Above the tabs: what the next question will run as. On every answer: what really ran, read from the trace (`REAL ENCRYPTED SEARCH`, `MOCK · NOT PRIVATE` or `CANNED`), plus scoring mode, fetch mode (download-all is labelled "not PIR"), and whether a real model and real embedding were used.
+- **Health strip.** Document server, key helper and local model, each with a fix command when down (`client.pipeline.health`, cached 8 s).
+- **Ask tab.** Chat turns with an answer card. Each source shows title, link, date, similarity, the closest sentence from the source (`client/evidence.py`, a word-overlap pointer, verbatim) and the full passage. Declines get an amber "No reliable source found" card.
+- **Failures.** A `PipelineError` becomes a red box naming the stage and the fix. Nothing is retried in a weaker mode.
+- **Toggle "Show what the server saw".** Dark panel: ciphertext sample, bytes, time, and the server's own log lines stamped during that question. With **Demo contrast** ticked, the question is also sent to B's plaintext server and that server's log entry is shown beside Blind RAG's. Both logs are read from the servers; nothing is drawn by hand.
+- **Attacker console**, under the panel: guess which of five questions was asked.
+- **Evidence tab.** Live numbers from this session, A's `data/measurements.md` if `make measure` has run (otherwise "Not measured yet"), and B's eval files with denominators.
+- **Who sees what tab.** Device, network and server views, what stays visible, how fetch works, and what is not claimed.
+- **Sidebar (collapsed):** backend (Pipeline or Canned), server URLs, requested modes, "New session".
 - All user and server text is escaped with `html.escape` before going into HTML. Source links render only for `http(s)` URLs. Keep that.
 
-Known flaws: the text input is slightly shorter than the "Ask privately" button; the README screenshots show the mock banner.
+Safety guards in `client/pipeline.py`: a mock client refuses to send to a real server (it would leak the plain embedding), and a real client refuses a mock server.
 
-## 12. Open work for C, in priority order
+## 12. The expanded task plan for C (C1 to C8)
 
-1. **Run the full system on the demo Mac** with real embedding and real LLM (`git pull`, stop old server and helper, `make demo`). Fix whatever breaks. Nothing below matters until this works.
-2. **Run `make measure` on the demo Mac** and record the numbers (A is waiting on this).
-3. **Remote server support, requested by A in `DEPLOY.md`:** (a) let `BLIND_RAG_SERVER_LOG` be a URL and read `GET <server>/v1/server_log?n=50`; (b) make `start_demo.sh` skip starting a local server when `BLIND_RAG_SERVER` points elsewhere.
-4. **Demo step 1, the contrast:** show B's plaintext server (`baseline/server.py`, port 8001, `GET /log`) logging the question in the clear, next to Blind RAG's log. Not wired into the UI.
-5. **Attacker console on real logs:** it exists but has only been exercised on the mock.
-6. **Replace the README screenshots** with real-mode ones (no mock banner).
-7. **Slides, backup video, and rehearsal** of the 3-minute script (section 13).
-8. **Get `person-c-client-ui` merged into `main`** by pull request once the team agrees, so GitHub's front page shows the real README.
+| Task | State | What remains |
+| --- | --- | --- |
+| C1 Real encrypted path | Code done. Pipeline + UI run real crypto on B's tables with the same top 10 as plaintext. | **Run it on the demo Mac with the real embedding model and LLM.** Not yet done. |
+| C2 No mislabeled mock | Done. Badges from the trace, refusal guards, no fallback. Tested. | Nothing. |
+| C3 Server-saw comparison | Done against a stand-in for B's plaintext server (same `/ask` and `/log` API). | Run with B's real `baseline.server` (`make demo-compare`). |
+| C4 Inspectable evidence | Done. | Judge the excerpt quality on real answers. |
+| C5 UX and recovery | Done: health strip, stage errors with fixes, timeouts. Two failures exercised. | Ollama-down error path is unit-tested only. |
+| C6 Benchmark cards | Done. Reads `data/measurements.md` and `eval/results/`. | Run `make measure` on the Mac. Add A's `eval/crypto_metrics.csv` and B's scorecard when they exist. |
+| C7 Threat-model view | Done in the UI. | A slide version. |
+| C8 Final demo | `demo/` has the script, prompts, runbook and `make preflight`. | Record the backup video and capture real screenshots on the Mac. Slides. |
+
+Other open items:
+
+1. **Run `make preflight` on the demo Mac** until it prints READY FOR THE DEMO with no SKIP.
+2. **Get PR #4 (`person-c-client-ui` into `main`) merged** so GitHub's front page shows the README.
+3. **Replace the README screenshots** in `docs/img/` with real-mode ones.
+4. B needs `client.pipeline:ask` for the full-pipeline eval (B2). It exists: `from client.pipeline import ask`, with `BLIND_RAG_CRYPTO=real BLIND_RAG_ANSWER=real` set.
 
 ## 13. Demo script (3 minutes, from the spec)
 
@@ -204,5 +220,6 @@ Record a backup video of every step.
 | Remote deployment | `DEPLOY.md` |
 | File and answer formats in prose | `docs/contracts.md` |
 | C's run commands and checklist | `README_C.md` |
+| Presenting: script, prompts, runbook | `demo/` |
 | How B built the corpus | `ingest/`, `docs/superpowers/plans/2026-11-14-b-ml-and-content.md` |
 | Eval results | `eval/results/` |

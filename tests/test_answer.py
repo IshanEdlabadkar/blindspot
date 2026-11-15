@@ -1,5 +1,15 @@
 from client import answer as answer_mod
 from client.answer import DECLINE_MESSAGE, DISCLAIMER, answer
+from client.safety import CRISIS_MESSAGE, EMERGENCY_MESSAGE
+
+CHUNKS = [{"id": i, "title": f"T{i}", "url": f"u{i}", "updated": "d", "text": f"fact {i}",
+           "score": 0.8 - i * 0.01} for i in range(10)]
+
+A1C = {"id": 40, "title": "A1C", "url": "https://medlineplus.gov/a1c.html", "updated": "d", "score": 0.8,
+       "text": "A1C is a blood test for type 2 diabetes. It measures your average blood sugar level over "
+               "the past 3 months. Doctors may use the A1C alone or with other diabetes tests."}
+KNEE = {"id": 41, "title": "Knee", "url": "u41", "updated": "d", "score": 0.7,
+        "text": "Osteoarthritis is the most common disease affecting the knee. Cartilage wears away."}
 
 
 def test_ollama_request_keeps_model_loaded_and_caps_length(monkeypatch):
@@ -21,11 +31,8 @@ def test_ollama_request_keeps_model_loaded_and_caps_length(monkeypatch):
     assert sent["keep_alive"] == "30m"
     assert sent["options"] == {"temperature": 0, "num_predict": 256}
 
-CHUNKS = [{"id": i, "title": f"T{i}", "url": f"u{i}", "updated": "d", "text": f"fact {i}",
-           "score": 0.8 - i * 0.01} for i in range(10)]
 
-
-def test_answer_cites_and_renumbers():
+def test_answer_cites_renumbers_and_drops_bad_citations():
     seen = {}
 
     def llm(prompt):
@@ -35,20 +42,68 @@ def test_answer_cites_and_renumbers():
     r = answer("q?", CHUNKS, llm=llm)
     assert r["status"] == "answered"
     assert [c["id"] for c in r["citations"]] == [0, 2]
-    assert r["answer"].startswith("Fact three [2]. Fact one [1][2]. Bogus .")
+    assert r["answer"].startswith("Fact three [2]. Fact one [1][2].")
+    assert "Bogus" not in r["answer"]
     assert r["answer"].endswith(DISCLAIMER)
     assert "[5] T4" in seen["prompt"] and "[6]" not in seen["prompt"]
     assert "answer_ms" in r["timings"]
+    assert r["urgent"] is None
 
 
-def test_no_answer_from_model_declines_with_closest_passages():
-    r = answer("q?", CHUNKS, llm=lambda p: "NO_ANSWER")
-    assert r["status"] == "declined" and r["answer"].startswith(DECLINE_MESSAGE)
-    assert [c["id"] for c in r["citations"]] == [0, 1, 2]
+def test_unsupported_sentence_is_removed_and_counted():
+    out = ("A1C measures your average blood sugar over the past 3 months [1]. "
+           "It also cures arthritis instantly [1].")
+    r = answer("What does A1C measure?", [A1C, KNEE], llm=lambda p: out)
+    assert r["status"] == "answered"
+    assert "average blood sugar" in r["answer"] and "cures" not in r["answer"]
+    assert r["checks"]["removed_sentences"] == 1
 
 
-def test_uncited_unsupported_answer_declines():
-    assert answer("q?", CHUNKS, llm=lambda p: "Some unsupported text.")["status"] == "declined"
+def test_citation_to_the_wrong_source_is_removed():
+    r = answer("q?", [A1C, KNEE], llm=lambda p: "A1C measures your average blood sugar [2].")
+    assert r["status"] == "declined"
+
+
+def test_uncited_answer_declines_and_no_citation_is_invented():
+    copied = "It measures your average blood sugar level over the past 3 months."
+    r = answer("q?", [A1C, KNEE], llm=lambda p: copied)
+    assert r["status"] == "declined"
+
+
+def test_citation_written_after_the_period_belongs_to_that_sentence():
+    r = answer("q?", [A1C, KNEE], llm=lambda p: "A1C measures average blood sugar. [1] Cartilage wears away. [2]")
+    assert r["status"] == "answered"
+    assert [c["id"] for c in r["citations"]] == [40, 41]
+    assert r["answer"].startswith("A1C measures average blood sugar. [1] Cartilage wears away. [2]")
+
+
+def test_citation_at_paragraph_end_covers_earlier_uncited_sentences_after_checking():
+    out = ("A1C measures your average blood sugar. Doctors may use it with other diabetes tests. "
+           "This leads to many unrelated outcomes [1].\n\nNO_ANSWER")
+    r = answer("q?", [A1C, KNEE], llm=lambda p: out)
+    assert r["status"] == "answered"
+    assert r["answer"].startswith("A1C measures your average blood sugar. [1] Doctors may use it with other "
+                                  "diabetes tests. [1]")
+    assert "unrelated" not in r["answer"] and r["checks"]["removed_sentences"] == 1
+
+
+def test_paragraph_citation_does_not_reach_into_another_paragraph():
+    out = "A1C measures your average blood sugar.\n\nCartilage wears away [2]."
+    r = answer("q?", [A1C, KNEE], llm=lambda p: out)
+    assert "A1C" not in r["answer"].split(DISCLAIMER)[0]
+    assert [c["id"] for c in r["citations"]] == [41]
+
+
+def test_sentence_supported_by_its_cited_sources_together():
+    # Neither source alone has half of these key terms; together they have nearly all.
+    out = "Average blood sugar and worn cartilage in osteoarthritis knee [1][2]."
+    r = answer("q?", [A1C, KNEE], llm=lambda p: out)
+    assert r["status"] == "answered" and [c["id"] for c in r["citations"]] == [40, 41]
+
+
+def test_each_citation_carries_its_supporting_excerpt():
+    r = answer("q?", [A1C, KNEE], llm=lambda p: "It measures average blood sugar over 3 months [1].")
+    assert r["citations"][0]["excerpt"] == "It measures your average blood sugar level over the past 3 months."
 
 
 def test_cited_answer_followed_by_stray_no_answer_is_kept():
@@ -57,13 +112,10 @@ def test_cited_answer_followed_by_stray_no_answer_is_kept():
     assert [c["id"] for c in r["citations"]] == [1]
 
 
-def test_uncited_answer_grounded_in_one_source_cites_it():
-    chunks = [{**CHUNKS[0], "text": "Unrelated passage about taxes."},
-              {**CHUNKS[1], "text": "Call or text the 988 Suicide and Crisis Lifeline for help right away."}]
-    r = answer("q?", chunks, llm=lambda p: "Call or text the 988 Suicide and Crisis Lifeline right away.")
-    assert r["status"] == "answered"
-    assert [c["id"] for c in r["citations"]] == [1]
-    assert r["answer"].startswith("Call or text the 988 Suicide and Crisis Lifeline right away. [1]")
+def test_no_answer_from_model_declines_with_closest_passages():
+    r = answer("q?", CHUNKS, llm=lambda p: "NO_ANSWER")
+    assert r["status"] == "declined" and r["answer"].startswith(DECLINE_MESSAGE)
+    assert [c["id"] for c in r["citations"]] == [0, 1, 2]
 
 
 def test_low_retrieval_score_declines_without_calling_model():
@@ -77,5 +129,19 @@ def test_low_retrieval_score_declines_without_calling_model():
 
 def test_chunks_without_scores_skip_threshold():
     plain = [{k: v for k, v in c.items() if k != "score"} for c in CHUNKS]
-    r = answer("q?", plain, llm=lambda p: "Yes [1].", min_score=0.99)
+    r = answer("q?", plain, llm=lambda p: "Fact zero [1].", min_score=0.99)
     assert r["status"] == "answered" and r["citations"][0]["score"] == 0.0
+
+
+def test_crisis_question_shows_988_even_when_declined():
+    r = answer("I keep having thoughts of ending my life", CHUNKS, llm=lambda p: "NO_ANSWER")
+    assert r["status"] == "declined"
+    assert r["urgent"] == {"kind": "crisis", "message": CRISIS_MESSAGE}
+    assert r["answer"].startswith(CRISIS_MESSAGE)
+
+
+def test_emergency_question_shows_911_before_the_answer():
+    r = answer("I have crushing chest pain", CHUNKS, llm=lambda p: "Fact one [1].")
+    assert r["status"] == "answered"
+    assert r["answer"].startswith(EMERGENCY_MESSAGE)
+    assert r["urgent"]["kind"] == "emergency"

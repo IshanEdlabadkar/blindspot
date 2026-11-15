@@ -134,7 +134,7 @@ Run modes, from least to most real:
 
 | Check | Command | What it proves |
 | --- | --- | --- |
-| Python tests | `python3.12 -m pytest -q` | 44 tests. C's are in `tests/test_c_flow.py`: record round trip, pipeline ranking equals plaintext, exactly k fixed-size fetches, log has no request data, stale-version recovery, download fallback, canned output. Two slow tests are deselected by default (model download, Ollama). |
+| Python tests | `python3.12 -m pytest -q` | B's and the team's tests. C's own unit tests were removed; C's code is checked by `make integration` and `make preflight`. Two slow tests are deselected by default (model download, Ollama). |
 | Crypto tests | `make test` | A's Go unit and HTTP tests. Should print `ok` twice. |
 | Integration | `make integration` | Starts real server, helper and mock on a normalized dummy corpus and checks the encrypted top 10 equals the plaintext top 10. Should end `ALL PASS`. |
 | Measurements | `make measure` | With server and helper running: latency, bytes, CPU, and that the log holds only the four fields. Writes `data/measurements.md`. |

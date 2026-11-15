@@ -23,3 +23,16 @@ def session(cls=requests.Session) -> requests.Session:
 def get(url: str, **kw) -> requests.Response:
     with session() as s:
         return s.get(url, **kw)
+
+
+LOOPBACK = ("127.0.0.1", "localhost", "::1", "[::1]")
+
+
+def insecure_remote(url: str) -> bool:
+    """True for a plain-http URL to another machine. Those are refused (BLIND_RAG_ALLOW_HTTP=1 overrides):
+    the question is encrypted either way, but plain http lets anyone on the path read the passages
+    coming back and tamper with the manifest. Plain http to this machine (local servers, relays) is fine."""
+    import os
+    from urllib.parse import urlparse
+    u = urlparse(url)
+    return u.scheme == "http" and (u.hostname or "") not in LOOPBACK and os.environ.get("BLIND_RAG_ALLOW_HTTP") != "1"

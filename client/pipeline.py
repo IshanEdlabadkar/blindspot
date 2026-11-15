@@ -102,6 +102,10 @@ def health(server: str, crypto_kind: str = "real", answer_kind: str = "real") ->
 class Pipeline:
     def __init__(self, server=None, crypto=None, answer_fn=None, fetch_mode=None):
         self.server = (server or _env("BLIND_RAG_SERVER", "http://127.0.0.1:8080")).rstrip("/")
+        from client import net
+        if net.insecure_remote(self.server):
+            raise PipelineError("manifest", f"Refusing plain http to a remote document server ({self.server}).",
+                                "Use its https:// address (see deploy/selfhost/ to put HTTPS in front of a server).")
         self.crypto = crypto or load_crypto()
         self.answer_fn = answer_fn or load_answer()
         # What is REALLY loaded, read from the objects, never from what was asked for.

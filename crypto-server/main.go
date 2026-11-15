@@ -116,7 +116,7 @@ func main() {
 	s.logOut = json.NewEncoder(lf)
 	log.Printf("corpus source: %s; request log: %s", src, *logPath)
 
-	var handler http.Handler = s.routes(*publicLog)
+	var handler http.Handler = securityHeaders(s.routes(*publicLog))
 	if rc, on := rateConfigFromEnv(); on {
 		handler = newLimiter(rc).wrap(handler)
 		log.Printf("rate limits per client: %.0f question requests/min (burst %.0f), %.0f downloads/min (burst %.0f); "+
@@ -422,4 +422,16 @@ func (s *server) logged(endpoint string, h http.HandlerFunc) http.HandlerFunc {
 		}()
 		h(cw, r)
 	}
+}
+
+// securityHeaders: nosniff always; over HTTPS (directly or behind Render / nginx / Apache, which set
+// X-Forwarded-Proto), HSTS so clients never fall back to plain http for this host.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+			w.Header().Set("Strict-Transport-Security", "max-age=63072000")
+		}
+		next.ServeHTTP(w, r)
+	})
 }

@@ -16,8 +16,11 @@ RUN git clone --depth 1 --branch v4.1.1 https://github.com/microsoft/SEAL.git /s
 WORKDIR /src
 COPY third_party third_party
 COPY crypto-server crypto-server
-# Portable binary: the image may run on a different CPU than the one that built it.
-RUN sed -i 's/ -march=native//' third_party/underhood/rlwe/rlwe.go third_party/simplepir/matrix/matrix.go
+# Portable binary: Render (and most clouds) build on one CPU and run on another.
+# -march=native in ANY cgo file of a package applies to all its C code, so strip
+# it everywhere and fail the build if one remains.
+RUN grep -rl --include='*.go' -- '-march=native' third_party | xargs -r sed -i 's/ -march=native//g' \
+ && ! grep -rn --include='*.go' -- '-march=native' third_party
 RUN cd crypto-server && GOFLAGS=-mod=mod GOPROXY=off go build -o /out/crypto-server .
 
 FROM debian:bookworm-slim

@@ -32,6 +32,7 @@ import contracts as c  # noqa: E402
 from client import canned  # noqa: E402
 from client.evidence import supporting_excerpt  # noqa: E402
 from client.pipeline import Pipeline, PipelineError, health  # noqa: E402
+from client.multi import MultiPipeline, configured_servers  # noqa: E402
 
 PLAIN_DEFAULT = os.environ.get("BLIND_RAG_PLAIN_SERVER", "http://127.0.0.1:8001")
 DECOYS = [
@@ -205,9 +206,13 @@ def cached_health(server, crypto_kind, answer_kind):
     return health(server, crypto_kind, answer_kind)
 
 
-def get_pipeline(server):
-    if ss.get("pipeline_server") != server:
-        ss.pipeline, ss.pipeline_server = Pipeline(server=server), server
+def get_pipeline(servers):
+    servers = tuple(servers)
+    if ss.get("pipeline_server") != servers:
+        if "pipeline" in ss:
+            ss.pipeline.close()
+        ss.pipeline = Pipeline(server=servers[0]) if len(servers) == 1 else MultiPipeline(list(servers))
+        ss.pipeline_server = servers
     return ss.pipeline
 
 
@@ -391,7 +396,20 @@ def stat(n, label, sub, kind="m"):
 with st.sidebar:
     st.header("Settings")
     backend = st.radio("Backend", ["Pipeline", "Canned (layout only)"], key="backend")
-    server = st.text_input("Document server", os.environ.get("BLIND_RAG_SERVER", "http://127.0.0.1:8080"))
+    # Document servers: the user chooses which to search. Configure the list with BLIND_RAG_SERVERS
+    # (comma-separated) or BLIND_RAG_SERVER; more can be added here.
+    extra = [u.strip().rstrip("/") for u in st.text_input(
+        "Add document servers", "", placeholder="https://… (comma-separated)").split(",") if u.strip()]
+    offered = list(dict.fromkeys(configured_servers() + extra))
+    selected = st.multiselect("Search these document servers", offered, default=offered, key="servers")
+    if len(offered) > 1:
+        st.caption("Each selected server gets the same encrypted question and returns exactly 10 records, "
+                   "so it learns only that you asked, not what. Unselected servers learn nothing. Someone "
+                   "watching every server could see which ones you selected.")
+    if not selected:
+        st.warning("Select at least one document server.")
+        st.stop()
+    server = selected[0]   # primary: its log feeds the server panel
     plain_url = st.text_input("Plaintext demo server", PLAIN_DEFAULT).rstrip("/")
     st.caption(f"requested: crypto `{os.environ['BLIND_RAG_CRYPTO']}` · answer `{os.environ['BLIND_RAG_ANSWER']}` · "
                f"fetch `{os.environ.get('BLIND_RAG_FETCH', 'auto')}` · embed `{os.environ.get('BLIND_RAG_EMBED', 'real')}`")
@@ -427,6 +445,9 @@ st.markdown(f'<div style="margin-top:10px"><span class="br-mode {cls}">Next ques
 
 if not canned_mode:
     items = cached_health(server, "mock" if want_mock else "real", "stub" if want_stub else "real")
+    for extra_server in selected[1:]:   # one "Document server" row per additional selected server
+        items += [i for i in cached_health(extra_server, "mock" if want_mock else "real", "stub")
+                  if i["name"] == "Document server"]
     st.markdown('<div class="br-health">' + "".join(
         f'<span><span class="dot {"up" if h["ok"] else "down"}"></span><b>{esc(h["name"])}</b>: {esc(h["detail"])}'
         + (f' &nbsp;fix: <code>{esc(h["fix"])}</code>' if h["fix"] else "") + "</span>" for h in items)
@@ -464,7 +485,7 @@ with tab_ask:
                         def on_stage(name, secs):
                             st.write(f"{STAGE_LABEL[name]} · {secs:.2f} s")
                         try:
-                            result, trace = get_pipeline(server).ask_traced(question, on_stage)
+                            result, trace = get_pipeline(selected).ask_traced(question, on_stage)
                         except Exception:
                             status.update(label="Stopped: no answer", state="error", expanded=False)
                             raise

@@ -35,7 +35,7 @@ export default function App() {
     let alive = true
     const load = () => getStatus().then((s) => alive && setStatus(s)).catch(() => alive && setStatus(null))
     void load()
-    const t = setInterval(load, 20000)
+    const t = setInterval(load, 5000)
     return () => { alive = false; clearInterval(t) }
   }, [])
 
@@ -78,17 +78,23 @@ export default function App() {
         <button onClick={() => setXray(null)} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
           <Burrow size={32} mood="peek" /> Blind RAG
         </button>
-        <Health status={status} />
+        <div className="flex items-center gap-5">
+          <a href="http://localhost:8501" target="_blank" rel="noreferrer" title="Measured results, who sees what, and more"
+            className="hidden text-sm text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger sm:inline">
+            More evidence
+          </a>
+          <Health status={status} />
+        </div>
       </header>
 
       {xrayTurn ? (
-        <XRay turn={xrayTurn} number={xrayTurn.id} status={status} onBack={() => setXray(null)} />
+        <XRay turn={xrayTurn} turns={turns} number={xrayTurn.id} status={status} onBack={() => setXray(null)} />
       ) : turns.length === 0 ? (
         <Landing status={status} onAsk={onAsk}>{composer(false)}</Landing>
       ) : (
         <>
           <main className="relative z-[1] mx-auto max-w-[760px] px-5 pb-64">
-            {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} onXray={() => setXray(t.id)} />)}
+            {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} onXray={() => setXray(t.id)} onRetry={t.phase === 'error' && !busy ? () => void onAsk(t.question) : undefined} />)}
             <div ref={bottom} />
           </main>
           <div data-fixed className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4">

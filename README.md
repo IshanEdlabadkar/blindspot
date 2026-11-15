@@ -76,10 +76,11 @@ git clone https://github.com/IshanEdlabadkar/blindspot && cd blindspot
 pip install -r requirements-c.txt
 make seal                          # one time, builds Microsoft SEAL (~5 min)
 brew install ollama && brew services start ollama && ollama pull llama3.2:3b
-make demo                          # server + key helper + UI, real crypto
+make demo                          # the Vault web UI (React) on :8600, opens in your browser; needs FastAPI + Node 20.19+ (see web/README.md)
+make demo-streamlit                # the older Streamlit UI on :8501 (evidence tab, attacker console)
 ```
 
-`make demo` opens the app in your browser. Ask a question, then flip **Show what the server saw**.
+`make demo` opens the app in your browser. Ask a question, tick the unsealed-copy box, then open the receipt (**what left this laptop**). The Streamlit UI (`make demo-streamlit`, or the **More evidence** link) has the measured results and the "Who sees what" tables.
 
 ### Without the crypto toolchain
 
@@ -96,7 +97,8 @@ The app runs the real encrypted path unless you ask for the mock like this, and 
 
 | Command | What it does |
 | --- | --- |
-| `make demo` | Everything in one terminal with real crypto |
+| `make demo` | Everything in one terminal with real crypto, React UI on :8600 (opens itself) |
+| `make demo-streamlit` | The same stack with only the Streamlit UI on :8501 |
 | `make demo-compare` | The same, plus a plaintext "normal RAG" server for the side-by-side log contrast |
 | `make preflight` | 8-step smoke test before presenting |
 | `make stop` | Stop any server or helper left running (do this after `git pull`) |

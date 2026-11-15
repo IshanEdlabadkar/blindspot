@@ -1,7 +1,8 @@
 # Run from the repo root. Crypto targets need Go + SEAL (see SETUP.md).
 # DATA: folder with manifest.json, score_table.bin, fetch_store.bin (B writes artifacts/).
 DATA ?= artifacts
-.PHONY: seal test server helper integration demo demo-compare stop preflight corpus-expanded
+.PHONY: seal test server helper integration demo demo-streamlit demo-compare stop preflight corpus-expanded
+.DEFAULT_GOAL := demo
 
 seal:          ## one-time: build and install Microsoft SEAL 4.1.1
 	./scripts/install_seal.sh
@@ -34,10 +35,13 @@ measure:       ## with server + helper running: latency, bytes, CPU, log check -
 integration:   ## after merging A + C: real crypto vs mock, same top-k (~1 min)
 	python3 scripts/integration_check.py
 
-demo:          ## everything in one terminal: server + helper + plaintext demo server + UI (Ctrl+C stops all; PLAIN=0 skips the plaintext server)
+demo:          ## DEFAULT: the Vault web UI (React) on :8600, opened in your browser, with everything behind it (Ctrl+C stops all; LOCAL=1 offline)
+	./web/demo.sh
+
+demo-streamlit: ## the older Streamlit-only stack on :8501 (honours DATA=..., PLAIN=0)
 	./scripts/start_demo.sh
 
-demo-compare:  ## same as make demo (which now always starts B's plaintext server on :8001)
+demo-compare:  ## Streamlit stack with B's plaintext server on :8001 (same as demo-streamlit)
 	PLAIN=1 ./scripts/start_demo.sh
 
 stop:          ## stop the server, helper, plaintext server and UI left running (do this after git pull)
@@ -51,4 +55,4 @@ preflight:     ## with make demo running: every document server checked, then th
 
 corpus-expanded: ## alternative, not the demo setup: ONE combined corpus (MedlinePlus + Genetics + MyHealthfinder) for a single server
 	$$(./scripts/find_python.sh sentence_transformers) -m ingest.build_multi --out artifacts-expanded
-	@echo "Serve it with:  make stop && make demo DATA=artifacts-expanded"
+	@echo "Serve it with:  make stop && make demo-streamlit DATA=artifacts-expanded"

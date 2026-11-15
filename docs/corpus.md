@@ -45,6 +45,6 @@ The manifest gets a new `corpus_version`, so clients reload automatically.
 
 ## What was verified
 
-- Parsers tested on fixtures shaped like the real feeds (`tests/test_sources.py`). The feed structures were read from the live MedlinePlus Genetics JSON and MyHealthfinder API on Nov 14.
+- The feed structures were read from the live MedlinePlus Genetics JSON and MyHealthfinder API on Nov 14.
 - An offline build (B's real MedlinePlus chunks plus fixture pages, fake embeddings) was served by A's real crypto server: encrypted top 10 equalled plaintext top 10, with both download-all and batched PIR fetch.
 - **Not yet run against the live downloads.** The bulk Genetics file (`ghr-summaries.xml`) is parsed schema-tolerantly because its exact XML layout could not be inspected from the build workspace. Run `--dry-run` first and check the per-source counts are in the hundreds, not zero.

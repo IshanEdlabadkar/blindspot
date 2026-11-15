@@ -80,3 +80,11 @@ def test_configured_servers(monkeypatch):
     monkeypatch.delenv("BLIND_RAG_SERVERS")
     monkeypatch.setenv("BLIND_RAG_SERVER", "http://c")
     assert configured_servers() == ["http://c"]
+
+
+def test_same_passage_from_two_servers_is_used_once():
+    same = [ch(1, .9), ch(2, .8), ch(3, .7)]
+    m, seen = make(["http://local", "http://remote"], {"http://local": same, "http://remote": same})
+    m.ask_traced("q")
+    assert [c["id"] for c in seen["chunks"]] == [1, 2, 3]
+    assert [c["server"] for c in seen["chunks"]] == ["http://local"] * 3

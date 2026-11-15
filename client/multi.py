@@ -93,8 +93,16 @@ class MultiPipeline:
             i = ch.get("id")
             return (0, i, "") if isinstance(i, int) else (1, 0, str(i))   # numeric ids compare as numbers
         merged.sort(key=lambda ch: (-ch["score"], tie(ch), self.servers.index(ch["server"])))
+        # The same passage can come from two servers (e.g. the same corpus selected twice, local and remote):
+        # keep its best-scoring copy only, so duplicates don't crowd out other sources.
+        seen, unique = set(), []
+        for ch in merged:
+            key = (ch.get("url"), ch.get("text"))
+            if key not in seen:
+                seen.add(key)
+                unique.append(ch)
         k = min(t["top_k"] for _, t in results)
-        best = merged[:k]
+        best = unique[:k]
 
         t0 = time.perf_counter()
         result = self.pipes[0]._answer(question, best)

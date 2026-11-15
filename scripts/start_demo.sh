@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Start the whole real system in ONE terminal: A's server, the crypto-helper, then the UI.
 #   make demo            (Ctrl+C stops everything this script started)
-#   make demo-compare    same, plus B's plaintext server for the log contrast
+#   (B's plaintext "normal RAG" server on :8001 always starts too, for the log contrast;
+#    PLAIN=0 make demo skips it)
 #   BLIND_RAG_SERVER=https://host make demo   use a remote document server
 # Reuses a server or helper that is already running. Logs: data/server.out, data/helper.out
 set -euo pipefail
@@ -59,8 +60,8 @@ export BLIND_RAG_ANSWER="${BLIND_RAG_ANSWER:-real}"
 if [ "$BLIND_RAG_ANSWER" = real ] && ! up http://127.0.0.1:11434/api/tags; then
   echo "WARNING: Ollama is not answering on :11434. Run: brew services start ollama"
 fi
-# PLAIN=1 also starts B's plaintext "normal RAG server" for the side-by-side log contrast.
-if [ "${PLAIN:-0}" = 1 ]; then
+# B's plaintext "normal RAG server" for the side-by-side log contrast: on by default (PLAIN=0 skips it).
+if [ "${PLAIN:-1}" = 1 ]; then
   if up http://127.0.0.1:8001/health; then echo "  plaintext demo server already running, reusing it"
   else "$PY" -m baseline.server > data/plain.out 2>&1 & pids+=($!)
        wait_for "plaintext demo server (:8001, warming the model)" http://127.0.0.1:8001/health data/plain.out; fi

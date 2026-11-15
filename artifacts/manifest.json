@@ -1,0 +1,32 @@
+{
+  "protocol": "blind-rag/1",
+  "corpus_version": "2026-11-14.2",
+  "corpus_name": "MedlinePlus health topics (public domain subset)",
+  "attribution": "Source: MedlinePlus, National Library of Medicine",
+  "embedding": {
+    "model": "BAAI/bge-small-en-v1.5",
+    "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "dim": 384,
+    "normalize": "l2",
+    "query_prefix": "Represent this sentence for searching relevant passages: "
+  },
+  "quantization": {
+    "type": "int8",
+    "scale": 127
+  },
+  "scoring": {
+    "library": "set by crypto server",
+    "params": "set by crypto server"
+  },
+  "pir": {
+    "library": "set by crypto server",
+    "params": "set by crypto server",
+    "record_bytes": 2048
+  },
+  "num_chunks": 2101,
+  "top_k": 10,
+  "hashes": {
+    "score_table": "sha256:800ccea72576503bc41eb242c85db07705a49f60b2a092c597bb8e07d049a76b",
+    "fetch_store": "sha256:fb5ebc84b45e184c0abbb87667e700343225ee3f526ef9176498e7be612765a8"
+  }
+}

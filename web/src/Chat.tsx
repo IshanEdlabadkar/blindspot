@@ -69,7 +69,7 @@ export function Landing({ status, onAsk, children }: { status: Status | null; on
   const libs = (status?.servers ?? []).map((s) => short(s.name))
   const total = (status?.servers ?? []).reduce((n, s) => n + (s.num_chunks ?? 0), 0)
   return (
-    <main className="mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-8 px-5 pt-6 pb-16 md:grid-cols-[1fr_540px] md:gap-x-16">
+    <main className="relative z-[1] mx-auto grid min-h-[calc(100dvh-64px)] max-w-[1120px] content-center gap-y-8 px-5 pt-6 pb-16 md:grid-cols-[1fr_540px] md:gap-x-16">
       <div className="md:self-end">
         <h1 className="max-w-[16ch] text-[40px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[56px]">
           Ask the library something private.

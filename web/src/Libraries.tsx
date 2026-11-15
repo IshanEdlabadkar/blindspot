@@ -46,7 +46,7 @@ export function Libraries({ status, disabled, setDisabled, refresh }: {
         Libraries{status ? ` (${on} of ${servers.length})` : ''}
       </button>
       {open && (
-        <div role="dialog" aria-label="Libraries" className="slip typed absolute top-9 right-0 z-30 w-[min(440px,calc(100vw-2.5rem))] px-5 pt-6 pb-5 text-[15px] leading-6 text-ink">
+        <div role="dialog" aria-label="Libraries" className="slip typed absolute top-9 right-0 z-30 whitespace-normal w-[min(440px,calc(100vw-2.5rem))] px-5 pt-6 pb-5 text-[15px] leading-6 text-ink">
           <p className="font-display font-black">Libraries</p>
           <p className="text-graphite">Pick which ones your question goes to. Each searches its own documents without reading your question.</p>
           <ul className="mt-3 space-y-2">

@@ -90,7 +90,7 @@ export default function App() {
     <div className="desk relative min-h-dvh">
       <DeskObjects calm={view === 'sim' || xray !== null} viewKey={view === 'sim' ? 'sim' : xrayTurn ? `xray-${xrayTurn.id}` : turns.length && !home ? 'chat' : 'landing'}
         version={turns.map((t) => `${t.phase}${t.proof ? 'p' : ''}`).join(',')} />
-      <header className="relative z-[1] mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-4 whitespace-nowrap sm:px-5">
+      <header className="relative z-30 mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-4 whitespace-nowrap sm:px-5">
         <button aria-label="Blindspot, back to the home page" onClick={() => { setXray(null); setView('ask'); setHome(true) }} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
           <Burrow size={32} mood="peek" /> <span className="hidden sm:inline">Blindspot</span>
         </button>
@@ -104,10 +104,6 @@ export default function App() {
         </nav>
         <div className="flex items-center gap-3 sm:gap-5">
           <Libraries status={status} disabled={disabled} setDisabled={setDisabled} refresh={refresh} />
-          <a href="http://localhost:8501" target="_blank" rel="noreferrer" title="Measured results, who sees what, and more"
-            className="hidden text-sm text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger sm:inline">
-            More evidence
-          </a>
           <Health status={status} />
         </div>
       </header>

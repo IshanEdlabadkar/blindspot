@@ -122,8 +122,15 @@ Pass all k = 10 chunks; `answer()` uses the first 5 as sources. Each chunk may a
         {"id": int, "title": str, "url": str, "updated": str, "text": str, "score": float}
     ],
     "timings": {"embed_ms": float, "retrieve_ms": float, "answer_ms": float},  # optional keys
+    # Added by answer() (B4/B8); UIs may ignore them, the answer text already contains the notice:
+    "urgent": None | {"kind": "crisis" | "emergency", "message": str},   # deterministic 988 / 911 notice
+    "checks": {"removed_sentences": int},   # sentences dropped because their cited source did not support them
 }
 ```
+
+Each answered citation also carries `"excerpt"`: the sentence from that source that best supports the answer, for showing exact evidence.
+
+Every sentence in an answer cites a source the model was given, and that source (or the sources it cites together) contains at least half of the sentence's key terms. Unsupported sentences are removed; if none remain, the answer declines. A citation at the end of a paragraph covers that paragraph's earlier uncited sentences, which are still checked. No citation is ever added that the model did not write.
 
 ## 7. Server log line
 

@@ -526,8 +526,14 @@ def ask_plain_server(url, question):
         if not mine:
             return {"error": "The plaintext server answered but its log has no entry for this question."}
         return {"entry": mine[-1]}
-    except requests.RequestException:
-        return {"error": f"Plaintext demo server not reachable at {url}. Start it: python3.12 -m baseline.server"}
+    except requests.HTTPError as e:
+        return {"error": f"The plaintext demo server at {url} returned an error ({e.response.status_code}). "
+                         "Its terminal window shows why."}
+    except requests.Timeout:
+        return {"error": f"The plaintext demo server at {url} took longer than 3 minutes to answer."}
+    except requests.RequestException as e:
+        return {"error": f"Plaintext demo server problem at {url}: {type(e).__name__}. If it is not running, "
+                         "start it: python3.12 -m baseline.server"}
 
 
 # ---------------------------------------------------------------- evidence data
@@ -669,7 +675,7 @@ with tab_ask:
     status_box = st.container()
     compare = False
     if show_server and not canned_mode:
-        compare = st.checkbox("Also ask a normal server, for comparison",
+        compare = st.checkbox("Also ask a normal server, for comparison", key="compare_plain",
                               help="Off by default. When on, the question really is sent unencrypted to the "
                                    "plaintext demo server, so its log can be shown next to Blind RAG's.")
     with st.form("ask", clear_on_submit=True):

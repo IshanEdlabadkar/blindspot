@@ -143,10 +143,12 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
         <div className="hidden shrink-0 md:block"><Burrow size={88} mood="idle" /></div>
       </div>
 
+      <Scoreboard proof={turn.proof} />
+
       <div className="mt-10 flex flex-col gap-8 md:grid md:grid-cols-2 md:grid-rows-[repeat(7,auto)] md:gap-x-10 md:gap-y-0 lg:gap-x-14">
         <div className={paper}>
           <Sec>
-            <p className="text-center font-display text-[20px] font-black">Blind RAG</p>
+            <p className="text-center font-display text-[20px] font-black">Blindspot</p>
             <p className="text-center text-graphite">Sealed, receipt {slipNo(number)}</p>
             <p className="text-center text-graphite">{stamp(when)}</p>
           </Sec>
@@ -255,7 +257,6 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
           Sealing hides the words, not the fact that you asked.
         </p>
       </div>
-      <Scoreboard proof={turn.proof} />
     </main>
   )
 }

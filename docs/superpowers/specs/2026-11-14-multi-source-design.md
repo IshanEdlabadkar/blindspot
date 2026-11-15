@@ -4,7 +4,7 @@ Date: 2026-11-14 · Owner: B (ML and content), with changes for A and C listed b
 
 ## Goal
 
-Answer questions from several independent providers, each running its own Blind RAG document server, without any server learning the question, the scores, which chunks were read, or which server held the answer.
+Answer questions from several independent providers, each running its own Blindspot document server, without any server learning the question, the scores, which chunks were read, or which server held the answer.
 
 First three servers:
 

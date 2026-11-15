@@ -180,8 +180,8 @@ def render(rows: list[dict], summary: dict, md: str) -> str:
                          f'<div class="d">{html.escape(d)}</div></div>' for v, l, d in tiles)
     data = json.dumps({"rows": rows, "summary": summary}, ensure_ascii=False).replace("</", "<\\/")
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Blind RAG benchmark · {html.escape(m['name'])}</title><style>{CSS}</style></head><body><div class="viz-root">
-<h1>Blind RAG benchmark</h1>
+<title>Blindspot benchmark · {html.escape(m['name'])}</title><style>{CSS}</style></head><body><div class="viz-root">
+<h1>Blindspot benchmark</h1>
 <div class="meta">{html.escape(m['name'])} · commit {html.escape(m['commit'])} ({html.escape(m['branch'])}) · {html.escape(m['started_utc'])} · {html.escape(m['host'])}<br>
 servers {html.escape(', '.join(m['servers']))} · corpus {html.escape(m['corpus'])} · crypto {html.escape(m['crypto'])} · fetch {html.escape(m['fetch'])} ·
 embed {html.escape(m['embed'])} · answers {html.escape(m['answer'])} · {a['questions']} questions × {m['repeat']} · {a['errors']} errors · setup {m['setup_seconds']:.2f} s</div>

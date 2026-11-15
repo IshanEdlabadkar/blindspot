@@ -1,4 +1,4 @@
-# Blind RAG document server: code only. The corpus is NOT in the image; the
+# Blindspot document server: code only. The corpus is NOT in the image; the
 # server loads it at startup from the provider's storage and picks up new
 # versions on its own:
 #   docker build -t blind-rag-server .

@@ -35,7 +35,7 @@ def build(retrieval: list[dict], answers: list[dict], questions: list[dict], enc
     enc = lambda key: encrypted.get(key) if encrypted else "pending (needs A's server + C's pipeline)"
     rows = [
         ("Retrieval", "Right page in top 5 (int8)", _frac(sum(rank(r) is not None and rank(r) <= 5 for r in pos), len(pos))),
-        ("Retrieval", "Right page in top 10 (int8, what Blind RAG fetches)",
+        ("Retrieval", "Right page in top 10 (int8, what Blindspot fetches)",
          _frac(sum(rank(r) is not None and rank(r) <= 10 for r in pos), len(pos))),
         ("Retrieval", "Right page in top 10 (float, no quantization)",
          _frac(sum(frank(r) is not None and frank(r) <= 10 for r in pos), len(pos))),
@@ -88,7 +88,7 @@ def main():
 
     cats = by_category(answers)
     md = [
-        "# Blind RAG quality scorecard (part B)", "",
+        "# Blindspot quality scorecard (part B)", "",
         f"Commit `{commit}` · corpus `{manifest['corpus_version']}` ({manifest['num_chunks']} MedlinePlus chunks) · "
         f"{len(questions)} questions ({sum(q['expect'] == 'answer' for q in questions)} answerable) · "
         f"embedding `{MODEL_NAME}` · reranker `{RERANK_MODEL}` · answers `{MODEL}` on-device",

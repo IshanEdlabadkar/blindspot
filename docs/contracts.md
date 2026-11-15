@@ -1,4 +1,4 @@
-# Blind RAG: shared contracts
+# Blindspot: shared contracts
 
 Agreed in hour 0. Every placeholder and every real component follows these, so the real piece replaces the placeholder without code changes. Change a contract only after telling the other two people.
 

@@ -17,7 +17,7 @@ def test_scorecard_rows_carry_denominators_and_mark_encrypted_pending():
     ]
     questions = [{"question": "What is A1C?", "urgent": None}, {"question": "I want to die", "urgent": "crisis"}]
     rows = {m: v for _, m, v in build(retrieval, answers, questions, None)}
-    assert rows["Right page in top 10 (int8, what Blind RAG fetches)"] == "1/2 (50%)"
+    assert rows["Right page in top 10 (int8, what Blindspot fetches)"] == "1/2 (50%)"
     assert rows["Right page in top 10 (float, no quantization)"] == "2/2 (100%)"
     assert rows["Answerable questions answered"] == "1/2 (50%)"
     assert rows["Wrong answers (answered when it should decline)"] == "0/1 (0%)"

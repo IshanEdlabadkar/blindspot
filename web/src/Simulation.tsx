@@ -28,7 +28,7 @@ function Grid({ people, side, tl, selected, last, onPick }: {
   people: Person[]; side: 'typical' | 'blind'; tl: ReturnType<typeof tally>; selected: number | null; last: number | null; onPick: (id: number) => void
 }) {
   return (
-    <div className="grid max-w-[340px] grid-cols-10 gap-1" role="group" aria-label={side === 'typical' ? 'Patrons the typical library has a file on' : 'Patrons who connected to the Blind RAG library'}>
+    <div className="grid max-w-[340px] grid-cols-10 gap-1" role="group" aria-label={side === 'typical' ? 'Patrons the typical library has a file on' : 'Patrons who connected to the Blindspot library'}>
       {people.map((p) => {
         const seen = tl.profiled.has(p.id), named = tl.ident.has(p.id)
         const look = side === 'typical'
@@ -44,7 +44,7 @@ function Grid({ people, side, tl, selected, last, onPick }: {
   )
 }
 
-export function Simulation({ lastQuestion }: { lastQuestion?: string; trace?: Trace }) {
+export function Simulation({ lastQuestion, examples }: { lastQuestion?: string; examples?: string[]; trace?: Trace }) {
   const base = useMemo(() => makePeople(), [])
   const scheduled = useMemo(() => makeEvents(base), [base])
   const [yours, setYours] = useState<{ person: Person; event: SimEvent }[]>([])
@@ -189,9 +189,9 @@ export function Simulation({ lastQuestion }: { lastQuestion?: string; trace?: Tr
           </div>
         </section>
 
-        <section className="receipt typed min-w-0 px-6 pt-6 pb-10 text-[14px] leading-6 text-ink" aria-label="Blind RAG library ledger">
+        <section className="receipt typed min-w-0 px-6 pt-6 pb-10 text-[14px] leading-6 text-ink" aria-label="Blindspot library ledger">
           <div className="flex items-start justify-between gap-3">
-            <div><h2 className="text-[19px] leading-6 font-black">The Blind RAG library</h2><p className="text-graphite">Ledger of what it wrote down</p></div>
+            <div><h2 className="text-[19px] leading-6 font-black">The Blindspot library</h2><p className="text-graphite">Ledger of what it wrote down</p></div>
             <Stamp read={false} />
           </div>
           <Cut />
@@ -258,7 +258,7 @@ export function Simulation({ lastQuestion }: { lastQuestion?: string; trace?: Tr
                   <article className="catalog typed px-6 pt-[52px] pb-14 text-[15px] sm:px-8">
                     <div className="absolute inset-x-6 top-3 flex items-baseline justify-between gap-4 sm:inset-x-8">
                       <span className="truncate text-[15px] font-bold text-ink">{who}</span>
-                      <span className="shrink-0 text-[14px] text-graphite">Blind RAG library</span>
+                      <span className="shrink-0 text-[14px] text-graphite">Blindspot library</span>
                     </div>
                     <p><span className="text-graphite">asked </span>nothing it can read</p>
                     <p><span className="text-graphite">tracking id </span>none, each request stands alone</p>
@@ -299,7 +299,7 @@ export function Simulation({ lastQuestion }: { lastQuestion?: string; trace?: Tr
               </p>
             </div>
             <div className="bg-card shadow-paper">
-              <p className="flex items-center justify-between gap-3 border-b-2 border-sealed px-5 py-3 font-display text-[15px] font-black">Blind RAG library <Stamp read={false} /></p>
+              <p className="flex items-center justify-between gap-3 border-b-2 border-sealed px-5 py-3 font-display text-[15px] font-black">Blindspot library <Stamp read={false} /></p>
               <div className="typed max-h-[340px] overflow-auto px-5 py-3 text-[13px] leading-5">
                 {events.length === 0 && <p className="text-graphite">Nothing yet. Run the simulation first.</p>}
                 {events.map((e) => {
@@ -314,13 +314,13 @@ export function Simulation({ lastQuestion }: { lastQuestion?: string; trace?: Tr
           </div>
         )}
         {dump && yours.length > 0 && (
-          <div className="mt-8 max-w-[560px]"><Attacker turn={attackerTurn} /></div>
+          <div className="mt-8 max-w-[560px]"><Attacker turn={attackerTurn} pool={examples} /></div>
         )}
       </section>
 
       <p className="mt-14 max-w-[70ch] text-[13px] leading-5 text-graphite">
         The hundred patrons, their questions, addresses and sealed requests are made up. Labels and ads come from a simple word-matching rule, a stand-in for real ad tech.
-        The Blind RAG library still sees that a request happened, when, from which address. It cannot see what was asked, how passages scored or which were fetched.
+        The Blindspot library still sees that a request happened, when, from which address. It cannot see what was asked, how passages scored or which were fetched.
       </p>
     </main>
   )

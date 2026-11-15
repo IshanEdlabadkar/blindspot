@@ -184,7 +184,7 @@ def main():
                 else "< 10 core-ms (below the OS timer's resolution)" if med["server_cpu"] < 0.01
                 else f"{med['server_cpu']*1000:.0f} core-ms" if med["server_cpu"] < 1 else f"{med['server_cpu']:.2f} core-s")
     lines = [
-        f"# Blind RAG crypto measurements",
+        f"# Blindspot crypto measurements",
         "",
         f"Client: {platform.node()} ({platform.system()} {platform.machine()}), server: {a.server}, "
         f"N = {n}, d = {d}, k = {k}, {a.questions} questions, {a.think:g} s between questions. "

@@ -1,4 +1,4 @@
-"""Plaintext MOCK of A's Go crypto server. NOT PRIVATE. Never demo this as Blind RAG.
+"""Plaintext MOCK of A's Go crypto server. NOT PRIVATE. Never demo this as Blindspot.
 
 Same three endpoints and the same log line as the real server, no encryption.
 

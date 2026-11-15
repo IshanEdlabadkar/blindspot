@@ -1,4 +1,4 @@
-"""Benchmark the Blind RAG pipeline: accuracy, speed, and a full trace of every question.
+"""Benchmark the Blindspot pipeline: accuracy, speed, and a full trace of every question.
 
 Runs eval questions through the real client pipeline (encrypted scoring + private fetch + rerank +
 local model), one or several document servers, and records for every question:
@@ -561,7 +561,7 @@ def _kb(n):
 
 def report_md(summary: dict) -> str:
     m, a, s, b, p = summary["meta"], summary["accuracy"], summary["speed"], summary["bytes"], summary["privacy"]
-    L = [f"# Blind RAG benchmark: {m['name']}", "",
+    L = [f"# Blindspot benchmark: {m['name']}", "",
          f"`{m['commit']}` ({m['branch']}) · {m['started_utc']} · {m['host']}  ",
          f"servers: {', '.join(m['servers'])} · corpus {m['corpus']} · crypto `{m['crypto']}` · fetch `{m['fetch']}` "
          f"· embed `{m['embed']}` · answers `{m['answer']}`  ",

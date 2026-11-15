@@ -85,6 +85,9 @@ Each corpus is its own provider with its own server, in its own folder of the vo
    doesn't answer is replaced by a local server from its backup in `artifacts/<id>/`. `LOCAL=1 make demo` is fully offline.
    Databricks is always the first source; the copies in the repo are the backup.
 
+Moving a service to a folder that holds the **same `corpus_version`** (a rename) needs **Manual Deploy > Restart service**:
+the server only swaps live when the version changes. A new `corpus_version` is picked up within a minute, no restart.
+
 ## 4. The demo laptop
 
 ```bash

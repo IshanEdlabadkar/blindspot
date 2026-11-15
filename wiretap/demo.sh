@@ -3,12 +3,13 @@
 # laptop, so the UI can search that traffic for the asker's words ("🔍 Search the traffic for your words",
 # shown when "Show what the server saw" is on).
 #
-#   ./wiretap/demo.sh                      # local MedlinePlus (:8080) + local FMLA (:8081) + plain (:8001)
-#   MEDLINEPLUS_URL=https://a.onrender.com FMLA_URL=https://b.onrender.com ./wiretap/demo.sh   # remote servers
-#   FMLA=0 ./wiretap/demo.sh               # MedlinePlus only
+#   ./wiretap/demo.sh            every document server in servers.remote.json (hosted, corpora on Databricks);
+#                                one that doesn't answer falls back to a local server on its backup in artifacts/<id>/
+#   LOCAL=1 ./wiretap/demo.sh    every server in servers.json, all local (offline)
 #
-# Relays: :9080 -> MedlinePlus, :9081 -> FMLA, :9001 -> the plaintext "normal RAG" server.
-# Recording: data/wire/wire.jsonl (emptied at every start). Ctrl+C stops everything this script started.
+# Relays: :9080, :9081, ... -> the document servers in list order (MedlinePlus, FMLA, Genetics, MyHealthfinder),
+# :9001 -> the plaintext "normal RAG" server. Recording: data/wire/wire.jsonl (emptied at every start).
+# Ctrl+C stops everything this script started. (./web/demo.sh does the same for the Vault web UI.)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p data
@@ -17,35 +18,54 @@ export PYTHON="$PY"
 pids=()
 cleanup() { for p in ${pids[@]+"${pids[@]}"}; do kill "$p" 2>/dev/null || true; done; }
 trap cleanup EXIT
-up() { curl -fsS -o /dev/null --max-time 2 "$1" 2>/dev/null; }
+up() { curl -fsS -o /dev/null --max-time "${2:-3}" "$1" 2>/dev/null; }
+wait_up() { for _ in $(seq 1 "${3:-120}"); do up "$1" && return 0; sleep 0.5; done; echo "ERROR: $2 did not start"; return 1; }
 
-MEDLINEPLUS_URL="${MEDLINEPLUS_URL:-http://127.0.0.1:8080}"
-routes=(--route "medlineplus:9080=$MEDLINEPLUS_URL" --route "plain:9001=${PLAIN_URL:-http://127.0.0.1:8001}")
-servers="http://127.0.0.1:9080"
+LIST=servers.remote.json; [ "${LOCAL:-0}" = 1 ] && LIST=servers.json
+ENTRIES=()   # macOS bash 3.2 has no mapfile
+while IFS= read -r line; do ENTRIES+=("$line"); done < <("$PY" -c 'import json,sys; [print(s["id"], s["url"]) for s in json.load(open(sys.argv[1]))]' "$LIST")
+echo "Document servers from $LIST:"
 
-if [ "${FMLA:-1}" != 0 ]; then
-  if [ -z "${FMLA_URL:-}" ]; then
-    FMLA_URL=http://127.0.0.1:8081
-    if ! up "$FMLA_URL/v1/manifest"; then
-      [ -f artifacts/fmla/manifest.json ] || { echo "ERROR: artifacts/fmla/ missing: uv run python -m ingest.build --source fmla"; exit 1; }
-      (cd crypto-server && go build -o crypto-server .)
-      ./crypto-server/crypto-server -data artifacts/fmla -addr 127.0.0.1:8081 -log data/server-fmla.log \
-        > data/server-fmla.out 2>&1 & pids+=($!)
-      for _ in $(seq 1 60); do up "$FMLA_URL/v1/manifest" && break; sleep 0.5; done
-      up "$FMLA_URL/v1/manifest" || { echo "ERROR: FMLA server did not start; see data/server-fmla.out"; exit 1; }
-      echo "  FMLA document server (:8081) ready"
-    fi
+built=0
+local_server() {  # id port -> starts a local document server on artifacts/<id>
+  [ -f "artifacts/$1/manifest.json" ] || { echo "ERROR: artifacts/$1/ missing"; exit 1; }
+  [ $built = 1 ] || { (cd crypto-server && go build -o crypto-server .) && built=1; }
+  ./crypto-server/crypto-server -data "artifacts/$1" -addr "127.0.0.1:$2" -log "data/server-$1.log" \
+    > "data/server-$1.out" 2>&1 & pids+=($!)
+  wait_up "http://127.0.0.1:$2/v1/manifest" "local $1 server"
+}
+
+# Wake every hosted server at once (a sleeping free Render service takes up to ~1 min).
+for e in "${ENTRIES[@]}"; do
+  url=${e#* }
+  [[ $url == http://127.0.0.1:* || $url == http://localhost:* ]] || { curl -s -o /dev/null --max-time 90 "$url/v1/manifest" & }
+done
+wait
+
+routes=(--route "plain:9001=${PLAIN_URL:-http://127.0.0.1:8001}")
+relays=()
+i=0
+for e in "${ENTRIES[@]}"; do
+  id=${e%% *}; url=${e#* }
+  if [[ $url == http://127.0.0.1:* || $url == http://localhost:* ]]; then
+    up "$url/v1/manifest" || local_server "$id" "${url##*:}"
+    echo "  $id: local $url"
+  elif up "$url/v1/manifest" 15; then
+    echo "  $id: hosted $url"
+  else
+    url="http://127.0.0.1:$((8080 + i))"; echo "  $id: hosted server did not answer, using the local backup on $url"
+    up "$url/v1/manifest" || local_server "$id" "${url##*:}"
   fi
-  routes+=(--route "fmla:9081=$FMLA_URL")
-  servers="$servers,http://127.0.0.1:9081"
-fi
+  routes+=(--route "$id:$((9080 + i))=$url"); relays+=("http://127.0.0.1:$((9080 + i))")
+  i=$((i + 1))
+done
+servers=$(IFS=,; echo "${relays[*]}")
 
 "$PY" -m wiretap.proxy --fresh "${routes[@]}" > data/wiretap.out 2>&1 & pids+=($!)
-for _ in $(seq 1 20); do grep -q "recording to" data/wiretap.out 2>/dev/null && break; sleep 0.25; done
+wait_up "http://127.0.0.1:9080/v1/manifest" "recording relay" 40
 cat data/wiretap.out
 
-# make demo starts the local MedlinePlus server, the key helper, the plaintext server and the UI;
-# the UI talks to the servers only through the relays.
-case "$MEDLINEPLUS_URL" in http://127.0.0.1:8080*) ;; *) export BLIND_RAG_SERVER="$MEDLINEPLUS_URL" ;; esac
+# make demo starts the key helper, the plaintext server and the UI; with WIRETAP_SERVERS set it starts
+# no document servers of its own, and the UI talks to the servers above only through the relays.
 export BLIND_RAG_SERVERS="$servers" WIRETAP_SERVERS="$servers" BLIND_RAG_PLAIN_SERVER=http://127.0.0.1:9001
 make demo

@@ -36,8 +36,9 @@ def utc_now() -> str:
 
 
 def configured_servers() -> list[str]:
-    raw = os.environ.get("BLIND_RAG_SERVERS") or os.environ.get("BLIND_RAG_SERVER", "http://127.0.0.1:8080")
-    return [s.strip().rstrip("/") for s in raw.split(",") if s.strip()]
+    """BLIND_RAG_SERVERS / BLIND_RAG_SERVER, else every server in servers.remote.json (all four hosted ones)."""
+    from client.multi import configured_servers as from_list
+    return from_list()
 
 
 def default_pipeline(servers: list[str]):

@@ -17,14 +17,19 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from client.multi import configured_servers  # noqa: E402
+
 ap = argparse.ArgumentParser()
-ap.add_argument("--server", default=os.environ.get("BLIND_RAG_SERVER", "http://127.0.0.1:8080"))
+# Default: the first configured server (servers.remote.json: the hosted MedlinePlus server). `make preflight`
+# first checks every server in the list with scripts/check_servers.py; this runs the deep checks on one.
+ap.add_argument("--server", default=os.environ.get("BLIND_RAG_SERVER") or configured_servers()[0])
 ap.add_argument("--answer", choices=["real", "stub"], default="real")
 ap.add_argument("--embed", choices=["real", "fake"], default=os.environ.get("BLIND_RAG_EMBED", "real"))
 ap.add_argument("--question", default="How is chlamydia treated and can I get it again?")
 ap.add_argument("--off-topic", default="Can my landlord evict me for reporting mold?")
-ap.add_argument("--log", default=str(ROOT / "data" / "server.log"))
-ap.add_argument("--data", default=os.environ.get("DATA", "artifacts"), help="corpus folder the server was started on")
+ap.add_argument("--log", default="auto", help="auto: data/server.log for a local server, <server>/v1/server_log for a hosted one")
+ap.add_argument("--data", default=os.environ.get("DATA"),
+                help="local copy of the server's corpus (default: artifacts/<source_id>/, else artifacts/)")
 args = ap.parse_args()
 os.environ["BLIND_RAG_EMBED"] = args.embed
 
@@ -52,6 +57,9 @@ if "FAIL" in results:
 
 # 2. manifest matches the local tables
 m = requests.get(args.server + "/v1/manifest", timeout=10).json()
+if not args.data:
+    sid = m.get("source_id")
+    args.data = f"artifacts/{sid}" if sid and (ROOT / "artifacts" / sid / "manifest.json").exists() else "artifacts"
 DATA_DIR = ROOT / args.data
 local = json.loads((DATA_DIR / "manifest.json").read_text())
 check(f"2. corpus_version matches {args.data}/", m["corpus_version"] == local["corpus_version"],
@@ -100,16 +108,26 @@ else:
     check("6. off-topic question declines", None, "needs --answer real --embed real")
 
 # 7. the server log holds the four agreed fields and none of the question
-log = pathlib.Path(args.log)
-if log.exists():
-    text = log.read_text()
+remote = not any(h in args.server for h in ("127.0.0.1", "localhost"))
+if args.log == "auto":
+    args.log = args.server + "/v1/server_log" if remote else str(ROOT / "data" / "server.log")
+text = None
+if args.log.startswith("http"):
+    try:
+        r = requests.get(args.log, params={"n": 200}, timeout=20)
+        text = r.text if r.status_code == 200 else None
+    except requests.RequestException:
+        text = None
+elif pathlib.Path(args.log).exists():
+    text = pathlib.Path(args.log).read_text()
+if text is not None:
     lines = [json.loads(x) for x in text.splitlines() if x.strip()]
     check("7. server log lines have only ts, endpoint, response_bytes, latency_ms",
           all(set(x) == set(c.LOG_FIELDS) for x in lines), f"{len(lines)} lines")
     words = [w for w in args.question.lower().split() if len(w) > 5]
     check("7. no word of the question is in the server log", not any(w in text.lower() for w in words))
 else:
-    check("7. server log readable", None, f"{log} not found (remote server?)")
+    check("7. server log readable", None, f"{args.log} not readable (public log off?)")
 
 # 8. warm numbers for the slide
 t0 = time.perf_counter()

@@ -44,10 +44,12 @@ start_local() {  # url data_dir
 # answer is replaced by a local server from its backup in artifacts/<id>/, if the repo has one.
 # LOCAL=1: everything local from servers.json (offline).
 servers=()   # each: url|backup_dir|local_url
-if [ -n "${BLIND_RAG_SERVER:-}" ] || [ -n "${WIRETAP_SERVERS:-}" ]; then
-  # (WIRETAP_SERVERS: ./wiretap/demo.sh already runs the servers behind its recording relays)
-  one="${BLIND_RAG_SERVER:-http://127.0.0.1:8080}"
-  servers=("${one%/}|$DATA|http://127.0.0.1:8080")
+if [ -n "${WIRETAP_SERVERS:-}" ]; then
+  # ./web/demo.sh or ./wiretap/demo.sh already chose the document servers (hosted, or local backups)
+  # and put the recording relays in front of them; start none here.
+  servers=()
+elif [ -n "${BLIND_RAG_SERVER:-}" ]; then
+  servers=("${BLIND_RAG_SERVER%/}|$DATA|http://127.0.0.1:8080")
 elif [ "$DATA" != artifacts ]; then
   servers=("http://127.0.0.1:8080|$DATA|http://127.0.0.1:8080")
 else
@@ -66,7 +68,7 @@ is_local() { case "$1" in http://127.0.0.1:*|http://localhost:*) return 0 ;; esa
 
 # Wake every hosted server at once (a sleeping free Render service takes up to ~1 min), then check each.
 wake=()
-for s in "${servers[@]}"; do
+for s in ${servers[@]+"${servers[@]}"}; do
   url=${s%%|*}; is_local "$url" || { curl -s -o /dev/null --max-time 90 "$url/v1/manifest" & wake+=($!); }
 done
 if [ ${#wake[@]} -gt 0 ]; then
@@ -74,7 +76,7 @@ if [ ${#wake[@]} -gt 0 ]; then
   wait "${wake[@]}" 2>/dev/null || true
 fi
 urls=()
-for s in "${servers[@]}"; do
+for s in ${servers[@]+"${servers[@]}"}; do
   IFS='|' read -r url dir lurl <<< "$s"
   if is_local "$url"; then
     start_local "$url" "${dir:-artifacts}"; urls+=("$url")
@@ -87,8 +89,8 @@ for s in "${servers[@]}"; do
     echo "  WARNING: $url did not answer and the repo has no backup for it; leaving it out"
   fi
 done
-[ ${#urls[@]} -gt 0 ] || { echo "ERROR: no document server available."; exit 1; }
-BLIND_RAG_SERVERS=$(IFS=,; echo "${urls[*]}"); export BLIND_RAG_SERVERS
+[ ${#urls[@]} -gt 0 ] || [ -n "${WIRETAP_SERVERS:-}" ] || { echo "ERROR: no document server available."; exit 1; }
+BLIND_RAG_SERVERS=$(IFS=,; echo "${urls[*]:-}"); export BLIND_RAG_SERVERS
 [ -z "${WIRETAP_SERVERS:-}" ] || BLIND_RAG_SERVERS="$WIRETAP_SERVERS"   # keep the UI on the recording relays
 unset BLIND_RAG_SERVER
 echo "  the UI offers: $BLIND_RAG_SERVERS"

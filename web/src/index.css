@@ -109,12 +109,9 @@ h1, h2 { font-family: var(--font-display); }
 /* Text on a catalog card sits on its ruled lines: one 28px rhythm for everything typed on it. */
 .catalog p, .catalog li, .catalog ol { line-height: 28px; }
 
-/* Themes. The desk goes dark; paper objects stay warm paper so the library idea holds and type on them keeps its contrast.
-   data-theme="paper" is the original light look. */
-[data-theme="night"]  { --color-blotter:#141A19; --color-blotter-dark:#0E1312; --d-ink:#F2EEE4; --d-graphite:#A9B2AB; --d-badger:#FF6B63; --d-sealed:#93ABFF; --d-dot:rgba(255,255,255,.045); }
-[data-theme="ink"]    { --color-blotter:#0E1424; --color-blotter-dark:#090E1A; --d-ink:#EEF1FA; --d-graphite:#A2ACC6; --d-badger:#FF7B7B; --d-sealed:#9DB4FF; --d-dot:rgba(160,180,255,.06); }
+/* The Ember theme is the only look: the desk goes dark; paper objects stay warm paper so the library idea holds and type on them keeps its contrast.
+   Ember = dark maroon desk, set on <html data-theme="ember">. */
 [data-theme="ember"]  { --color-blotter:#1C1112; --color-blotter-dark:#130A0B; --d-ink:#F6ECE8; --d-graphite:#C3AFA9; --d-badger:#FF7A6B; --d-sealed:#A9B8FF; --d-dot:rgba(255,200,180,.05); }
-[data-theme="forest"] { --color-blotter:#0F1D17; --color-blotter-dark:#09130F; --d-ink:#EEF3E8; --d-graphite:#A3B5A8; --d-badger:#FF7A68; --d-sealed:#9BB6FF; --d-dot:rgba(190,255,210,.05); }
 :root:not([data-theme="paper"]) .desk {
   --color-ink: var(--d-ink); --color-graphite: var(--d-graphite); --color-badger: var(--d-badger);
   --color-stamp: var(--d-badger); --color-sealed: var(--d-sealed); --color-rule: #5C6F8A;
@@ -128,7 +125,7 @@ h1, h2 { font-family: var(--font-display); }
 :root:not([data-theme="paper"]) .bg-badger { background-color:#C5050C; color:#fff; }
 :root:not([data-theme="paper"]) .bg-badger:hover { background-color:#A8040A; }
 :root:not([data-theme="paper"]) .desk > header ~ * .press.bg-ink { background-color:#EDE6D3; color:#1E1C1A; }
-:root:not([data-theme="paper"]) :is(.slip) .press.bg-ink { background-color:#1E1C1A; color:#FFFDF8; }
+:root:not([data-theme="paper"]) .desk > header ~ * .slip .press.bg-ink { background-color:#1E1C1A; color:#FFFDF8; }
 :root:not([data-theme="paper"]) .desk-object svg [stroke="#1E1C1A"] { stroke:#CFC9B8; }
 :root:not([data-theme="paper"]) .desk-object { filter: drop-shadow(0 2px 5px rgba(0,0,0,.55)) !important; }
 :root:not([data-theme="paper"]) ::selection { background: var(--color-highlighter); color:#1E1C1A; }

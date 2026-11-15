@@ -1,20 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { fmtBytes, type Trace } from './api'
+import type { Trace } from './api'
 import { Attacker } from './Attacker'
 import { Burrow } from './Burrow'
 import { CATS, catOf, classify, clock, hex, makeEvents, makePeople, rng, tally, type Person, type SimEvent } from './sim'
 import type { Turn } from './turn'
-
-type Sizes = { score: [number, number]; fetch: [number, number] }
-const DEFAULT_SIZES: Sizes = { score: [1_900_000, 2_200_000], fetch: [900_000, 400_000] }
-
-/** Use the byte counts from the last real question when there is one, so the sealed log matches what this laptop really sent. */
-function sizesFrom(trace?: Trace): { sizes: Sizes; real: boolean } {
-  const reqs = trace?.servers?.[0]?.requests ?? trace?.requests ?? []
-  const score = reqs.find((r) => /score/.test(r.endpoint)), fetch = reqs.find((r) => /fetch/.test(r.endpoint))
-  if (!score || !fetch) return { sizes: DEFAULT_SIZES, real: false }
-  return { sizes: { score: [score.request_bytes, score.response_bytes], fetch: [fetch.request_bytes, fetch.response_bytes] }, real: true }
-}
 
 function Tally({ label, value, strong }: { label: string; value: number | string; strong?: boolean }) {
   return (
@@ -55,7 +44,7 @@ function Grid({ people, side, tl, selected, last, onPick }: {
   )
 }
 
-export function Simulation({ lastQuestion, trace }: { lastQuestion?: string; trace?: Trace }) {
+export function Simulation({ lastQuestion }: { lastQuestion?: string; trace?: Trace }) {
   const base = useMemo(() => makePeople(), [])
   const scheduled = useMemo(() => makeEvents(base), [base])
   const [yours, setYours] = useState<{ person: Person; event: SimEvent }[]>([])
@@ -84,7 +73,6 @@ export function Simulation({ lastQuestion, trace }: { lastQuestion?: string; tra
   const events = useMemo(() => [...scheduled.slice(0, done), ...yours.map((y) => y.event)].sort((a, b) => a.t - b.t || a.n - b.n), [scheduled, done, yours])
   const tl = useMemo(() => tally(events), [events])
   const lastPid = events.length ? events[events.length - 1].pid : null
-  const { sizes, real } = useMemo(() => sizesFrom(trace), [trace])
   const finished = done >= scheduled.length
 
   // Sealed bytes for each request line: fixed per event so they don't flicker between renders.
@@ -227,13 +215,12 @@ export function Simulation({ lastQuestion, trace }: { lastQuestion?: string; tra
               const p = people.find((x) => x.id === e.pid)!
               return (
                 <div key={e.n} className="h-12">
-                  <p className="truncate"><span className="text-graphite">{clock(e.t)} {p.ip} </span>score {fmtBytes(sizes.score[0])}</p>
+                  <p className="truncate"><span className="text-graphite">{clock(e.t)} {p.ip} </span>score</p>
                   <p className="hex truncate text-sealed">{sealed(e, 0)}{sealed(e, 1)}</p>
                 </div>
               )
             })}
           </div>
-          <p className="mt-2 text-[13px] text-graphite">Sizes are {real ? 'from your last real question' : 'typical, until you ask a real one'}. Each question also makes a fetch of about {fmtBytes(sizes.fetch[0])}.</p>
         </section>
       </div>
 
@@ -332,7 +319,7 @@ export function Simulation({ lastQuestion, trace }: { lastQuestion?: string; tra
       </section>
 
       <p className="mt-14 max-w-[70ch] text-[13px] leading-5 text-graphite">
-        The hundred patrons, their questions, addresses and sealed bytes are made up. Labels and ads come from a simple word-matching rule, a stand-in for real ad tech.
+        The hundred patrons, their questions, addresses and sealed requests are made up. Labels and ads come from a simple word-matching rule, a stand-in for real ad tech.
         The Blind RAG library still sees that a request happened, when, from which address and how big. It cannot see what was asked, how passages scored or which were fetched.
       </p>
     </main>

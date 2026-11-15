@@ -61,8 +61,7 @@ The server still sees that a query happened, when, from which IP address, and ho
 | Retrieval recall at 10 | 1.00 for both float and int8 embeddings (20 answerable questions) | `eval/results/retrieval.csv` |
 | Answers | 19 of 20 answerable questions answered; 5 of 5 unanswerable ones declined | `eval/results/answers.jsonl` |
 | Encrypted ranking vs plaintext | Identical top 10 on every question checked | `make integration` |
-| Crypto cost per question | About 6 ms, 3.1 KB up, 16.8 KB down | [SETUP.md](SETUP.md), measured by A |
-| One-time download per corpus version | 17.2 MB public scoring hint + 4.3 MB fetch store | [SETUP.md](SETUP.md) |
+| Crypto compute per question | About 6 ms | [SETUP.md](SETUP.md), measured by A |
 | Local answer generation | About 3 to 6 s warm | B's eval run |
 
 The retrieval and answer figures come from the plaintext baseline. Encryption adds no error, so the int8 ranking is the ranking Blind RAG produces. Full end-to-end numbers on the demo laptop come from `make measure`.

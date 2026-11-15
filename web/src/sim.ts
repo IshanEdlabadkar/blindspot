@@ -1,5 +1,5 @@
 // A hundred made-up patrons asking sensitive questions, for the "100 people" tab.
-// Everything here is synthetic: names, questions, addresses, sealed bytes. Ad labels come from a plain
+// Everything here is synthetic: names, questions, addresses, sealed requests. Ad labels come from a plain
 // word-matching rule, a stand-in for real ad tech, not a claim about how any real company profiles people.
 
 export type Cat = { id: string; label: string; segment: string; guess: string; ads: string[]; kw: string[]; queries: string[] }

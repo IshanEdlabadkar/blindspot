@@ -100,7 +100,7 @@ export default function App() {
 
       <div className={view === 'sim' ? 'hidden' : ''}>
         {xrayTurn ? (
-          <XRay turn={xrayTurn} turns={turns} number={xrayTurn.id} status={status} onBack={() => setXray(null)} />
+          <XRay turn={xrayTurn} number={xrayTurn.id} status={status} onBack={() => setXray(null)} />
         ) : turns.length === 0 ? (
           <Landing status={status} onAsk={onAsk}>{composer(false)}</Landing>
         ) : (

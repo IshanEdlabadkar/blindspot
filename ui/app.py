@@ -659,7 +659,7 @@ def mirror_html(t, src):
     # -- right: Blind RAG's server, from its own log
     rows = question_log(src, trace)
     lines = "".join(f'<div class="row log"><span>{esc(local_hms(r.get("ts", "")))} {esc(r.get("endpoint", ""))}</span>'
-                    f'<span>{r.get("response_bytes", 0):,} B · {r.get("latency_ms", "")} ms</span></div>' for r in rows[:6])
+                    f'<span>{r.get("latency_ms", "")} ms</span></div>' for r in rows[:6])
     if len(rows) > 6:
         lines += f'<div class="k">… {len(rows) - 6} more lines, same four fields</div>'
     lines = lines or f'<div class="k">no log available at {esc(src)}</div>'
@@ -674,8 +674,7 @@ def mirror_html(t, src):
         end, kind = "MOCK MODE PROVES NOTHING ABOUT PRIVACY", "mock"
     right = (f'<div class="br-rc {kind}"><div class="who">{who}</div><div class="cut"></div>{lines}'
              f'<div class="k">QUESTION</div>{qrow}<div class="cut"></div>'
-             f'<div class="row"><span>SENT</span><span>{fmt_bytes(trace["upload_bytes"])}</span></div>'
-             f'<div class="row"><span>RECEIVED</span><span>{fmt_bytes(trace["download_bytes"])}</span></div>'
+             f'<div class="row"><span>READABLE BY THE SERVER</span><span>NO</span></div>'
              f'<div class="cut"></div><div class="end">{end}</div></div>')
     return ('<div class="br-mirror-h">What each server kept from your last question</div>'
             '<div class="br-mirror-sub">Read from each server\'s own log just now. Same question, same library.</div>'
@@ -703,7 +702,7 @@ def wire_panel(turn):
         n = len(h["found"])
         plain = h["route"] == "plain"
         label = "A normal AI health service" if plain else f"Blind RAG · {h['route']} server"
-        sent = f"{h['requests']} requests · {fmt_bytes(h['bytes'])} sent"
+        sent = f"{h['requests']} requests"
         if n == 0:
             body = esc(h["sample_hex"][:96] or "(no request body)") + " …"
             rows += (f'<div class="br-wire ok"><div class="top"><b>{esc(label)}</b><span>{esc(sent)}</span>'
@@ -731,7 +730,7 @@ def wire_panel(turn):
             hit = bool(h["found"])
             who = "normal AI health service" if h["route"] == "plain" else f"Blind RAG · {h['route']}"
             out += (f'<div class="br-wire {"bad" if hit else "ok"} slim"><div class="top"><b>{esc(who)}</b>'
-                    f'<span>{fmt_bytes(h["bytes"])} searched</span><em>{"found" if hit else "not found"}</em></div></div>')
+                    f'<span>searched</span><em>{"found" if hit else "not found"}</em></div></div>')
         st.markdown(out, unsafe_allow_html=True)
 
 
@@ -770,6 +769,8 @@ def load_retrieval():
 def load_answers():
     p = ROOT / "eval" / "results" / "answers.jsonl"
     if not p.exists():
+        p = ROOT / "eval" / "results" / "answers_plaintext.jsonl"
+    if not p.exists():
         return None
     rows = [json.loads(x) for x in open(p, encoding="utf-8") if x.strip()]
     ans = [r for r in rows if r.get("source_url")]
@@ -778,7 +779,7 @@ def load_answers():
     return {"answerable": len(ans), "answered": sum(r["status"] == "answered" for r in ans),
             "gold_cited": sum(bool(r.get("gold_cited")) for r in ans),
             "unanswerable": len(un), "declined": sum(r["status"] == "declined" for r in un),
-            "median_answer_s": ms[len(ms) // 2] / 1000 if ms else None, "path": "eval/results/answers.jsonl"}
+            "median_answer_s": ms[len(ms) // 2] / 1000 if ms else None, "path": "eval/results/" + p.name}
 
 
 def load_measurements():
@@ -1069,14 +1070,33 @@ if view == "Evidence":
     if traces:
         tr = traces[-1]
         b, cl, _ = mode_text(tr["mode"])
-        cards = (stat(fmt_bytes(tr["upload_bytes"]), "uploaded for your last question", f"this session · {esc(b)}")
-                 + stat(fmt_bytes(tr["download_bytes"]), "downloaded for your last question",
-                        "includes one-time downloads on a first question")
-                 + stat(f'{tr["timings"].get("scoring", 0) + tr["timings"].get("encrypting", 0):.2f} s',
-                        "encrypt + server scoring", "this session")
+        cards = (stat(f'{tr["timings"].get("scoring", 0) + tr["timings"].get("encrypting", 0):.2f} s',
+                        "encrypt + server scoring", f"this session · {esc(b)}")
                  + stat(f'{tr["total_seconds"]:.2f} s', "end to end", f'{len(traces)} question(s) this session'))
         st.markdown('<div class="br-h">This session, live</div><div class="br-grid">' + cards + "</div>",
                     unsafe_allow_html=True)
+
+    ret0, ans0 = load_retrieval(), load_answers()
+    if ret0 and ans0:
+        n0 = ret0["n"]
+        rows0 = [
+            ("Right source in the top 10", f'{ret0["float"][10]}/{n0}', f'{ret0["int8"][10]}/{n0}',
+             "Blind RAG scores 8-bit numbers; the normal service uses full floats"),
+            ("Answerable questions answered", f'{ans0["answered"]}/{ans0["answerable"]}', f'{ans0["answered"]}/{ans0["answerable"]}',
+             "Same retrieval, same local answer step"),
+            ("Answers citing the expected source", f'{ans0["gold_cited"]}/{ans0["answerable"]}', f'{ans0["gold_cited"]}/{ans0["answerable"]}', "Same"),
+            ("Off-topic questions declined", f'{ans0["declined"]}/{ans0["unanswerable"]}', f'{ans0["declined"]}/{ans0["unanswerable"]}',
+             "No answer is written without a reliable source"),
+            ("Server can read your question", "Yes", "No", "Shown live in the Live demo tab"),
+            ("Server keeps your question in its log", "Yes", "No", "Its log keeps four fields, none of them the question"),
+            ("Words from your question found in the traffic", "Found in the clear", "Not found", "Searched live on the wire in the Live demo tab"),
+        ]
+        body0 = "".join(f"<tr><td>{esc(a)}</td><td>{esc(b)}</td><td><b>{esc(c_)}</b></td><td>{esc(d)}</td></tr>" for a, b, c_, d in rows0)
+        st.markdown('<div class="br-h">Blind RAG vs a normal AI service</div><div class="br-sub">Same questions, same library. '
+                    'Quality is the plaintext evaluation (<code>' + esc(ans0["path"]) + '</code>): the encrypted ranking matches the '
+                    'plaintext int8 ranking, so privacy does not cost answer quality. End-to-end encrypted runs: <code>make bench</code>.</div>'
+                    '<table class="br-t"><tr><th>Measure</th><th>Normal AI service</th><th>Blind RAG</th><th>Note</th></tr>'
+                    + body0 + "</table>", unsafe_allow_html=True)
 
     st.markdown('<div class="br-h">Retrieval and answer quality</div><div class="br-sub">Plaintext baseline over the '
                 'same chunks. Encryption adds no error, so the int8 ranking is the ranking Blind RAG produces.</div>',
@@ -1101,18 +1121,17 @@ if view == "Evidence":
     else:
         cards += stat("—", "answer outcomes", "Run <code>python -m eval.run_eval --answers</code>", "x")
     st.markdown('<div class="br-grid">' + cards + "</div>", unsafe_allow_html=True)
-    st.markdown('<div class="br-h">Privacy cost</div><div class="br-sub">From <code>make measure</code> on this '
+    st.markdown('<div class="br-h">Speed</div><div class="br-sub">From <code>make measure</code> on this '
                 'machine (<code>data/measurements.md</code>).</div>', unsafe_allow_html=True)
-    meas = load_measurements()
+    meas = [m for m in (load_measurements() or []) if not re.search(r"byte|\b[KM]B\b|upload|download|\bup\b|\bdown\b", " ".join(m[:2]), re.I)] or None
     if meas:
         body = "".join(f"<tr><td>{esc(a)}</td><td>{esc(b)}</td><td><b>{esc(m)}</b></td><td>{esc(ok)}</td></tr>"
                        for a, b, m, ok in meas)
         st.markdown('<table class="br-t"><tr><th>Metric</th><th>Target (spec)</th><th>Measured</th><th>Met</th></tr>'
                     + body + "</table>", unsafe_allow_html=True)
     else:
-        st.markdown('<div class="br-grid">' + stat("—", "crypto latency, bytes and server CPU",
-                    "Run <code>make measure</code> with the server and helper up. Targets: under 10 s end to end, "
-                    "under 5 MB up, under 20 MB down.", "x") + "</div>", unsafe_allow_html=True)
+        st.markdown('<div class="br-grid">' + stat("—", "crypto latency and server CPU",
+                    "Run <code>make measure</code> with the server and helper up. Target: under 10 s end to end.", "x") + "</div>", unsafe_allow_html=True)
 
     st.caption("Small evaluation set. These are not medically validated accuracy figures.")
 

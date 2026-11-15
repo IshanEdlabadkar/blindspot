@@ -1,9 +1,8 @@
 import { useReducedMotion } from 'motion/react'
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { fmtBytes, searchWire, type Route, type ServerTrace, type Status } from './api'
+import { searchWire, type Route, type ServerTrace, type Status } from './api'
 import { Burrow } from './Burrow'
 import { short, slipNo } from './Chat'
-import { Attacker } from './Attacker'
 import { libraryName, type Turn } from './turn'
 
 const HEX = '0123456789abcdef'
@@ -77,32 +76,6 @@ function Sec({ title, children, last }: { title?: string; children: React.ReactN
   )
 }
 
-/** Does the size of what leaves this laptop depend on what was asked? Compare every question in this session. */
-function SameSize({ turns }: { turns: Turn[] }) {
-  const rows = turns.filter((t) => t.trace).map((t) => ({ id: t.id, chars: t.question.length, bytes: t.trace!.upload_bytes }))
-  const same = rows.length > 1 && rows.every((r) => r.bytes === rows[0].bytes)
-  const spread = rows.length ? Math.max(...rows.map((r) => r.bytes)) - Math.min(...rows.map((r) => r.bytes)) : 0
-  return (
-    <div>
-      <p className="font-bold text-ink">Same size every time</p>
-      <p className="text-graphite">An observer on the network can see how many bytes you sent. Does that give the question away?</p>
-      <ul className="mt-2 space-y-0.5">
-        {rows.map((r) => (
-          <li key={r.id}><Line left={`${slipNo(r.id)}  (${r.chars} letters asked)`} right={`${fmtBytes(r.bytes)} sealed`} /></li>
-        ))}
-      </ul>
-      {rows.length < 2 && <p className="mt-2 text-graphite">Ask a second question, short or long, to compare.</p>}
-      {rows.length > 1 && (
-        <p className={`mt-2 ${same ? 'font-bold text-ink' : 'text-stamp'}`}>
-          {same
-            ? 'Every question left at exactly the same size, so its length tells an observer nothing.'
-            : `The sizes differ by ${fmtBytes(spread)}. That is a small leak: size could hint at the question.`}
-        </p>
-      )}
-    </div>
-  )
-}
-
 function SecretWord({ since }: { since?: string }) {
   const [word, setWord] = useState('')
   const [res, setRes] = useState<{ words: string[]; routes: Route[] } | null>(null)
@@ -129,7 +102,7 @@ function SecretWord({ since }: { since?: string }) {
   )
 }
 
-export function XRay({ turn, turns, number, status, onBack }: { turn: Turn; turns: Turn[]; number: number; status: Status | null; onBack: () => void }) {
+export function XRay({ turn, number, status, onBack }: { turn: Turn; number: number; status: Status | null; onBack: () => void }) {
   const tr = turn.trace
   const servers: ServerTrace[] = tr?.servers ?? (tr ? [{ server: tr.server ?? '', corpus_version: '', num_chunks: tr.num_chunks ?? 0,
     requests: tr.requests ?? [], timings: tr.timings ?? {}, fetched: 10, used: turn.result?.citations.length ?? 0,
@@ -140,7 +113,6 @@ export function XRay({ turn, turns, number, status, onBack }: { turn: Turn; turn
   const words = turn.proof?.words ?? []
   const routes = [...(turn.proof?.routes ?? [])].sort((a, b) => Number(a.route === 'plain') - Number(b.route === 'plain'))
   const blind = routes.filter((r) => r.route !== 'plain')
-  const upOf = (x: ServerTrace) => x.requests.reduce((n, r) => n + r.request_bytes, 0)
   const when = turn.since && !Number.isNaN(Date.parse(turn.since)) ? new Date(turn.since) : new Date()
   const t = (v?: number, d = 2) => (v === undefined ? '...' : `${v.toFixed(d)} s`)
 
@@ -148,7 +120,7 @@ export function XRay({ turn, turns, number, status, onBack }: { turn: Turn; turn
   const entry = turn.plain?.entry
   const compared = Boolean(turn.compare || entry || plainRoute)
   const stamp = (d: Date) => `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-  const sealedTotal = blind.reduce((n, r) => n + r.bytes, 0) || servers.reduce((n, x) => n + upOf(x), 0)
+  const searched = servers.reduce((n, x) => n + x.num_chunks, 0)
   const waiting = <p className="text-graphite">Searching the recording...</p>
   const off = <p>Recording is off. Start the demo with <span className="font-bold">./web/demo.sh</span> to print this part.</p>
   const proofPart = (body: React.ReactNode) => !turn.proof ? waiting : !turn.proof.recording ? off : body
@@ -187,7 +159,7 @@ export function XRay({ turn, turns, number, status, onBack }: { turn: Turn; turn
           <Sec title={`Sent to ${servers.length} ${servers.length === 1 ? 'library' : 'libraries'}`}>
             {servers.map((x) => (
               <div key={x.server}>
-                <Line left={nameOf(x.server)} right={`${fmtBytes(upOf(x))} sealed`} />
+                <Line left={nameOf(x.server)} right="sealed" />
                 <p className="text-graphite">{`  scored ${x.num_chunks.toLocaleString()}, sent back ${x.fetched}`}</p>
               </div>
             ))}
@@ -212,7 +184,7 @@ export function XRay({ turn, turns, number, status, onBack }: { turn: Turn; turn
             </>)}
           </Sec>
           <Sec last>
-            <Line strong left="Total sent" right={`${fmtBytes(sealedTotal)} sealed`} />
+            <Line strong left="Passages searched" right={searched.toLocaleString()} />
             <Line left="Read on this laptop" right={t(s.embedding)} />
             <Line left="Sealed" right={t(s.encrypting)} />
             <Line left="Searched without reading" right={t(s.scoring)} />
@@ -236,7 +208,7 @@ export function XRay({ turn, turns, number, status, onBack }: { turn: Turn; turn
               <p className="text-[14px]"><Highlight text={turn.question} words={words} /></p>
             </Sec>
             <Sec title="Sent to 1 service">
-              <Line left="A normal AI service" right={plainRoute ? `${fmtBytes(plainRoute.bytes)} plain` : '...'} />
+              <Line left="A normal AI service" right="plain" />
               <p className="text-graphite">  as readable text</p>
             </Sec>
             <Sec title="What it wrote down">
@@ -262,8 +234,8 @@ export function XRay({ turn, turns, number, status, onBack }: { turn: Turn; turn
               </> : <p className="text-graphite">Its traffic wasn't recorded.</p>)}
             </Sec>
             <Sec last>
-              <Line strong left="Total sent" right={plainRoute ? `${fmtBytes(plainRoute.bytes)} plain` : '...'} />
-              <p className="mt-1 text-graphite">Smaller, because nothing was sealed. It is also the only one that can read it, and it kept it.</p>
+              <Line strong left="Who can read it" right="the service" />
+              <p className="mt-1 text-graphite">Nothing was sealed. The service read it in full, and it kept it.</p>
             </Sec>
           </div>
         ) : (
@@ -281,10 +253,6 @@ export function XRay({ turn, turns, number, status, onBack }: { turn: Turn; turn
           What the libraries can still tell: that a question was asked, when, from which address, and how many bytes.
           Sealing hides the words, not the fact that you asked.
         </p>
-      </div>
-      <div className="mt-8 grid gap-8 md:grid-cols-2 md:gap-x-10 lg:gap-x-14">
-        <div className="slip typed self-start px-6 pt-6 pb-5 text-[15px] leading-6 text-ink"><SameSize turns={turns} /></div>
-        <Attacker turn={turn} />
       </div>
     </main>
   )

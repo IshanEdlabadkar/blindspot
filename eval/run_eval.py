@@ -41,16 +41,29 @@ def load_questions(path: Path | None = None) -> list[dict]:
 
 # ---------------------------------------------------------------- retrieval (plaintext tables)
 
-def run_retrieval(questions: list[dict], modes=("float", "int8")) -> list[dict]:
+def _has_float(idx) -> bool:
+    """True when the float embeddings (data/embeddings_*.npy, not in git) exist for every source."""
+    parts = getattr(idx, "indexes", [idx])
+    return all(getattr(p, "float_vecs", None) is not None for p in parts)
+
+
+def run_retrieval(questions: list[dict], modes=None) -> list[dict]:
     """Per question, over every source merged by score: rank of the right page (float, int8), the int8
     fetched ids as "source:id" (k=10 per source; what the encrypted path must reproduce exactly), and
     whether the right page reaches the model's sources."""
     idx = default_index()
+    # The float comparison (quantization cost) needs B's local float embeddings, which are not in git.
+    # Without them, report int8 only; the answer evaluation uses the int8 ranking either way.
+    if modes is None:
+        modes = ("float", "int8") if _has_float(idx) else ("int8",)
+    if "float" not in modes:
+        print("note: float embeddings not found (made by ingest/build.py); skipping the float comparison")
     rows = []
     for q in questions:
         qvec = embed_query_float(q["question"])
         gold = q["source_url"]
         row = {"id": q["id"], "question": q["question"], "gold": gold}
+        row["float_rank"] = row["float_top1"] = None
         for mode in modes:
             merged = idx.fetch(qvec, max(KS), mode)
             urls = [c["url"] for c in merged]
@@ -173,6 +186,9 @@ def main():
     print(f"Recall over {len(pos)} answerable questions")
     print("mode   " + "  ".join(f"@{k:<4}" for k in KS))
     for mode in ("float", "int8"):
+        if mode == "float" and all(r["float_top1"] is None for r in rows):
+            print("float  (skipped: no data/embeddings_f32.npy)")
+            continue
         rec = recall_table([r[f"{mode}_rank"] for r in pos])
         print(f"{mode:6} " + "  ".join(f"{rec[k]:.2f} " for k in KS))
     for key, label in (("evidence_top5", "search order"), ("evidence_rerank5", "after rerank")):

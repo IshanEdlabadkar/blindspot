@@ -12,6 +12,7 @@ The rules go to the model as a system message with three short examples (answere
 not covered), through Ollama's chat endpoint with an explicit context window so a longer prompt is never
 silently truncated from the front, where the rules are.
 """
+import os
 import re
 import time
 from functools import lru_cache
@@ -215,6 +216,46 @@ def _cite(c: dict, excerpt: str | None = None) -> dict:
     return out
 
 
+def _env_num(name: str, default):
+    v = os.environ.get(name)
+    try:
+        return type(default)(v) if v not in (None, "") else default
+    except ValueError:
+        return default
+
+
+def select_sources(chunks: list[dict], n_context: int = N_CONTEXT) -> list[dict]:
+    """Which reranked passages become the model's sources.
+
+    Default (unchanged): the best n_context, minus any more than RERANK_MARGIN reranker points below
+    the best one (a passage about another condition that shares common words, C. diff for a chlamydia
+    question, otherwise ends up quoted in the answer).
+
+    Opt-in variants, for measuring more synthesis (eval.bench --sources ...); all off by default:
+      BLIND_RAG_N_CONTEXT=8        more slots
+      BLIND_RAG_RERANK_MARGIN=7    a looser margin
+      BLIND_RAG_MIN_SOURCES=2      always keep at least this many, margin or not
+      BLIND_RAG_ONE_PER_PAGE=1     a page fills one slot (two pieces of one page don't crowd out others)
+    """
+    n_context = _env_num("BLIND_RAG_N_CONTEXT", n_context)
+    margin = _env_num("BLIND_RAG_RERANK_MARGIN", RERANK_MARGIN)
+    min_keep = _env_num("BLIND_RAG_MIN_SOURCES", 1)
+    one_per_page = os.environ.get("BLIND_RAG_ONE_PER_PAGE") == "1"
+    pool = chunks
+    if one_per_page:
+        seen, pool = set(), []
+        for c in chunks:
+            page = c.get("url") or c.get("title")
+            if page not in seen:
+                seen.add(page)
+                pool.append(c)
+    ctx = pool[:n_context]
+    if ctx and "rerank_score" in ctx[0]:
+        best = ctx[0]["rerank_score"]
+        ctx = [c for i, c in enumerate(ctx) if i < min_keep or c["rerank_score"] >= best - margin]
+    return ctx
+
+
 def answer(question: str, chunks: list[dict], llm=ollama_chat,
            n_context: int = N_CONTEXT, min_score: float = MIN_SCORE, rerank=None) -> dict:
     """chunks: the k fetched records in search order. They are reranked locally, then the best
@@ -224,12 +265,7 @@ def answer(question: str, chunks: list[dict], llm=ollama_chat,
     top_score = chunks[0].get("score") if chunks else None
     chunks = (rerank or _default_rerank)(question, chunks)
     t_rerank = (time.perf_counter() - t0) * 1000
-    ctx = chunks[:n_context]
-    # Drop sources far below the best rerank score: a passage about another condition that shares
-    # common words (C. diff for a chlamydia question) otherwise ends up quoted in the answer.
-    if ctx and "rerank_score" in ctx[0]:
-        best = ctx[0]["rerank_score"]
-        ctx = [c for c in ctx if c["rerank_score"] >= best - RERANK_MARGIN]
+    ctx = select_sources(chunks, n_context)
 
     def result(status, text, citations, removed=0):
         body = f"{urgent[1]}\n\n{text}" if urgent else text

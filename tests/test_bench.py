@@ -109,3 +109,39 @@ def test_real_answer_path_is_traced(tmp_path, servers, questions, monkeypatch):
     assert r["trace"]["reranked"][0]["id"] == r["trace"]["search"][-1]["id"]
     assert set(r["speed"]["answer_parts"]) >= {"rerank", "checks"}
     assert "answer_parts_seconds" in s["speed"]
+
+
+def test_source_selection_variants(monkeypatch):
+    from client import answer as A
+    for k in ("BLIND_RAG_N_CONTEXT", "BLIND_RAG_RERANK_MARGIN", "BLIND_RAG_MIN_SOURCES", "BLIND_RAG_ONE_PER_PAGE"):
+        monkeypatch.delenv(k, raising=False)
+    cs = [{"url": "p1", "rerank_score": 9.0}, {"url": "p1", "rerank_score": 8.0}, {"url": "p2", "rerank_score": 3.5},
+          {"url": "p3", "rerank_score": 2.0}, {"url": "p4", "rerank_score": 1.0}, {"url": "p5", "rerank_score": 0.5}]
+    assert [c["url"] for c in A.select_sources(cs)] == ["p1", "p1"]          # default: margin 5 keeps 2
+    monkeypatch.setenv("BLIND_RAG_MIN_SOURCES", "3")
+    assert [c["url"] for c in A.select_sources(cs)] == ["p1", "p1", "p2"]
+    monkeypatch.setenv("BLIND_RAG_ONE_PER_PAGE", "1")
+    assert [c["url"] for c in A.select_sources(cs)] == ["p1", "p2", "p3"]
+    monkeypatch.setenv("BLIND_RAG_RERANK_MARGIN", "8.6")
+    monkeypatch.setenv("BLIND_RAG_N_CONTEXT", "8")
+    assert [c["url"] for c in A.select_sources(cs)] == ["p1", "p2", "p3", "p4", "p5"]
+
+
+def test_sources_sweep_metrics_and_llm_cache(tmp_path, servers, questions, monkeypatch):
+    from client import answer as A
+    monkeypatch.setenv("BLIND_RAG_N_CONTEXT", "")   # bench.main sets it; monkeypatch restores it after
+    calls = []
+    monkeypatch.setattr(A, "_default_rerank", lambda q, cs: [dict(c, rerank_score=10.0 - i) for i, c in enumerate(cs)])
+    monkeypatch.setattr(A, "ollama_chat", lambda prompt, *a, **kw: calls.append(prompt) or "It has causes [1][2].")
+    monkeypatch.setattr(A.answer, "__defaults__", (A.ollama_chat, A.N_CONTEXT, -1.0, None))
+    monkeypatch.setattr(A, "_missing_terms", lambda *a, **k: False)
+    cache = tmp_path / "llm.jsonl"
+    _, rows, s = run(tmp_path, questions, "--servers", servers[0], "--answer", "real",
+                     "--sources", "n=3", "--llm-cache", str(cache))
+    y = rows[0]["synthesis"]
+    assert y["sources"] == 3 and s["synthesis"]["sources_to_model"]["mean"] == 3
+    assert s["meta"]["sources_config"] == "n=3" and s["meta"]["llm_cache"]["misses"] == len(calls) > 0
+    n = len(calls)
+    _, _, s2 = run(tmp_path / "again", questions, "--servers", servers[0], "--answer", "real",
+                   "--sources", "n=3", "--llm-cache", str(cache))
+    assert len(calls) == n and s2["meta"]["llm_cache"]["hits"] == n   # same sources: no model calls

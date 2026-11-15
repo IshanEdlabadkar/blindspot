@@ -30,6 +30,7 @@ export default function App() {
   const [compare, setCompare] = useState(true)
   const [xray, setXray] = useState<number | null>(null)
   const [view, setView] = useState<'ask' | 'sim'>('ask')
+  const [home, setHome] = useState(false)
   const [disabled, setDisabledRaw] = useState<Set<string>>(() => {
     try { return new Set<string>(JSON.parse(localStorage.getItem('blindspot.disabled') ?? '[]')) } catch { return new Set<string>() }
   })
@@ -48,7 +49,7 @@ export default function App() {
     return () => clearInterval(t)
   }, [refresh])
 
-  useEffect(() => { window.scrollTo({ top: 0 }) }, [xray, view])
+  useEffect(() => { window.scrollTo({ top: 0 }) }, [xray, view, home])
   // The libraries a question goes to: the ticked ones that are reachable (all of the ticked ones if none are, so the error says why).
   const ticked = (status?.servers ?? []).filter((s) => !disabled.has(s.url))
   const searched = (ticked.some((s) => s.ok) ? ticked.filter((s) => s.ok) : ticked).map((s) => s.url)
@@ -60,6 +61,7 @@ export default function App() {
   const onAsk = useCallback(async (question: string) => {
     const id = nextId.current++
     setXray(null)
+    setHome(false)
     setTurns((ts) => [...ts, { id, question, compare, stages: {}, phase: 'working' }])
     setTimeout(() => bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 50)
     try {
@@ -86,15 +88,15 @@ export default function App() {
 
   return (
     <div className="desk relative min-h-dvh">
-      <DeskObjects viewKey={view === 'sim' ? 'sim' : xrayTurn ? `xray-${xrayTurn.id}` : turns.length ? 'chat' : 'landing'}
+      <DeskObjects viewKey={view === 'sim' ? 'sim' : xrayTurn ? `xray-${xrayTurn.id}` : turns.length && !home ? 'chat' : 'landing'}
         version={turns.map((t) => `${t.phase}${t.proof ? 'p' : ''}`).join(',')} />
       <header className="relative z-[1] mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-4 whitespace-nowrap sm:px-5">
-        <button onClick={() => { setXray(null); setView('ask') }} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
+        <button aria-label="Blindspot, back to the home page" onClick={() => { setXray(null); setView('ask'); setHome(true) }} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
           <Burrow size={32} mood="peek" /> <span className="hidden sm:inline">Blindspot</span>
         </button>
         <nav aria-label="Views" className="flex items-center gap-4 sm:gap-7">
           {([['ask', 'Ask'], ['sim', '100 people']] as const).map(([k, label]) => (
-            <button key={k} onClick={() => setView(k)} aria-current={view === k ? 'page' : undefined}
+            <button key={k} onClick={() => { setView(k); if (k === 'ask') setHome(false) }} aria-current={view === k ? 'page' : undefined}
               className={`font-display text-[15px] font-bold underline-offset-[10px] ${view === k ? 'text-ink underline decoration-badger decoration-[3px]' : 'text-graphite hover:text-ink'}`}>
               {label}
             </button>
@@ -113,7 +115,7 @@ export default function App() {
       <div className={view === 'sim' ? 'hidden' : ''}>
         {xrayTurn ? (
           <XRay turn={xrayTurn} number={xrayTurn.id} status={status} onBack={() => setXray(null)} />
-        ) : turns.length === 0 ? (
+        ) : turns.length === 0 || home ? (
           <Landing status={status} examples={examples} onAsk={onAsk}>{composer(false)}</Landing>
         ) : (
           <>

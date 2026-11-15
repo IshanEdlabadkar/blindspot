@@ -96,20 +96,20 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
         Blindspot answered as well as a normal AI service on our test questions. What the library learns about the person asking is where they differ.
       </p>
 
-      <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile label="Right source in the top 10" normal={q ? `${top10n}%` : '...'} blind={q ? `${top10b}%` : '...'} sub="Same ranking, rounded to 8-bit numbers" />
-        <Tile label="Questions answered" normal={q ? `${pct(q.answered ?? 0, q.answerable ?? 0)}%` : '...'} blind={q ? `${pct(q.answered ?? 0, q.answerable ?? 0)}%` : '...'} sub="Same answer step, on this laptop" />
+      <div className={`mt-5 grid gap-5 sm:grid-cols-2 ${q ? 'lg:grid-cols-4' : 'lg:grid-cols-2'}`}>
+        {q && <Tile label="Right source in the top 10" normal={`${top10n}%`} blind={`${top10b}%`} sub="Same ranking, rounded to 8-bit numbers" />}
+        {q && <Tile label="Questions answered" normal={`${pct(q.answered ?? 0, q.answerable ?? 0)}%`} blind={`${pct(q.answered ?? 0, q.answerable ?? 0)}%`} sub="Same answer step, on this laptop" />}
         <Tile label="Patrons a library can profile" normal={`${pct(sim.profiled, sim.n)}%`} blind="0%" sub={`${sim.n} simulated patrons`} />
         <Tile label="Your words visible on the wire" normal={wire ? `${wire.normal}%` : '...'} blind={wire ? `${wire.blind}%` : '...'}
           sub={wire ? `${wire.n} of ${wire.w} words in the clear, ${wire.bf} of ${wire.bw} sealed` : 'Tick the unsealed-copy box and ask to measure this'} />
       </div>
 
-      <div className="mt-5 grid gap-5 md:grid-cols-2">
-        <div className="receipt typed px-6 pt-5 pb-3 text-[15px] leading-6 text-ink" aria-label="Answer quality">
+      <div className={`mt-5 grid gap-5 ${q ? 'md:grid-cols-2' : 'max-w-[620px]'}`}>
+        {q && <div className="receipt typed px-6 pt-5 pb-3 text-[15px] leading-6 text-ink" aria-label="Answer quality">
           <h4 className="font-display text-[18px] font-black">Answer quality</h4>
           <p className="text-[13px] leading-5 text-graphite">{card?.answerable ?? 79} answerable and {card?.should_decline ?? 17} should-decline test questions</p>
           <div className="mt-1"><Legend /></div>
-          {q ? (
+          {(
             <div className="mt-2">
               <Row label="Right source in the top 10" normal={top10n} blind={top10b} />
               <Row label="Answerable questions answered" normal={pct(q.answered ?? 0, q.answerable ?? 0)} blind={pct(q.answered ?? 0, q.answerable ?? 0)} />
@@ -117,12 +117,12 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
               <Row label="Out-of-scope questions declined" normal={pct(q.declined ?? 0, q.should_decline ?? 0)} blind={pct(q.declined ?? 0, q.should_decline ?? 0)} />
               <Row label="Wrong answers when it should decline" normal={pct(q.wrong ?? 0, q.should_decline ?? 0)} blind={pct(q.wrong ?? 0, q.should_decline ?? 0)} lowerIsBetter />
             </div>
-          ) : <p className="mt-2 text-graphite">Quality figures are not available (eval/results is missing).</p>}
+          )}
           <p className="mt-2 border-t border-dashed border-graphite/40 pt-2 text-[12.5px] leading-[18px] text-graphite">
             Plaintext evaluation. Blindspot's encrypted ranking matched the plaintext int8 ranking on every question checked, so its figures are the int8 ones. A full encrypted run is <span className="font-bold">make bench</span>.
             The questions were written by the team, so one question moves a figure by about 1.3 points.
           </p>
-        </div>
+        </div>}
 
         <div className="receipt typed px-6 pt-5 pb-3 text-[15px] leading-6 text-ink" aria-label="Targeted ads">
           <h4 className="font-display text-[18px] font-black">What a library can sell: targeted ads</h4>

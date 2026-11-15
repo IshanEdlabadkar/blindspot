@@ -143,8 +143,6 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
         <div className="hidden shrink-0 md:block"><Burrow size={88} mood="idle" /></div>
       </div>
 
-      <Scoreboard proof={turn.proof} />
-
       <div className="mt-10 flex flex-col gap-8 md:grid md:grid-cols-2 md:grid-rows-[repeat(7,auto)] md:gap-x-10 md:gap-y-0 lg:gap-x-14">
         <div className={paper}>
           <Sec>
@@ -249,6 +247,8 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
           </div>
         )}
       </div>
+
+      <Scoreboard proof={turn.proof} />
 
       <div className="mt-10 grid gap-8 md:grid-cols-2 md:gap-x-10 lg:gap-x-14">
         {turn.proof?.recording && <div className="slip typed self-start px-6 pt-6 pb-5 text-[15px] leading-6 text-ink"><SecretWord since={turn.since} /></div>}

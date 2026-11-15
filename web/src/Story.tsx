@@ -2,28 +2,64 @@ import { motion, useInView, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { hex, rng } from './sim'
 
-const QUERY = 'chest pain when breathing'
+const QUERIES = [
+  'chest pain when breathing',
+  'is my period late because I am pregnant',
+  'how to stop drinking alone',
+  'HIV test results what now',
+  'signs of postpartum depression',
+  'can my job fire me for taking leave',
+  'lump in my breast what is it',
+  'how to talk to my kid about anxiety',
+]
 const RECIPIENTS = ['Google', 'Microsoft', 'X']
 
-/** A search box that types a query, then either sends readable copies to three companies or sends nothing readable. */
+/** A search box that types one query after another, then either sends readable copies to three companies or sends nothing readable. */
 export function SearchDemo({ mode }: { mode: 'leak' | 'sealed' }) {
   const ref = useRef<HTMLDivElement>(null)
-  const seen = useInView(ref, { once: true, amount: 0.6 })
+  const inView = useInView(ref, { amount: 0.6 })
   const reduce = useReducedMotion()
-  const [typed, setTyped] = useState(reduce ? QUERY.length : 0)
+  const [qi, setQi] = useState(0)
+  const next = useRef(0)
+  const QUERY = QUERIES[qi]
+  const [typed, setTyped] = useState(reduce ? QUERIES[0].length : 0)
   const [sent, setSent] = useState(Boolean(reduce))
-  const cipher = useMemo(() => hex(rng(7), 22), [])
+  const ciphers = useMemo(() => QUERIES.map((_, i) => hex(rng(7 + i), 22)), [])
+  const cipher = ciphers[qi]
 
   useEffect(() => {
-    if (!seen || reduce) return
-    let i = 0
-    const t = setInterval(() => {
-      i += 1
-      setTyped(i)
-      if (i >= QUERY.length) { clearInterval(t); setTimeout(() => setSent(true), 500) }
-    }, 70)
-    return () => clearInterval(t)
-  }, [seen, reduce])
+    if (!inView || reduce) return
+    const timers: number[] = []
+    const run = () => {
+      const idx = next.current
+      const text = QUERIES[idx]
+      setQi(idx); setSent(false); setTyped(0)
+      let i = 0
+      const type = window.setInterval(() => {
+        i += 1
+        setTyped(i)
+        if (i < text.length) return
+        clearInterval(type)
+        timers.push(window.setTimeout(() => setSent(true), 450))
+        timers.push(window.setTimeout(() => {
+          let j = text.length
+          const erase = window.setInterval(() => {
+            j -= 3
+            setTyped(Math.max(j, 0))
+            if (j > 0) return
+            clearInterval(erase)
+            setSent(false)
+            next.current = (idx + 1) % QUERIES.length
+            timers.push(window.setTimeout(run, 250))
+          }, 22)
+          timers.push(erase)
+        }, 3000))
+      }, 65)
+      timers.push(type)
+    }
+    run()
+    return () => timers.forEach((t) => { clearTimeout(t); clearInterval(t) })
+  }, [inView, reduce])
 
   const leaving = mode === 'leak' ? QUERY : cipher
   return (
@@ -36,7 +72,7 @@ export function SearchDemo({ mode }: { mode: 'leak' | 'sealed' }) {
         <p className="typed mt-1 min-h-[34px] border-b-2 border-ink text-[19px] leading-[34px] text-ink">
           {QUERY.slice(0, typed)}<span aria-hidden className={`ml-px inline-block w-[2px] bg-ink align-middle ${typed < QUERY.length ? 'h-5' : 'h-5 opacity-30'}`} />
         </p>
-        <p className="typed mt-2 text-[12.5px] leading-5 text-graphite">
+        <p className="typed mt-2 truncate text-[12.5px] leading-5 text-graphite">
           {mode === 'leak' ? 'What leaves this page' : 'What leaves this laptop'}:{' '}
           <span className={mode === 'leak' ? 'text-badger' : 'text-sealed'}>{sent || typed >= QUERY.length ? (mode === 'leak' ? `"${QUERY}"` : cipher) : '...'}</span>
         </p>
@@ -44,7 +80,7 @@ export function SearchDemo({ mode }: { mode: 'leak' | 'sealed' }) {
 
       <div className="relative mt-3 h-[96px]">
         {sent && !reduce && [0, 1, 2].map((i) => (
-          <motion.span key={i} aria-hidden
+          <motion.span key={`${qi}-${i}`} aria-hidden
             className={`typed absolute top-0 -translate-x-1/2 whitespace-nowrap text-[12px] ${mode === 'leak' ? 'text-badger' : 'text-sealed'}`}
             initial={{ left: '50%', top: 0, opacity: 0 }}
             animate={mode === 'leak'
@@ -56,15 +92,14 @@ export function SearchDemo({ mode }: { mode: 'leak' | 'sealed' }) {
         ))}
         <div className="absolute inset-x-0 bottom-0 grid grid-cols-3 gap-3">
           {RECIPIENTS.map((r, i) => (
-            <motion.div key={r} className="typed bg-card px-3 py-2 text-center shadow-paper"
-              animate={{ y: sent && mode === 'leak' ? 0 : 0 }}
+            <div key={r} className="typed bg-card px-3 py-2 text-center shadow-paper transition-shadow duration-200"
               style={{ boxShadow: sent && mode === 'leak' ? 'inset 0 0 0 2px var(--color-badger), var(--shadow-paper)' : undefined }}>
               <p className="font-bold text-ink">{r}</p>
               <p className={`text-[12.5px] leading-5 ${mode === 'leak' ? 'text-badger' : 'text-sealed'}`}>
-                {sent ? (mode === 'leak' ? 'may have received it' : 'received nothing') : ' '}
+                {sent ? (mode === 'leak' ? 'may have received it' : 'received nothing') : ' '}
               </p>
               <span className="sr-only">{i}</span>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>

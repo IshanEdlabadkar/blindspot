@@ -46,8 +46,20 @@ case "$SERVER" in
     else ./crypto-server/crypto-server -data "$DATA" -log data/server.log > data/server.out 2>&1 & pids+=($!)
          wait_for "document server (:8080)" http://127.0.0.1:8080/v1/manifest data/server.out; fi ;;
   *)
-    if up "$SERVER/v1/manifest"; then echo "  using remote document server $SERVER"
-    else echo "ERROR: document server $SERVER is not reachable"; exit 1; fi ;;
+    # A hosted server may be asleep: the first request can take about a minute to wake it.
+    echo "  checking remote document server $SERVER (can take ~1 min if it was asleep)..."
+    code=000
+    for _ in $(seq 1 12); do
+      code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 "$SERVER/v1/manifest" 2>/dev/null || true)
+      [ "$code" = 200 ] && break
+      sleep 3
+    done
+    if [ "$code" = 200 ]; then echo "  using remote document server $SERVER"
+    else
+      echo "ERROR: document server $SERVER did not answer (last HTTP status: $code)."
+      echo "       Open $SERVER/v1/manifest in a browser: if it loads, run make demo again."
+      exit 1
+    fi ;;
 esac
 
 if up http://127.0.0.1:8090/health; then echo "  helper already running, reusing it"

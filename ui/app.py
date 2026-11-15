@@ -81,6 +81,8 @@ header[data-testid="stHeader"] {background: transparent;}
 .br-card {background: #fff; border: 1px solid #DDE1E8; border-radius: 14px; padding: 22px 24px;
           display: flex; flex-direction: column; gap: 14px;}
 .br-card.declined {border-color: #E3C58F; background: #FFFBF2;}
+.br-urgent {background: #B42318; color: #fff; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px;
+            font-weight: 600; line-height: 1.45;}
 .br-label {font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 500; font-size: 13px;
            letter-spacing: .06em; text-transform: uppercase; color: #4A5362;}
 .br-answer {font-size: 17px; line-height: 1.6; white-space: pre-wrap; margin: 0;}
@@ -245,6 +247,13 @@ def turn_html(t):
     answer = result["answer"]
     for d in ("This is general health information, not medical advice.", c.DISCLAIMER):
         answer = answer.replace(d, "").strip()
+    # B's answer() flags crisis/emergency questions (988 / 911). Show it on every card, answered or
+    # declined, and keep it out of the answer text so it isn't shown twice.
+    urgent = result.get("urgent") or None
+    urgent_html = ""
+    if urgent and urgent.get("message"):
+        answer = answer.replace(urgent["message"], "").strip()
+        urgent_html = f'<div class="br-urgent">{esc(urgent["message"])}</div>'
     srcs = ""
     for i, cit in enumerate(result["citations"], 1):
         url = str(cit.get("url") or "")
@@ -255,7 +264,9 @@ def turn_html(t):
             meta.append(f'updated {esc(cit["updated"])}')
         if isinstance(cit.get("score"), float) and 0 < cit["score"] <= 1:
             meta.append(f'similarity {cit["score"]:.2f}')
-        exc = "" if result["declined"] else supporting_excerpt(answer, i, cit.get("text", ""))
+        # B's answer() verifies each cited sentence and returns the matching source sentence; use it.
+        # Otherwise (stub answer) fall back to a word-overlap pointer.
+        exc = "" if result["declined"] else (cit.get("excerpt") or supporting_excerpt(answer, i, cit.get("text", "")))
         exc_html = (f'<div class="cap">Closest sentence in the source</div><blockquote>{esc(exc)}</blockquote>'
                     if exc else "")
         srcs += (f'<div class="br-src"><div class="ttl"><b>{i}</b><span>{esc(cit.get("title"))}</span></div>'
@@ -270,7 +281,7 @@ def turn_html(t):
         body = f'<div class="br-label">Answer</div><p class="br-answer">{answer_html(answer)}</p>'
         card = "br-card"
     return (f'<div class="br-turn"><div class="br-q">{esc(q)}</div>{chips}'
-            f'<div class="{card}">{body}{srcs}'
+            f'<div class="{card}">{urgent_html}{body}{srcs}'
             f'<div class="br-note">{esc(c.DISCLAIMER)}</div></div></div>')
 
 

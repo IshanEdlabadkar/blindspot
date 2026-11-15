@@ -33,7 +33,7 @@ The key helper, the app and the language model still run on the laptop. If the h
 
 ## Warm up (do this every time)
 
-1. Ask *How is chlamydia treated and can I get it again?* once. The first question downloads the public scoring hint (17 MB) and loads the language model, so it is the slow one.
+1. Ask *How is chlamydia treated and can I get it again?* once. The first question downloads the public scoring hint (17 MB), the reranker model, and loads the language model, so it is the slow one.
 2. Check the badge is green: **REAL ENCRYPTED SEARCH**.
 3. Check the three health dots under the title are green.
 4. Sidebar (arrow, top left) → **New session** to clear the history.
@@ -50,6 +50,7 @@ The app never falls back to a weaker mode by itself. It shows a red box naming t
 | "No module named streamlit" | Use `make demo`, not `python3 -m streamlit`. On this Mac `python3` is the wrong Python; `python3.12` has the packages |
 | "Refusing to send an unencrypted question" | You started the UI in mock mode against the real server. Use `make demo` |
 | Server says 409 or scores look wrong after a pull | `make stop`, then `make demo`: an old server was still running |
+| "document server ... did not answer" with the hosted server | It was asleep and took over a minute to wake. Open its `/v1/manifest` in a browser, wait until it loads, run the command again |
 | First question takes very long | Model and hint downloads. Needs internet once; after that it works offline |
 | Contrast box says the plaintext server is unreachable | You ran `make demo`, not `make demo-compare` |
 | Nothing works and you are on in two minutes | Play the backup recording |

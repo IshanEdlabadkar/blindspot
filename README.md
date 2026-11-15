@@ -116,6 +116,8 @@ BLIND_RAG_EMBED=fake python3 -m streamlit run ui/app.py
 | `mock_server/`, `client/mock_crypto_client.py` | Plaintext stand-ins for development | C |
 | `contracts.py` | Shared formats: record layout, wire format, answer shape | all |
 
+**Picking this project up? Read the [detailed handoff](docs/HANDOFF.md) first.**
+
 More detail: [crypto status and design decisions](docs/crypto.md), [setup](SETUP.md), [remote deployment](DEPLOY.md), [shared contracts](docs/contracts.md), [client and UI notes](README_C.md).
 
 ## Limits

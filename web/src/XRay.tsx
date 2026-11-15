@@ -1,11 +1,13 @@
-import { motion, useReducedMotion } from 'motion/react'
+import { useReducedMotion } from 'motion/react'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { fmtBytes, searchWire, type Route, type ServerTrace, type Status } from './api'
+import { Burrow } from './Burrow'
+import { short, slipNo } from './Chat'
 import { libraryName, type Turn } from './turn'
 
 const HEX = '0123456789abcdef'
 
-/** The signature moment: the question's own letters turn into the real ciphertext as they cross the seam. */
+/** The question's own letters turn into the real ciphertext that was sent. */
 function Scramble({ from, to, run }: { from: string; to: string; run: boolean }) {
   const reduce = useReducedMotion()
   const target = useMemo(() => {
@@ -18,7 +20,7 @@ function Scramble({ from, to, run }: { from: string; to: string; run: boolean })
     const start = performance.now()
     let raf = 0
     const tick = (now: number) => {
-      const x = Math.min(1, (now - start) / 1800)
+      const x = Math.min(1, (now - start) / 1600)
       setP(x)
       if (x < 1) raf = requestAnimationFrame(tick)
     }
@@ -32,52 +34,43 @@ function Scramble({ from, to, run }: { from: string; to: string; run: boolean })
     if (edge < p) return HEX[Math.floor(Math.random() * 16)]
     return ch
   }).join('')
-  return <span aria-label="Your question, encrypted" className={p >= 1 ? 'hex text-seal' : ''}>{out}</span>
+  return <span aria-label="Your question, as it was sent">{out}</span>
 }
 
-function Step({ n, side, title, children, delay }: {
-  n: number; side: 'here' | 'there' | 'both'; title: string; children: React.ReactNode; delay: number
-}) {
-  const reduce = useReducedMotion()
-  // Full-width steps sit on the night background above the seam line, so it never crosses their text.
-  const col = side === 'here' ? 'md:col-start-1' : side === 'there' ? 'md:col-start-2' : 'z-[1] bg-night md:col-span-2 md:py-3'
+const Cut = () => <p aria-hidden className="my-4 overflow-hidden whitespace-nowrap text-graphite/60">{'- '.repeat(40)}</p>
+
+function Line({ left, right, strong }: { left: React.ReactNode; right?: React.ReactNode; strong?: boolean }) {
   return (
-    <motion.section className={`relative ${col}`}
-      initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: reduce ? 0 : delay, duration: 0.45, ease: [0.2, 0.7, 0.2, 1] }}>
-      <h3 className="flex items-baseline gap-3 text-[15px] font-medium text-paper">
-        <span className="hex text-sm text-seal">{n}</span>{title}
-      </h3>
-      <div className="mt-3 pl-7 text-[15px] leading-6 text-fog">{children}</div>
-    </motion.section>
+    <p className={`flex justify-between gap-4 ${strong ? 'font-bold text-ink' : ''}`}>
+      <span className="min-w-0">{left}</span>{right !== undefined && <span className="shrink-0 text-right">{right}</span>}
+    </p>
   )
 }
 
 function Highlight({ text, words }: { text: string; words: string[] }) {
   if (!words.length) return <>{text}</>
   const re = new RegExp(`(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
-  return <>{text.split(re).map((part, i) => i % 2 ? <mark key={i} className="rounded bg-leak/25 px-0.5 text-leak">{part}</mark> : <Fragment key={i}>{part}</Fragment>)}</>
+  let k = 0
+  return <>{text.split(re).map((part, i) => i % 2
+    ? <mark key={i} className="mark bg-transparent" style={{ ['--d' as string]: `${0.5 + 0.2 * k++}s` }}>{part}</mark>
+    : <Fragment key={i}>{part}</Fragment>)}</>
 }
 
-function ProofRow({ r, words, logged }: { r: Route; words: string[]; logged?: string }) {
+function RouteBlock({ r, words, logged, i }: { r: Route; words: string[]; logged?: string; i: number }) {
   const leaked = r.found.length > 0
   const name = libraryName(r.route)
-  const shown = leaked && logged ? `It logged: “${logged}”` : r.matches[0]?.context ?? ''
   return (
-    <div className={`grid gap-x-6 gap-y-3 border-t py-5 sm:grid-cols-[1fr_auto] ${leaked ? 'border-leak/40' : 'border-seam'}`}>
-      <div className="min-w-0">
-        <p className="text-paper">{name}{leaked ? ', unencrypted' : ''}</p>
-        <p className="mt-1 text-sm text-dim">{r.requests} request{r.requests === 1 ? '' : 's'}, {fmtBytes(r.bytes)} sent from this laptop</p>
-        {leaked
-          ? <p className="mt-3 text-[15px] leading-6 text-paper"><Highlight text={shown} words={words} /></p>
-          : <p className="hex mt-3 line-clamp-2 text-[13px] leading-5 text-dim">{r.sample_hex.slice(0, 120)}…</p>}
-      </div>
-      <div className={`text-right ${leaked ? 'text-leak' : 'text-seal'}`}>
-        <p className="text-[40px] leading-none font-semibold tracking-tight tabular-nums">
-          {r.found.length}<span className="text-[22px] text-dim"> of {r.words}</span>
-        </p>
-        <p className="mt-1.5 text-sm">{leaked ? 'of your words found' : 'of your words found'}</p>
-      </div>
+    <div className="relative py-3">
+      <Line strong left={`${name}${leaked ? ' (unsealed)' : ''}`} right={fmtBytes(r.bytes)} />
+      <Line left={`  ${r.requests} request${r.requests === 1 ? '' : 's'}`} />
+      {leaked
+        ? <p className="mt-1 text-ink">It logged: “<Highlight text={logged ?? r.matches[0]?.context ?? ''} words={words} />”</p>
+        : <p className="hex mt-1 line-clamp-2 text-[13px] text-graphite">{r.sample_hex.slice(0, 96)}</p>}
+      <Line strong left="Your words found" right={`${r.found.length} of ${r.words}`} />
+      <span className={`stamp absolute top-10 right-1 text-[15px] ${leaked ? 'text-stamp' : 'text-sealed'}`}
+        style={{ ['--r' as string]: `${i % 2 ? 5 : -7}deg`, ['--d' as string]: `${0.25 + i * 0.18}s` }}>
+        {leaked ? 'Read' : 'Not read'}
+      </span>
     </div>
   )
 }
@@ -87,116 +80,112 @@ function SecretWord({ since }: { since?: string }) {
   const [res, setRes] = useState<{ words: string[]; routes: Route[] } | null>(null)
   const go = async () => { if (word.trim()) setRes(await searchWire(word.trim(), since)) }
   return (
-    <div className="mt-8 rounded-2xl border border-seam bg-slate p-5">
-      <label htmlFor="secret" className="text-paper">Search the same traffic for any word</label>
-      <p className="mt-1 text-sm text-fog">Try a name or a word you put in your question. Four letters or more.</p>
-      <form className="mt-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); void go() }}>
+    <div>
+      <label htmlFor="secret" className="font-bold text-ink">Search this traffic for any word</label>
+      <p className="text-graphite">A name, or something from your question. Four letters or more.</p>
+      <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); void go() }}>
         <input id="secret" value={word} onChange={(e) => { setWord(e.target.value); setRes(null) }}
-          className="h-11 flex-1 rounded-xl border border-seam bg-night px-3 text-paper placeholder:text-dim focus:border-seal/60 focus:outline-none"
-          placeholder="e.g. a name" />
-        <button className="h-11 rounded-xl bg-seal px-4 text-sm font-medium text-night disabled:opacity-40" disabled={!word.trim()}>Search</button>
+          className="typed h-10 min-w-0 flex-1 border-b-2 border-ink bg-transparent px-1 text-ink placeholder:text-graphite/70 focus:outline-none"
+          placeholder="type a word" />
+        <button className="press h-10 rounded-[2px] bg-ink px-4 font-display text-sm font-bold text-card disabled:opacity-50" disabled={!word.trim()}>Search</button>
       </form>
       {res && (
-        <ul className="mt-4 space-y-1.5 text-[15px]">
-          {!res.words.length && <li className="text-fog">Use a word of four letters or more.</li>}
+        <div className="mt-3">
+          {!res.words.length && <p className="text-graphite">Use a word of four letters or more.</p>}
           {res.words.length > 0 && res.routes.map((r) => (
-            <li key={r.route} className={r.found.length ? 'text-leak' : 'text-seal'}>
-              {libraryName(r.route)}: {r.found.length ? 'found' : 'not found'} in {fmtBytes(r.bytes)}
-            </li>
+            <Line key={r.route} left={libraryName(r.route)} right={<span className={r.found.length ? 'font-bold text-stamp' : 'text-sealed'}>{r.found.length ? 'FOUND' : 'not found'}</span>} />
           ))}
-        </ul>
+        </div>
       )}
     </div>
   )
 }
 
-export function XRay({ turn, status, onBack }: { turn: Turn; status: Status | null; onBack: () => void }) {
+export function XRay({ turn, number, status, onBack }: { turn: Turn; number: number; status: Status | null; onBack: () => void }) {
   const tr = turn.trace
   const servers: ServerTrace[] = tr?.servers ?? (tr ? [{ server: tr.server ?? '', corpus_version: '', num_chunks: tr.num_chunks ?? 0,
     requests: tr.requests ?? [], timings: tr.timings ?? {}, fetched: 10, used: turn.result?.citations.length ?? 0,
     ciphertext_sample: tr.ciphertext_sample }] : [])
-  const nameOf = (url: string) => status?.servers.find((s) => s.url === url)?.name.replace(/ \(.*\)$/, '') ?? url
+  const nameOf = (url: string) => short(status?.servers.find((s) => s.url === url)?.name ?? url)
   const cipher = servers.find((s) => s.ciphertext_sample)?.ciphertext_sample ?? tr?.ciphertext_sample ?? turn.proof?.routes.find((r) => r.sample_hex)?.sample_hex ?? ''
   const s = turn.stages
   const words = turn.proof?.words ?? []
   const routes = [...(turn.proof?.routes ?? [])].sort((a, b) => Number(a.route === 'plain') - Number(b.route === 'plain'))
   const blind = routes.filter((r) => r.route !== 'plain')
-  const totalPassages = servers.reduce((n, x) => n + (x.num_chunks || 0), 0)
+  const upOf = (x: ServerTrace) => x.requests.reduce((n, r) => n + r.request_bytes, 0)
+  const when = turn.since && !Number.isNaN(Date.parse(turn.since)) ? new Date(turn.since) : new Date()
+  const t = (v?: number, d = 2) => (v === undefined ? '...' : `${v.toFixed(d)} s`)
 
   return (
-    <div className="mx-auto max-w-[1080px] px-5 pt-10 pb-24">
-      <button onClick={onBack} className="text-sm text-fog hover:text-paper">Back to the conversation</button>
-      <h2 className="mt-6 max-w-[22ch] text-[34px] leading-[1.1] font-semibold tracking-[-0.015em] sm:text-[40px]">
-        What happened to your question
-      </h2>
-      <p className="mt-3 max-w-[60ch] text-[16px] leading-7 text-fog">
-        Every number here was recorded while your question was answered. The left side is this laptop. The right side is everything else.
-      </p>
-
-      <div className="relative mt-12 grid gap-x-16 gap-y-12 md:grid-cols-2">
-        <div aria-hidden className="absolute top-0 bottom-0 left-1/2 hidden w-px bg-gradient-to-b from-seam via-seal-deep to-seam md:block" />
-        <p className="text-sm text-dim md:col-start-1">This laptop</p>
-        <p className="text-sm text-dim md:col-start-2 md:row-start-1">Everywhere else</p>
-
-        <Step n={1} side="here" title="Your question is read here, and only here" delay={0.05}>
-          <p className="rounded-xl border border-seam bg-slate px-4 py-3 text-[16px] leading-7 text-paper">{turn.question}</p>
-          <p className="mt-3">A small model on this laptop turned it into 384 numbers that capture its meaning{s.embedding !== undefined ? `, in ${s.embedding.toFixed(2)} s` : ''}.</p>
-        </Step>
-
-        <Step n={2} side="both" title="It is locked before it leaves" delay={0.4}>
-          <div className="rounded-xl border border-seam bg-slate px-4 py-3 text-[16px] leading-7">
-            <Scramble from={turn.question} to={cipher} run={Boolean(cipher)} />
-          </div>
-          <p className="mt-3">Sealed with a key that exists only in this laptop’s memory{s.encrypting !== undefined ? `, in ${s.encrypting.toFixed(2)} s` : ''}. What crosses the line is the right-hand version.</p>
-        </Step>
-
-        <Step n={3} side="there" title={`${servers.length} ${servers.length === 1 ? 'library searches' : 'libraries search'} without reading it`} delay={1.9}>
-          <ul className="space-y-3">
-            {servers.map((x) => {
-              const up = x.requests.reduce((n, r) => n + r.request_bytes, 0)
-              return (
-                <li key={x.server} className="rounded-xl border border-seam px-4 py-3">
-                  <p className="text-paper">{nameOf(x.server)}</p>
-                  <p className="mt-1 text-sm">Received {fmtBytes(up)} of sealed data, scored all {x.num_chunks.toLocaleString()} passages, sent back exactly {x.fetched} without knowing which mattered.</p>
-                </li>
-              )
-            })}
-          </ul>
-          {s.scoring !== undefined && <p className="mt-3">Scoring {totalPassages.toLocaleString()} passages took {s.scoring.toFixed(2)} s.</p>}
-        </Step>
-
-        <Step n={4} side="here" title="The answer is written here" delay={2.3}>
-          <p>The passages were unlocked on this laptop, the best ones chosen, and a local model wrote the answer from them
-            {s.answering !== undefined ? ` in ${s.answering.toFixed(1)} s` : ''}. {turn.result ? `It cites ${turn.result.citations.length} passage${turn.result.citations.length === 1 ? '' : 's'}.` : ''}</p>
-        </Step>
-
-        <Step n={5} side="both" title="Proof: every byte that left, searched for your words" delay={2.7}>
-          {!turn.proof && <p>Searching the recorded traffic…</p>}
-          {turn.proof && !turn.proof.recording && (
-            <p>Traffic recording is off. Start the demo with <span className="hex text-paper">./web/demo.sh</span> to record it.</p>
-          )}
-          {turn.proof && turn.proof.recording && (
-            <>
-              <p>A recorder on this laptop, between this app and every library, kept each byte that left. It searched them for the {words.length} words in your question{words.length ? ': ' : '.'}
-                {words.map((w, i) => <Fragment key={w}>{i > 0 && ', '}<span className="text-paper">{w}</span></Fragment>)}.</p>
-              <div className="mt-5">
-                {routes.map((r) => <ProofRow key={r.route} r={r} words={words}
-                  logged={r.route === 'plain' ? turn.plain?.entry?.question : undefined} />)}
-              </div>
-              {blind.length > 0 && blind.every((r) => r.found.length === 0) && (
-                <p className="mt-5 text-paper">None of your words reached {blind.length === 1 ? 'the library' : `any of the ${blind.length} libraries`}.
-                  {' '}The chance of one appearing by luck in that much random data is about {Math.max(...blind.map((r) => r.chance_by_luck)).toExponential(0)}.</p>
-              )}
-              <SecretWord since={turn.since} />
-            </>
-          )}
-        </Step>
+    <main className="mx-auto grid max-w-[1120px] gap-10 px-5 pt-6 pb-24 md:grid-cols-[1fr_480px] md:gap-16">
+      <div className="md:sticky md:top-8 md:self-start">
+        <button onClick={onBack} className="text-[15px] text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">
+          Back to the conversation
+        </button>
+        <h2 className="mt-8 max-w-[14ch] text-[36px] leading-[1.05] font-black tracking-[-0.02em] text-ink sm:text-[48px]">
+          What left this laptop
+        </h2>
+        <p className="mt-4 max-w-[46ch] text-[17px] leading-7 text-graphite">
+          A recorder sat between this app and every library and kept each byte that went out. This receipt is what it saw,
+          and what it found when it searched those bytes for the words in your question.
+        </p>
+        <p className="mt-4 max-w-[46ch] text-[15px] leading-6 text-graphite">
+          What the libraries can still tell: that a question was asked, when, from which address, and how many bytes.
+          Sealing hides the words, not the fact that you asked.
+        </p>
+        <Burrow size={96} mood="idle" className="mt-10 hidden md:inline-block" />
       </div>
 
-      <p className="mt-16 max-w-[64ch] border-t border-seam pt-6 text-sm leading-6 text-dim">
-        What the libraries can still see: that a question was asked, when, from which address, and how many bytes were sent.
-        Encryption hides the words, not the fact that you asked.
-      </p>
-    </div>
+      <div className="receipt typed mx-auto w-full max-w-[480px] px-6 pt-7 pb-12 text-[15px] leading-6 text-ink sm:px-8">
+        <p className="text-center font-display text-[20px] font-black">Blind RAG</p>
+        <p className="text-center text-graphite">Traffic receipt, {slipNo(number)}</p>
+        <p className="text-center text-graphite">{when.toLocaleDateString()} {when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+        <Cut />
+        <p className="font-bold">Your question</p>
+        <p>{turn.question}</p>
+        <p className="mt-1 text-graphite">Read only on this laptop.</p>
+        <p className="mt-3 font-bold">As it was sent</p>
+        <p className="hex text-[14px] text-sealed"><Scramble from={turn.question} to={cipher} run={Boolean(cipher)} /></p>
+        <Cut />
+        <Line left="Read on this laptop" right={t(s.embedding)} />
+        <Line left="Sealed" right={t(s.encrypting)} />
+        <Line left="Searched without reading" right={t(s.scoring)} />
+        <Line left="Passages fetched" right={t(s.fetching)} />
+        <Line left="Answer written here" right={t(s.answering, 1)} />
+        <Cut />
+        {servers.map((x) => (
+          <div key={x.server} className="mb-2">
+            <Line strong left={nameOf(x.server)} right={`${fmtBytes(upOf(x))} sealed`} />
+            <Line left={`  scored ${x.num_chunks.toLocaleString()} passages`} right={`sent ${x.fetched}`} />
+          </div>
+        ))}
+        <Cut />
+        {!turn.proof && <p className="text-graphite">Searching the recording...</p>}
+        {turn.proof && !turn.proof.recording && (
+          <p>Recording is off. Start the demo with <span className="font-bold">./web/demo.sh</span> to print this part.</p>
+        )}
+        {turn.proof && turn.proof.recording && (
+          <>
+            <p className="font-bold">Words searched for</p>
+            <p>{words.join(', ')}</p>
+            <div className="mt-2 divide-y divide-dashed divide-graphite/40">
+              {routes.map((r, i) => <RouteBlock key={r.route} r={r} i={i} words={words}
+                logged={r.route === 'plain' ? turn.plain?.entry?.question : undefined} />)}
+            </div>
+            {blind.length > 0 && blind.every((r) => r.found.length === 0) && (
+              <>
+                <Cut />
+                <p className="font-bold">None of your words reached {blind.length === 1 ? 'the library' : `any of the ${blind.length} libraries`}.</p>
+                <p className="text-graphite">Odds of one appearing by luck in that much random data: about {Math.max(...blind.map((r) => r.chance_by_luck)).toExponential(0)}.</p>
+              </>
+            )}
+            <Cut />
+            <SecretWord since={turn.since} />
+          </>
+        )}
+        <Cut />
+        <p className="text-center text-graphite">Thank you for asking privately.</p>
+      </div>
+    </main>
   )
 }

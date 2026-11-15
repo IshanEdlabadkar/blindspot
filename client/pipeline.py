@@ -172,7 +172,47 @@ class Pipeline:
             self.load_manifest(force=True)
             return self._run(question, on_stage)
 
+    def retrieve(self, question: str, on_stage=None):
+        """Steps 1-7 only: the k fetched chunks (with scores) and the trace, no answer.
+        Used by client.multi.MultiPipeline to search several servers and answer once."""
+        try:
+            trace, _stage, chunks = self._retrieve(question, on_stage)
+        except StaleCorpus:
+            self.load_manifest(force=True)
+            trace, _stage, chunks = self._retrieve(question, on_stage)
+        self._finish(trace)
+        return chunks, trace
+
+    def _finish(self, trace):
+        trace["ended_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds")
+        trace["upload_bytes"] = sum(r["request_bytes"] for r in trace["requests"])
+        trace["download_bytes"] = sum(r["response_bytes"] for r in trace["requests"])
+        trace["total_seconds"] = round(sum(trace["timings"].values()), 3)
+
     def _run(self, question, on_stage):
+        trace, stage, chunks = self._retrieve(question, on_stage)
+
+        # 8-9. rerank and answer (B's answer() does both, and the safe decline)
+        result = self._answer(question, chunks)
+        stage("answering")
+
+        self._finish(trace)
+        return result, trace
+
+    def _answer(self, question, chunks):
+        try:
+            return c.normalize_result(self.answer_fn(question, chunks))
+        except requests.ConnectionError as e:
+            raise PipelineError("answering", "The local model is not running, so no answer was written.",
+                                "brew services start ollama   then: ollama pull llama3.2:3b") from e
+        except requests.Timeout as e:
+            raise PipelineError("answering", "The local model took too long to answer.",
+                                "Ask again; the first answer after a start is the slowest.") from e
+        except requests.HTTPError as e:
+            raise PipelineError("answering", f"The local model returned an error: {e}",
+                                "ollama pull llama3.2:3b") from e
+
+    def _retrieve(self, question, on_stage):
         m = self.load_manifest()
         n, k = m["num_chunks"], m["top_k"]
         mode = {"crypto": self.crypto_kind, "fetch": self.fetch_mode, "answer": self.answer_kind,
@@ -265,27 +305,8 @@ class Pipeline:
             ch["raw_score"] = int(scores[i])
             ch["score"] = float(scores[i]) / (scale * scale)
         stage("fetching")
-
-        # 8-9. rerank and answer (B's answer() does both, and the safe decline)
-        try:
-            result = c.normalize_result(self.answer_fn(question, chunks))
-        except requests.ConnectionError as e:
-            raise PipelineError("answering", "The local model is not running, so no answer was written.",
-                                "brew services start ollama   then: ollama pull llama3.2:3b") from e
-        except requests.Timeout as e:
-            raise PipelineError("answering", "The local model took too long to answer.",
-                                "Ask again; the first answer after a start is the slowest.") from e
-        except requests.HTTPError as e:
-            raise PipelineError("answering", f"The local model returned an error: {e}",
-                                "ollama pull llama3.2:3b") from e
-        stage("answering")
-
-        trace["ended_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds")
-        trace["upload_bytes"] = sum(r["request_bytes"] for r in trace["requests"])
-        trace["download_bytes"] = sum(r["response_bytes"] for r in trace["requests"])
-        trace["total_seconds"] = round(sum(trace["timings"].values()), 3)
         trace["top_ids"] = [int(i) for i in top]   # device-only; shown as "what only you know"
-        return result, trace
+        return trace, stage, chunks
 
     def close(self):
         """10. Wipe: drop key and cached data."""

@@ -19,10 +19,12 @@ helper:        ## asker-side key holder at http://127.0.0.1:8090 (needed for BLI
 check-servers: ## every hosted server (servers.remote.json): reachable, right corpus, matches repo backup, log has only 4 fields
 	python3 scripts/check_servers.py $(ARGS)
 
-bench:         ## with make demo running: accuracy + speed + per-question trace for every eval question -> eval/results/bench/<run>/report.html
+bench:         ## with make demo running (the key helper is started if needed): accuracy + speed + per-question trace for every eval question -> eval/results/bench/<run>/report.html
+	@curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:8090/health 2>/dev/null || { echo "starting the key helper (:8090, log data/helper.out)"; mkdir -p data; (cd crypto-server && go build -o crypto-helper ./cmd/crypto-helper) && (nohup ./crypto-server/crypto-helper > data/helper.out 2>&1 &) ; sleep 2; }
 	python3 -m eval.bench $(ARGS)
 
 bench-quick:   ## same, retrieval only (no rerank/model): crypto speed + right page in top-k, ~1 s per question
+	@curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:8090/health 2>/dev/null || { echo "starting the key helper (:8090, log data/helper.out)"; mkdir -p data; (cd crypto-server && go build -o crypto-helper ./cmd/crypto-helper) && (nohup ./crypto-server/crypto-helper > data/helper.out 2>&1 &) ; sleep 2; }
 	python3 -m eval.bench --answer none $(ARGS)
 
 .PHONY: measure

@@ -27,6 +27,14 @@ sys.path.insert(0, str(ROOT))
 LOG_FIELDS = {"ts", "endpoint", "response_bytes", "latency_ms"}
 
 
+def fmt_t(sec):
+    return f"{sec*1000:.0f} ms" if sec < 1 else f"{sec:.2f} s"
+
+
+def fmt_b(n):
+    return f"{n/1e6:.1f} MB" if n >= 1e6 else f"{n/1e3:.1f} KB"
+
+
 def server_pid(explicit):
     if explicit:
         return explicit
@@ -79,7 +87,11 @@ def main():
     manifest, manifest_bytes = r.json(), len(r.content)
     n, d, k = manifest["num_chunks"], manifest["embedding"]["dim"], manifest["top_k"]
     scale = manifest["quantization"]["scale"]
+    t = time.perf_counter()
     key = cc.keygen(manifest)
+    keygen_secs = time.perf_counter() - t
+    mode = getattr(key, "mode", "?")
+    hint_bytes = manifest.get("scoring", {}).get("hint_bytes", 0) if mode == "hint" else 0
 
     t = time.perf_counter()
     store = http.get(a.server + "/v1/fetch_store", timeout=300).content
@@ -113,8 +125,8 @@ def main():
         rows.append({"encrypt": t_enc, "score_rt": t_score, "decrypt_rank_fetch": t_dec,
                      "total": t_enc + t_score + t_dec, "up": len(body), "down": len(resp.content),
                      "server_cpu": None if cpu0 is None else cpu1 - cpu0})
-        print(f"q{i+1:02d}  encrypt {t_enc:5.2f}s  score {t_score:5.2f}s  decrypt+rank {t_dec:5.2f}s  "
-              f"total {rows[-1]['total']:5.2f}s  up {len(body)/1e6:5.1f} MB  down {len(resp.content)/1e6:4.2f} MB")
+        print(f"q{i+1:02d}  encrypt {fmt_t(t_enc)}  score {fmt_t(t_score)}  decrypt+rank {fmt_t(t_dec)}  "
+              f"total {fmt_t(rows[-1]['total'])}  up {fmt_b(len(body))}  down {fmt_b(len(resp.content))}")
 
     # Log check: only the agreed fields, nothing derived from requests.
     log_ok, log_note = True, "no log file found"
@@ -129,30 +141,34 @@ def main():
                                    f"{len(long_lines)} long lines")
 
     med = {key_: float(np.median([r[key_] for r in rows])) for key_ in rows[0] if rows[0][key_] is not None}
-    cpu_note = "n/a (server PID not found; pass --server-pid)" if "server_cpu" not in med else f"{med['server_cpu']:.2f} core-s"
+    cpu_note = ("n/a (server PID not found; pass --server-pid)" if "server_cpu" not in med
+                else "< 10 core-ms (below the OS timer's resolution)" if med["server_cpu"] < 0.01
+                else f"{med['server_cpu']*1000:.0f} core-ms" if med["server_cpu"] < 1 else f"{med['server_cpu']:.2f} core-s")
     lines = [
         f"# Blind RAG crypto measurements",
         "",
         f"Machine: {platform.node()} ({platform.system()} {platform.machine()}), "
         f"N = {n}, d = {d}, k = {k}, {a.questions} questions, {a.think:g} s between questions. "
-        f"Corpus {manifest['corpus_version']}. Medians.",
+        f"Corpus {manifest['corpus_version']}. Scoring mode: **{mode}**. Medians.",
         "",
         "| Metric | Target | Measured | Met |",
         "| --- | --- | --- | --- |",
-        f"| Encrypt on device | (not in spec) | {med['encrypt']:.2f} s | |",
-        f"| Encrypted scoring round trip | < 2 s | {med['score_rt']:.2f} s | {'yes' if med['score_rt'] < 2 else 'no'} |",
-        f"| Private fetch of k = 10 (trivial PIR) | < 3 s | {med['decrypt_rank_fetch']:.2f} s per question, "
-        f"plus {store_secs:.2f} s once for the {store_bytes/1e6:.1f} MB store | {'yes' if med['decrypt_rank_fetch'] < 3 else 'no'} |",
-        f"| Crypto part of end-to-end latency | < 10 s total | {med['total']:.2f} s | {'yes' if med['total'] < 10 else 'no'} |",
-        f"| Upload per query | < 5 MB | {med['up']/1e6:.1f} MB | {'yes' if med['up'] < 5e6 else 'no'} |",
-        f"| Download per query | < 20 MB | {med['down']/1e6:.2f} MB, plus {store_bytes/1e6:.1f} MB store once | "
+        f"| Encrypt on device | (not in spec) | {fmt_t(med['encrypt'])} | |",
+        f"| Encrypted scoring round trip | < 2 s | {fmt_t(med['score_rt'])} | {'yes' if med['score_rt'] < 2 else 'no'} |",
+        f"| Private fetch of k = 10 (trivial PIR) | < 3 s | {fmt_t(med['decrypt_rank_fetch'])} per question, "
+        f"plus {fmt_t(store_secs)} once for the {fmt_b(store_bytes)} store | {'yes' if med['decrypt_rank_fetch'] < 3 else 'no'} |",
+        f"| Crypto part of end-to-end latency | < 10 s total | {fmt_t(med['total'])} | {'yes' if med['total'] < 10 else 'no'} |",
+        f"| Upload per query | < 5 MB | {fmt_b(med['up'])} | {'yes' if med['up'] < 5e6 else 'no'} |",
+        f"| Download per query | < 20 MB | {fmt_b(med['down'])}, plus one-time downloads below | "
         f"{'yes' if med['down'] < 20e6 else 'no'} |",
         f"| Server CPU per query | < 2 core-s | {cpu_note} | "
         f"{'' if 'server_cpu' not in med else ('yes' if med['server_cpu'] < 2 else 'no')} |",
         f"| One-time manifest download | < 10 KB | {manifest_bytes/1e3:.1f} KB | {'yes' if manifest_bytes < 10e3 else 'no'} |",
         f"| Server log holds no request data | required | {log_note} | {'yes' if log_ok else 'NO'} |",
         "",
-        f"One-time setup (manifest, key, store download): {setup_secs:.2f} s.",
+        f"One-time per corpus version: manifest {fmt_b(manifest_bytes)}, "
+        + (f"scoring hint {fmt_b(hint_bytes)} (cached on disk after the first run), " if hint_bytes else "")
+        + f"fetch store {fmt_b(store_bytes)}. Setup took {fmt_t(setup_secs)} (key setup {fmt_t(keygen_secs)}).",
         "Rerank and answer generation (B's part) are not included.",
     ]
     out = pathlib.Path(a.out)

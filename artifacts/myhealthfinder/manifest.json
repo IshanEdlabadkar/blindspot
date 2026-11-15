@@ -1,0 +1,34 @@
+{
+  "protocol": "blind-rag/1",
+  "source_id": "myhealthfinder",
+  "source_name": "MyHealthfinder (ODPHP, health.gov)",
+  "corpus_version": "2026-11-15.1",
+  "corpus_name": "MyHealthfinder health topics",
+  "attribution": "Source: MyHealthfinder, Office of Disease Prevention and Health Promotion (health.gov)",
+  "embedding": {
+    "model": "BAAI/bge-small-en-v1.5",
+    "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "dim": 384,
+    "normalize": "l2",
+    "query_prefix": "Represent this sentence for searching relevant passages: "
+  },
+  "quantization": {
+    "type": "int8",
+    "scale": 127
+  },
+  "scoring": {
+    "library": "set by crypto server",
+    "params": "set by crypto server"
+  },
+  "pir": {
+    "library": "set by crypto server",
+    "params": "set by crypto server",
+    "record_bytes": 2048
+  },
+  "num_chunks": 524,
+  "top_k": 10,
+  "hashes": {
+    "score_table": "sha256:5af223ea7701ab1a3ae455481924336b5fd94b86912ccf84db754d29576e6264",
+    "fetch_store": "sha256:d7220c4da615a9927c6b87981872d2110a4e4381cf41c71b01a80f202468726d"
+  }
+}

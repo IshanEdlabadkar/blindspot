@@ -124,7 +124,7 @@ make bench ARGS="--limit 10 --repeat 3"            # speed: 3 runs per question
 make bench ARGS="--fetch pir"                      # real PIR fetch instead of the trivial download
 make bench ARGS="--servers http://127.0.0.1:8080,https://blindspot-cz2t.onrender.com"
 make bench ARGS="--category urgent"                # one category (or --ids q001,q002, --split test)
-uv run python -m eval.bench --compare eval/results/bench/RUN_A eval/results/bench/RUN_B   # side-by-side table
+python3 -m eval.bench --compare eval/results/bench/RUN_A eval/results/bench/RUN_B   # side-by-side table
 ```
 
 Runs are not committed (`eval/results/bench/` is ignored); copy a report somewhere if you want to keep it. B's `eval.run_eval` and `eval.scorecard` stay the source for the quality scorecard; the bench adds the encrypted path, timings and traces.

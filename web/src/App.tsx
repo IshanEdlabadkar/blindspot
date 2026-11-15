@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ask, getStatus, type Status } from './api'
 import { Burrow } from './Burrow'
 import { Composer, Landing, TurnView } from './Chat'
@@ -6,7 +6,10 @@ import { Libraries } from './Libraries'
 import { DeskObjects } from './DeskObjects'
 import { Simulation } from './Simulation'
 import type { Turn } from './turn'
+import { toRun } from './pipeline3d/run'
 import { XRay } from './XRay'
+
+const Sim = lazy(() => import('./pipeline3d/Sim'))
 
 function Health({ status }: { status: Status | null }) {
   if (!status) return <span className="text-sm text-graphite">Connecting</span>
@@ -38,6 +41,7 @@ export default function App() {
     try { localStorage.setItem('blindspot.disabled', JSON.stringify([...s])) } catch { /* private mode */ }
   }
   const refresh = useCallback(() => { void getStatus().then(setStatus).catch(() => setStatus(null)) }, [])
+  const [sim, setSim] = useState<number | null>(null)
   const nextId = useRef(1)
   const bottom = useRef<HTMLDivElement>(null)
   const busy = turns.some((t) => t.phase === 'working' || t.phase === 'answered')
@@ -79,6 +83,11 @@ export default function App() {
 
   const xrayTurn = turns.find((t) => t.id === xray)
   const lastTrace = [...turns].reverse().find((t) => t.trace)?.trace
+  const simTurn = turns.find((t) => t.id === sim)
+  const closeSim = useCallback(() => setSim(null), [])
+  // Built once per opened answer, so the status poll doesn't rebuild the 3D scene.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const simRun = useMemo(() => (simTurn ? toRun(simTurn, status) : null), [simTurn])
   const composer = (compact: boolean) => (
     <Composer onAsk={onAsk} busy={busy} compare={compare} setCompare={setCompare} status={status}
       number={nextId.current} compact={compact} autoFocus={false} disabled={disabled} />
@@ -118,7 +127,7 @@ export default function App() {
         ) : (
           <>
             <main className="relative z-[1] mx-auto max-w-[760px] px-5 pb-64">
-              {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} onXray={() => setXray(t.id)} onRetry={t.phase === 'error' && !busy ? () => void onAsk(t.question) : undefined} />)}
+              {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} onXray={() => setXray(t.id)} onSim={() => setSim(t.id)} onRetry={t.phase === 'error' && !busy ? () => void onAsk(t.question) : undefined} />)}
               <div ref={bottom} />
             </main>
             <div data-fixed className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4">
@@ -130,6 +139,11 @@ export default function App() {
       <div className={view === 'sim' ? '' : 'hidden'}>
         <Simulation examples={status?.servers.flatMap((s) => s.examples ?? [])} lastQuestion={turns.length ? turns[turns.length - 1].question : undefined} trace={lastTrace} />
       </div>
+      {simRun && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center bg-[#ECEBE7] font-display text-ink">Setting up the desk…</div>}>
+          <Sim run={simRun} onClose={closeSim} />
+        </Suspense>
+      )}
     </div>
   )
 }

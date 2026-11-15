@@ -177,12 +177,14 @@ def make_app(servers=None, pipeline_factory=default_pipeline, plain_ask=default_
         chosen = [u for u in (body.servers or []) if u in servers] or list(servers)
 
         def stream():
-            with lock:
-                since = utc_now()
-                yield _sse("start", {"question": q, "since": since, "servers": chosen})
-                events: queue.Queue = queue.Queue()
+            since = utc_now()
+            yield _sse("start", {"question": q, "since": since, "servers": chosen})
+            events: queue.Queue = queue.Queue()
 
-                def run():
+            def run():
+                # The lock covers only the pipeline work, inside this thread, so it is always released.
+                # Holding it in the generator froze the API when a client disconnected mid-stream.
+                with lock:
                     try:
                         result, trace = pipeline(chosen).ask_traced(
                             q, lambda name, secs: events.put(("stage", {"name": name, "seconds": secs})))
@@ -191,20 +193,20 @@ def make_app(servers=None, pipeline_factory=default_pipeline, plain_ask=default_
                         events.put(("error", {"stage": getattr(e, "stage", "unexpected"),
                                               "message": getattr(e, "message", f"{type(e).__name__}: {e}"),
                                               "fix": getattr(e, "fix", "")}))
-                threading.Thread(target=run, daemon=True).start()
-                while True:
-                    name, data = events.get()
-                    yield _sse(name, data)
-                    if name == "error":
-                        return
-                    if name == "answer":
-                        break
-                if body.compare:
-                    yield _sse("plain", plain_ask(plain_url, q))
-                routes = search_traffic(read_records(wire_log), q, since)
-                yield _sse("proof", {"words": question_words(q), "routes": routes, "since": since,
-                                     "recording": wire_log.exists()})
-                yield _sse("done", {})
+            threading.Thread(target=run, daemon=True).start()
+            while True:
+                name, data = events.get()
+                yield _sse(name, data)
+                if name == "error":
+                    return
+                if name == "answer":
+                    break
+            if body.compare:
+                yield _sse("plain", plain_ask(plain_url, q))
+            routes = search_traffic(read_records(wire_log), q, since)
+            yield _sse("proof", {"words": question_words(q), "routes": routes, "since": since,
+                                 "recording": wire_log.exists()})
+            yield _sse("done", {})
 
         return StreamingResponse(stream(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

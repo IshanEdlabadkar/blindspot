@@ -95,6 +95,27 @@ h1, h2 { font-family: var(--font-display); }
 .desk-object { animation: settle .3s ease-out both; }
 @keyframes settle { from { opacity: 0; } to { opacity: 1; } }
 
+/* 3D pipeline view: labels pinned to the scene, typed like the DESK demo. */
+.sim-label { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: var(--font-type); font-size: 15px; font-weight: 700;
+  color: #2B2926; transition: opacity .2s ease-out; will-change: transform; }
+.sim-label.sim-sealed { color: var(--color-sealed); }
+.sim-label.sim-red { color: var(--color-stamp); }
+.sim-label[data-typing="1"]::after { content: ""; display: inline-block; width: .55em; height: 1em; margin-left: 2px; vertical-align: -2px;
+  background: currentColor; animation: caret .8s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.sim-card { white-space: normal; width: 290px; padding: 12px 14px; background: var(--color-card); box-shadow: var(--shadow-paper);
+  font-weight: 400; font-size: 14px; line-height: 1.55; color: var(--color-ink); }
+.sim-card b { font-family: var(--font-display); font-weight: 900; }
+.sim-card mark { background: var(--color-highlighter); color: inherit; padding: 0 .1em; }
+.sim-lines line { stroke: #2B2926; stroke-width: 1; transition: opacity .2s ease-out; }
+.sim-lines circle { fill: #2B2926; transition: opacity .2s ease-out; }
+.sim-caption { text-shadow: 0 2px 22px rgba(30,28,26,.28); animation: caption-in .35s ease-out both; }
+@keyframes caption-in { from { opacity: 0; transform: translateY(8px); } }
+/* Explanation cards that scroll past the 3D stage, one per step. */
+.sim-step { padding: 18px 20px 20px; background: var(--color-card); box-shadow: var(--shadow-paper); border-top: 3px solid var(--color-badger); }
+
+@media (max-width: 640px) { .sim-label { font-size: 12px; white-space: normal; max-width: calc(100vw - 32px); } .sim-card { width: 220px; font-size: 12px; } }
+
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes dig { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg) translateY(2px); } }
 @keyframes clod { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 12% { opacity: 1; }

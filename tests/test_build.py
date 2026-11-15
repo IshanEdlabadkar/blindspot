@@ -31,6 +31,16 @@ def test_artifacts_round_trip(tmp_path):
     assert json.loads(lines[4])["id"] == 4
 
 
+def test_manifest_names_its_source(tmp_path):
+    from ingest.sources import fmla
+    chunks, vecs = fake()
+    m = write_artifacts(chunks, vecs, tmp_path / "f", "2026-11-10.1", source=fmla)
+    assert m["source_id"] == "fmla" and m["source_name"] == fmla.SOURCE_NAME
+    assert m["corpus_name"] == fmla.CORPUS_NAME and m["attribution"] == fmla.ATTRIBUTION
+    default = write_artifacts(chunks, vecs, tmp_path / "d", "v")
+    assert default["source_id"] == "medlineplus"
+
+
 def test_hash_mismatch_raises(tmp_path):
     chunks, vecs = fake()
     m = write_artifacts(chunks, vecs, tmp_path, "v")

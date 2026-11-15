@@ -37,12 +37,9 @@ def wait(url, secs=60):
 
 def main():
     from tools import make_dummy_tables
-    make_dummy_tables.main(out=str(DATA), n=5000)
-    # Normalize the dummy table so encrypted scores never wrap (see SETUP.md).
-    rng = np.random.default_rng(0)
-    v = rng.standard_normal((5000, 384))
-    v /= np.linalg.norm(v, axis=1, keepdims=True)
-    np.clip(np.round(v * 127), -127, 127).astype(np.int8).tofile(DATA / "score_table.bin")
+    # Normalized rows so encrypted scores never wrap (see SETUP.md). The tool writes the
+    # manifest hashes after building the table, so the server's hash check passes.
+    make_dummy_tables.main(out=str(DATA), n=5000, normalize=True)
 
     subprocess.run(["go", "build", "-o", "crypto-server", "."], cwd=BIN, check=True)
     subprocess.run(["go", "build", "-o", "crypto-helper", "./cmd/crypto-helper"], cwd=BIN, check=True)

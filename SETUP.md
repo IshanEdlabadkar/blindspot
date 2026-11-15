@@ -100,8 +100,38 @@ Every spec performance target is met. With real PIR fetch (`BLIND_RAG_FETCH=pir`
 
 Token mode (`BLIND_RAG_SCORE_MODE=token`) is the old path: 34 MB up and ~2.7 s per question, kept as a fallback.
 
+## Benchmark: accuracy, speed and a trace of every question
+
+With `make demo` running (server + helper + Ollama), `make bench` runs every question in `eval/questions.jsonl` through the real client pipeline (the same one the UI uses) and writes `eval/results/bench/<run>/`:
+
+- `report.html`: open it in a browser. Summary tiles, where the time goes, a sortable table of questions ("problems only" filter), and, for the clicked question, a waterfall of every stage, every key-helper call and every HTTP request (client round trip vs the server's own time from its log), the encrypted top-k with the right page marked, the sources after rerank, and the answer.
+- `report.md`, `summary.json`, `traces.jsonl` (one row per question run: everything above, as data).
+
+What it measures:
+
+| Area | Measured |
+| --- | --- |
+| Accuracy | right page in encrypted top 1/3/5/10, in the model's sources after rerank, cited; answered vs declined as expected; wrong answers; 988/911 notice; sentences removed by the checker; per category |
+| Exactness | when `artifacts/` holds the server's corpus version: decrypted scores equal the plaintext int8 scores, and the encrypted top-k equals the plaintext top-k |
+| Speed | p50/p95 per stage (embed, encrypt, score, fetch, rerank, model, checks), per key-helper call, per endpoint (client, server, network); cold first question vs warm |
+| Bytes / privacy | up/down per question, one-time downloads, server log has only the four fields, exactly k fetched from every selected server |
+
+Useful variants (`ARGS=` passes options through `make`):
+
+```
+make bench-quick                                   # retrieval only, no model: ~1 s per question
+make bench ARGS="--limit 10 --repeat 3"            # speed: 3 runs per question
+make bench ARGS="--fetch pir"                      # real PIR fetch instead of the trivial download
+make bench ARGS="--servers http://127.0.0.1:8080,https://blindspot-cz2t.onrender.com"
+make bench ARGS="--category urgent"                # one category (or --ids q001,q002, --split test)
+uv run python -m eval.bench --compare eval/results/bench/RUN_A eval/results/bench/RUN_B   # side-by-side table
+```
+
+Runs are not committed (`eval/results/bench/` is ignored); copy a report somewhere if you want to keep it. B's `eval.run_eval` and `eval.scorecard` stay the source for the quality scorecard; the bench adds the encrypted path, timings and traces.
+
 ## Changelog
 
+- **Nov 15 (`bench`):** `make bench` / `make bench-quick`: accuracy, speed per stage and a clickable per-question trace (`eval/results/bench/<run>/report.html`). No setup beyond `make demo`; see "Benchmark" above.
 - **Nov 14, 21:45 (`integration`):** **search several document servers**: pick them in the sidebar, or set `BLIND_RAG_SERVERS=https://a,https://b`. Each selected server gets the same encrypted question and exactly 10 fetches; results merge on the device. See "Searching several document servers" in `docs/crypto.md`.
 - **Nov 14, 20:25:** **batched real PIR fetch:** `POST /v1/fetch_batch` carries all k selectors in one round trip (each still under its own fresh key), and the helper keeps a pool of prepared fetch keys. Real-PIR fetch for a question drops from ~0.5 s to ~25 ms locally, and saves ~1 s of round trips against Render. `crypto_client.make_selectors()` / `decrypt_records()`; `make measure --fetch pir` uses it. **C:** to use it in the pipeline, see "Batched PIR fetch" in `docs/crypto.md`. Restart `make helper` after pulling.
 - **Nov 14, 20:10:** remote deployment (Dockerfile, Render config, `DEPLOY.md`, Databricks publish script) moved to the **`deploy/render`** branch; `main` runs locally only. The server's URL/folder loader and live reload stay on `main`. `scripts/fix_march.sh` now strips `-march=native` from every file that sets it (it missed two).

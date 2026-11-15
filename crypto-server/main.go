@@ -1,6 +1,14 @@
 // Blind RAG document server. Computes only on encrypted data; holds no keys.
 //
-//	go run . -data ../data -addr :8080
+// The corpus (manifest.json, score_table.bin, fetch_store.bin) comes from the
+// provider's own storage, never from this program or its image:
+//
+//	go run . -data ../artifacts                          # a folder
+//	BLIND_RAG_DATA_URL=https://storage.example/blindrag/ go run .   # a URL
+//
+// Files are checked against the manifest's sha256 hashes. The server polls the
+// source and swaps in a new corpus when corpus_version changes, without a
+// restart; clients holding the old version get 409 and reload the manifest.
 //
 // Endpoints:
 //
@@ -11,20 +19,16 @@
 //	GET  /v1/fetch_store  the whole fetch store (trivial PIR: the client reads chunks locally)
 //	GET  /v1/fetch_hint   public PIR hint for the fetch store, downloaded once (real PIR)
 //	POST /v1/fetch        one encrypted selector in, one encrypted column out (real PIR)
+//	GET  /v1/server_log   recent log lines (only with -public-log)
 //
-// Logs one JSON line per request to -log (default <data>/server.log), the
-// fields fixed in contracts.py: ts, endpoint, response_bytes, latency_ms.
-// Request bodies are never logged or stored.
+// Logs one JSON line per request to -log, the fields fixed in contracts.py:
+// ts, endpoint, response_bytes, latency_ms. Request bodies are never logged or stored.
 package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
-	"fmt"
-	"io"
 	"log"
 	"math"
 	"net/http"
@@ -32,30 +36,27 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/IshanEdlabadkar/blindspot/crypto-server/blindcrypto"
 	"github.com/ahenzinger/underhood/underhood"
 )
 
-const maxScoreBody = 64 << 20 // token is ~33 MB
+const (
+	maxScoreBody = 64 << 20 // token-mode token is ~33 MB
+	recentMax    = 200
+	freeDelay    = 2 * time.Minute // keep a replaced corpus alive for in-flight requests
+)
 
 type server struct {
-	version  string
-	manifest map[string]any
-	hint     []byte
-	fetch    *blindcrypto.FetchServer // nil when real PIR is off
-	fetchHnt []byte
-	fetchMu  sync.Mutex
-	store    []byte
-	score    *blindcrypto.ScoreServer
-	mu       sync.Mutex // underhood's thread safety is undocumented; serialize
-	logOut   *json.Encoder
-	logMu    sync.Mutex
-	recent   [][]byte // last log lines, for GET /v1/server_log
+	cur    atomic.Pointer[corpus]
+	src    source
+	opts   corpusOpts
+	logOut *json.Encoder
+	logMu  sync.Mutex
+	recent [][]byte // last log lines, for GET /v1/server_log
 }
-
-const recentMax = 200
 
 func envBool(name string, def bool) bool {
 	switch os.Getenv(name) {
@@ -67,8 +68,18 @@ func envBool(name string, def bool) bool {
 	return def
 }
 
+func envDuration(name string, def time.Duration) time.Duration {
+	if d, err := time.ParseDuration(os.Getenv(name)); err == nil {
+		return d
+	}
+	return def
+}
+
 func main() {
-	dataDir := flag.String("data", "../data", "directory with manifest.json, score_table.bin, fetch_store.bin")
+	dataDir := flag.String("data", envOr("BLIND_RAG_DATA_DIR", "../artifacts"), "folder with the provider's manifest.json, score_table.bin, fetch_store.bin")
+	dataURL := flag.String("data-url", os.Getenv("BLIND_RAG_DATA_URL"), "base URL of the provider's corpus files (overrides -data); a query string such as a signed-URL token is kept")
+	dataAuth := os.Getenv("BLIND_RAG_DATA_AUTH") // optional Authorization header for -data-url; env only, never a flag
+	poll := flag.Duration("poll", envDuration("BLIND_RAG_DATA_POLL", time.Minute), "how often to check the source for a new corpus_version (0 = never)")
 	defAddr := "127.0.0.1:8080"
 	if port := os.Getenv("PORT"); port != "" { // set by Docker and Render
 		defAddr = "0.0.0.0:" + port
@@ -77,16 +88,23 @@ func main() {
 	tokenMode := flag.Bool("token-mode", envBool("BLIND_RAG_TOKEN_MODE", true), "also serve token mode (~650 MB RAM at 2,101 chunks; hint mode alone ~100 MB)")
 	realPIR := flag.Bool("pir", envBool("BLIND_RAG_PIR", true), "also serve real PIR fetch at /v1/fetch (~50 MB RAM, ~2 s startup at 2,101 chunks)")
 	publicLog := flag.Bool("public-log", envBool("BLIND_RAG_PUBLIC_LOG", false), "serve recent log lines at GET /v1/server_log (for the UI's server panel when the server is remote)")
-	logPath := flag.String("log", "", "request log file (default <data>/server.log)")
-	allowWrap := flag.Bool("allow-wrap", false, "start even if scores can exceed the modulus (random dummy tables only)")
+	logPath := flag.String("log", os.Getenv("BLIND_RAG_LOG"), "request log file (default <data>/server.log, or ./server.log with -data-url)")
+	allowWrap := flag.Bool("allow-wrap", false, "load even if scores can exceed the modulus (random dummy tables only)")
 	flag.Parse()
 
-	s, err := load(*dataDir, *allowWrap, *tokenMode, *realPIR)
+	src, err := sourceFromFlags(*dataDir, *dataURL, dataAuth)
+	if err != nil {
+		log.Fatal(err)
+	}
+	s, err := newServer(src, corpusOpts{allowWrap: *allowWrap, tokenMode: *tokenMode, realPIR: *realPIR})
 	if err != nil {
 		log.Fatal(err)
 	}
 	if *logPath == "" {
-		*logPath = filepath.Join(*dataDir, "server.log")
+		*logPath = "server.log"
+		if d, ok := src.(dirSource); ok {
+			*logPath = filepath.Join(d.dir, "server.log")
+		}
 	}
 	lf, err := os.OpenFile(*logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -94,184 +112,112 @@ func main() {
 	}
 	defer lf.Close()
 	s.logOut = json.NewEncoder(lf)
-	log.Printf("request log: %s", *logPath)
-	defer s.score.Free()
+	log.Printf("corpus source: %s; request log: %s", src, *logPath)
 
+	mux := s.routes(*publicLog)
+	if !*tokenMode {
+		log.Printf("token mode off: hint mode only")
+	}
+	if *poll > 0 {
+		go s.pollLoop(*poll)
+		log.Printf("checking for a new corpus_version every %v", *poll)
+	}
+	log.Printf("serving corpus %s on http://%s", s.cur.Load().version, *addr)
+	log.Fatal(http.ListenAndServe(*addr, mux))
+}
+
+func envOr(name, def string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	return def
+}
+
+func newServer(src source, o corpusOpts) (*server, error) {
+	c, err := loadCorpus(src, o)
+	if err != nil {
+		return nil, err
+	}
+	s := &server{src: src, opts: o, logOut: json.NewEncoder(nopWriter{})}
+	s.cur.Store(c)
+	return s, nil
+}
+
+type nopWriter struct{}
+
+func (nopWriter) Write(b []byte) (int, error) { return len(b), nil }
+
+// load is the folder-based constructor used by the tests.
+func load(dir string, allowWrap, tokenMode, realPIR bool) (*server, error) {
+	return newServer(dirSource{dir}, corpusOpts{allowWrap: allowWrap, tokenMode: tokenMode, realPIR: realPIR})
+}
+
+func (s *server) routes(publicLog bool) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/manifest", s.logged("/v1/manifest", s.handleManifest))
 	mux.HandleFunc("GET /v1/score_hint", s.logged("/v1/score_hint", s.handleHint))
 	mux.HandleFunc("POST /v1/score", s.logged("/v1/score", s.handleScore))
 	mux.HandleFunc("GET /v1/fetch_store", s.logged("/v1/fetch_store", s.handleFetchStore))
-	if s.fetch != nil {
-		mux.HandleFunc("GET /v1/fetch_hint", s.logged("/v1/fetch_hint", s.handleFetchHint))
-		mux.HandleFunc("POST /v1/fetch", s.logged("/v1/fetch", s.handleFetch))
-	}
-	if *publicLog {
+	mux.HandleFunc("GET /v1/fetch_hint", s.logged("/v1/fetch_hint", s.handleFetchHint))
+	mux.HandleFunc("POST /v1/fetch", s.logged("/v1/fetch", s.handleFetch))
+	if publicLog {
 		// Not itself logged, so a UI polling it does not flood the log.
 		mux.HandleFunc("GET /v1/server_log", s.handleServerLog)
 		log.Printf("public log enabled: GET /v1/server_log")
 	}
-	if !*tokenMode {
-		log.Printf("token mode off: hint mode only")
-	}
-	log.Printf("serving corpus %s on http://%s", s.version, *addr)
-	log.Fatal(http.ListenAndServe(*addr, mux))
+	return mux
 }
 
-func load(dir string, allowWrap, tokenMode, realPIR bool) (*server, error) {
-	raw, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+// reload loads the source's corpus if its version differs from the one being
+// served. On any error the current corpus keeps serving.
+func (s *server) reload() (bool, error) {
+	v, err := readVersion(s.src)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, fmt.Errorf("manifest.json: %w", err)
+	old := s.cur.Load()
+	if v == old.version {
+		return false, nil
 	}
-	version, _ := m["corpus_version"].(string)
-	nf, _ := m["num_chunks"].(float64)
-	emb, _ := m["embedding"].(map[string]any)
-	df, _ := emb["dim"].(float64)
-	pirM, _ := m["pir"].(map[string]any)
-	lf, _ := pirM["record_bytes"].(float64)
-	n, d, recLen := uint64(nf), uint64(df), uint64(lf)
-	if version == "" || n == 0 || d == 0 || recLen == 0 {
-		return nil, fmt.Errorf("manifest needs corpus_version, num_chunks, embedding.dim, pir.record_bytes")
-	}
-
-	tableBytes, err := os.ReadFile(filepath.Join(dir, "score_table.bin"))
+	c, err := loadCorpus(s.src, s.opts)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	if uint64(len(tableBytes)) != n*d {
-		return nil, fmt.Errorf("score_table.bin is %d bytes, want N*d = %d", len(tableBytes), n*d)
-	}
-	store, err := os.ReadFile(filepath.Join(dir, "fetch_store.bin"))
-	if err != nil {
-		return nil, err
-	}
-	if uint64(len(store)) != n*recLen {
-		return nil, fmt.Errorf("fetch_store.bin is %d bytes, want N*L = %d", len(store), n*recLen)
-	}
-
-	table := make([]int8, len(tableBytes))
-	for i, b := range tableBytes {
-		table[i] = int8(b)
-	}
-	if err := checkScoreRange(table, n, d, allowWrap); err != nil {
-		return nil, err
-	}
-	db, err := blindcrypto.NewScoreDB(table, n, d)
-	if err != nil {
-		return nil, err
-	}
-	hash := sha256.Sum256(tableBytes)
-	seed := blindcrypto.SeedFromTable(hash)
-	start := time.Now()
-	ss := blindcrypto.NewScoreServerHintOnly(db, seed)
-	if tokenMode {
-		ss = blindcrypto.NewScoreServer(db, seed)
-	}
-	hint := blindcrypto.EncodeHint(ss.Hint())
-	log.Printf("precomputed score table (%d x %d) and %.1f MB hint in %v", n, d, float64(len(hint))/1e6, time.Since(start))
-
-	// Publish what the client needs: the public seed and the fetch mode.
-	scoring, _ := m["scoring"].(map[string]any)
-	if scoring == nil {
-		scoring = map[string]any{}
-	}
-	scoring["seed"] = hex.EncodeToString(seed[:])
-	scoring["modulus"] = blindcrypto.P
-	scoring["library"] = "underhood (Tiptoe) + SimplePIR LHE"
-	scoring["params"] = fmt.Sprintf("logq=64 n=2048 p=2^17 d=%d", d)
-	scoring["mode"] = "hint" // clients may still send a token (token mode) instead, if enabled
-	scoring["token_mode"] = tokenMode
-	scoring["hint_path"] = "/v1/score_hint"
-	scoring["hint_bytes"] = len(hint)
-	scoring["hint_sha256"] = blindcrypto.HintSHA256(hint)
-	m["scoring"] = scoring
-	pirM["mode"] = "trivial" // default; "simplepir" is offered below when enabled
-	pirM["modes"] = []string{"trivial"}
-	pirM["library"] = "trivial PIR (whole store)"
-	pirM["params"] = "none"
-
-	var fs *blindcrypto.FetchServer
-	var fetchHint []byte
-	if realPIR {
-		start := time.Now()
-		fdb, err := blindcrypto.NewFetchDB(store, n, recLen)
-		if err != nil {
-			return nil, err
-		}
-		sh := sha256.Sum256(store)
-		fseed := blindcrypto.SeedFromTable(sh)
-		fs = blindcrypto.NewFetchServer(fdb, fseed)
-		fetchHint = blindcrypto.EncodeHint(fs.Hint())
-		pirM["modes"] = []string{"trivial", "simplepir"}
-		pirM["library"] = "trivial PIR (whole store) or SimplePIR"
-		pirM["params"] = fmt.Sprintf("simplepir: logq=64 n=2048 p=2^16 L=%d M=%d", fs.Info.L, fs.Info.M)
-		pirM["seed"] = hex.EncodeToString(fseed[:])
-		pirM["hint_path"] = "/v1/fetch_hint"
-		pirM["hint_bytes"] = len(fetchHint)
-		pirM["hint_sha256"] = blindcrypto.HintSHA256(fetchHint)
-		log.Printf("precomputed PIR fetch store (L=%d x M=%d) and %.1f MB hint in %v",
-			fs.Info.L, fs.Info.M, float64(len(fetchHint))/1e6, time.Since(start))
-	}
-
-	return &server{
-		version: version, manifest: m, hint: hint, store: store, score: ss,
-		fetch: fs, fetchHnt: fetchHint,
-		logOut: json.NewEncoder(io.Discard),
-	}, nil
+	s.cur.Store(c)
+	log.Printf("now serving corpus %s (was %s)", c.version, old.version)
+	time.AfterFunc(freeDelay, old.free)
+	return true, nil
 }
 
-// checkScoreRange: scores are exact only while |score| < P/2 = 65,536.
-// By Cauchy-Schwarz a query quantized like the rows scores at most about
-// (max row norm)^2. Unit vectors at scale 127 give ~16,100, a 4x margin.
-// Refuse to start if a close match could wrap: it would silently vanish
-// from the top k.
-func checkScoreRange(table []int8, n, d uint64, allowWrap bool) error {
-	var worst float64
-	for i := uint64(0); i < n; i++ {
-		var ss float64
-		for _, x := range table[i*d : (i+1)*d] {
-			ss += float64(x) * float64(x)
+func (s *server) pollLoop(every time.Duration) {
+	for range time.Tick(every) {
+		if _, err := s.reload(); err != nil {
+			log.Printf("corpus check: %v (still serving %s)", err, s.cur.Load().version)
 		}
-		worst = math.Max(worst, math.Sqrt(ss))
 	}
-	bound := worst * worst
-	if bound < float64(blindcrypto.P/2) {
-		log.Printf("score range OK: max row norm %.0f, worst-case score ~%.0f < %d", worst, bound, blindcrypto.P/2)
-		return nil
-	}
-	msg := fmt.Sprintf("score_table can overflow: max row norm %.0f, so a close match scores ~%.0f, above the limit %d. "+
-		"Rebuild with L2-normalized rows and quantization scale 127 (manifest quantization.scale = 127).", worst, bound, blindcrypto.P/2)
-	if allowWrap {
-		log.Printf("WARNING: %s Continuing because -allow-wrap is set.", msg)
-		return nil
-	}
-	return fmt.Errorf("%s Use -allow-wrap only for random dummy tables", msg)
 }
 
 func (s *server) handleManifest(w http.ResponseWriter, r *http.Request) {
-	// hint_url is absolute, built from the address the client used, so the
-	// client needs no extra configuration to find it.
+	c := s.cur.Load()
+	// hint URLs are absolute, built from the address the client used, so the
+	// client needs no extra configuration to find them.
 	scheme := "http"
 	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 		scheme = "https"
 	}
-	m := make(map[string]any, len(s.manifest))
-	for k, v := range s.manifest {
+	m := make(map[string]any, len(c.manifest))
+	for k, v := range c.manifest {
 		m[k] = v
 	}
 	sc := make(map[string]any)
-	for k, v := range s.manifest["scoring"].(map[string]any) {
+	for k, v := range c.manifest["scoring"].(map[string]any) {
 		sc[k] = v
 	}
 	sc["hint_url"] = scheme + "://" + r.Host + "/v1/score_hint"
 	m["scoring"] = sc
-	if s.fetch != nil {
+	if c.fetch != nil {
 		pm := make(map[string]any)
-		for k, v := range s.manifest["pir"].(map[string]any) {
+		for k, v := range c.manifest["pir"].(map[string]any) {
 			pm[k] = v
 		}
 		pm["hint_url"] = scheme + "://" + r.Host + "/v1/fetch_hint"
@@ -306,46 +252,59 @@ func (s *server) handleServerLog(w http.ResponseWriter, r *http.Request) {
 	w.Write(b.Bytes())
 }
 
-func (s *server) handleFetchHint(w http.ResponseWriter, r *http.Request) {
+func serveBlob(w http.ResponseWriter, version string, b []byte) {
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("X-Corpus-Version", s.version)
-	w.Write(s.fetchHnt)
+	w.Header().Set("X-Corpus-Version", version)
+	w.Write(b)
+}
+
+func (s *server) handleHint(w http.ResponseWriter, r *http.Request) {
+	c := s.cur.Load()
+	serveBlob(w, c.version, c.hint)
+}
+
+func (s *server) handleFetchStore(w http.ResponseWriter, r *http.Request) {
+	c := s.cur.Load()
+	serveBlob(w, c.version, c.store)
+}
+
+func (s *server) handleFetchHint(w http.ResponseWriter, r *http.Request) {
+	c := s.cur.Load()
+	if c.fetch == nil {
+		http.Error(w, "real PIR is off on this server", http.StatusNotFound)
+		return
+	}
+	serveBlob(w, c.version, c.fetchHnt)
 }
 
 // handleFetch: real PIR. The server multiplies every record by the encrypted
 // selector, so it touches all of them equally and learns nothing about which
 // one was wanted.
 func (s *server) handleFetch(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("X-Corpus-Version") != s.version {
+	c := s.cur.Load()
+	if c.fetch == nil {
+		http.Error(w, "real PIR is off on this server", http.StatusNotFound)
+		return
+	}
+	if r.Header.Get("X-Corpus-Version") != c.version {
 		http.Error(w, "stale corpus_version", http.StatusConflict)
 		return
 	}
 	q, err := blindcrypto.UnmarshalFetchRequest(http.MaxBytesReader(w, r.Body, 1<<20))
-	if err != nil || q.Query.Rows() < s.fetch.Info.M {
+	if err != nil || q.Query.Rows() < c.fetch.Info.M {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	s.fetchMu.Lock()
-	ans := s.fetch.Answer(q)
-	s.fetchMu.Unlock()
+	c.fetchMu.Lock()
+	ans := c.fetch.Answer(q)
+	c.fetchMu.Unlock()
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(blindcrypto.MarshalAnswer(ans))
 }
 
-func (s *server) handleHint(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("X-Corpus-Version", s.version)
-	w.Write(s.hint)
-}
-
-func (s *server) handleFetchStore(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("X-Corpus-Version", s.version)
-	w.Write(s.store)
-}
-
 func (s *server) handleScore(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("X-Corpus-Version") != s.version {
+	c := s.cur.Load()
+	if r.Header.Get("X-Corpus-Version") != c.version {
 		http.Error(w, "stale corpus_version", http.StatusConflict)
 		return
 	}
@@ -354,27 +313,27 @@ func (s *server) handleScore(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	if len(req.Token) > 0 && !s.score.TokenMode() {
+	if len(req.Token) > 0 && !c.score.TokenMode() {
 		http.Error(w, "token mode is off on this server; use hint mode", http.StatusBadRequest)
 		return
 	}
-	if req.Query.Query.Rows() < s.score.DB.Info.M {
+	if req.Query.Query.Rows() < c.score.DB.Info.M {
 		http.Error(w, "bad query size", http.StatusBadRequest)
 		return
 	}
-	resp := s.compute(req)
+	resp := c.compute(req)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(resp.MarshalBinary())
 }
 
-func (s *server) compute(req *blindcrypto.ScoreRequest) *blindcrypto.ScoreResponse {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (c *corpus) compute(req *blindcrypto.ScoreRequest) *blindcrypto.ScoreResponse {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ta := &underhood.HintAnswer{} // hint mode: the client already has the hint
-	if len(req.Token) > 0 && s.score.TokenMode() {
-		ta = s.score.HintAnswer(&req.Token) // token mode
+	if len(req.Token) > 0 && c.score.TokenMode() {
+		ta = c.score.HintAnswer(&req.Token) // token mode
 	}
-	return &blindcrypto.ScoreResponse{TokenAnswer: ta, Scores: s.score.Answer(req.Query)}
+	return &blindcrypto.ScoreResponse{TokenAnswer: ta, Scores: c.score.Answer(req.Query)}
 }
 
 // countingWriter records status and response size for the log line.

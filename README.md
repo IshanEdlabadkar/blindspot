@@ -21,7 +21,7 @@ Search a sensitive knowledge base without the server learning the question, the 
 - [x] `make measure`: latency, bytes, CPU, log check
 - [x] Hint-mode scoring: 3 KB up, ~6 ms per question; every spec performance target met
 - [x] Real PIR fetch (optional, `BLIND_RAG_FETCH=pir`): 10 private fetches per question, chunks byte-identical to trivial PIR
-- [x] Remote deploy: Dockerfile + Render blueprint (image not yet built; first Render build is its test)
+- [x] Remote deploy: Render runs code only; the corpus lives in the provider's storage (Databricks volume), hash-checked and hot-swapped by `corpus_version` (image not yet built; first Render build is its test)
 - [ ] Run `make measure` on the demo laptop (hours 13 to 16)
 
 ## Crypto design decisions
@@ -36,6 +36,7 @@ Search a sensitive knowledge base without the server learning the question, the 
 | Real PIR fetch as an option (`POST /v1/fetch`) | SimplePIR with the hint downloaded once (8.4 MB): every chunk in its own column, 16 bits per element, so a fetch is 17 KB up and 8 KB down. It scales to large corpora where downloading everything is not an option. (Tiptoe's own PIR was ruled out: ~33 MB token per fetch.) |
 | Python calls Go through a local helper process | Works the same on Mac and on Windows (WSL2). Keys stay in the helper's memory. |
 | Public scoring seed = first 16 bytes of SHA-256(score table) | Server and client agree with no extra manifest field for B to write. The seed is public by design. |
+| Corpus loaded from the provider's storage, never shipped with the code | The provider's ingestion publishes to their storage; the server verifies hashes and swaps in new versions live, per the spec's update flow. |
 | Little-endian everywhere | Matches `contracts.py`. |
 | Fallback | If anything in crypto breaks, keep the mock path. No switch to Apple's library. |
 

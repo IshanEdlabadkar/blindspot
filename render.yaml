@@ -15,3 +15,9 @@ services:
         value: "0"            # hint mode only: fits in 512 MB
       - key: BLIND_RAG_PUBLIC_LOG
         value: "1"            # GET /v1/server_log for the UI's server panel
+      - key: BLIND_RAG_DATA_URL
+        sync: false           # the provider's corpus storage; set in the Render dashboard (see DEPLOY.md)
+      - key: BLIND_RAG_DATA_AUTH
+        sync: false           # optional Authorization header for that storage
+      - key: BLIND_RAG_DATA_POLL
+        value: 1m             # check for a new corpus_version every minute

@@ -1,7 +1,9 @@
-# Blind RAG document server, with B's tables (artifacts/) baked in.
-# Build from the repo root on a branch that has artifacts/ (e.g. main):
+# Blind RAG document server: code only. The corpus is NOT in the image; the
+# server loads it at startup from the provider's storage and picks up new
+# versions on its own:
 #   docker build -t blind-rag-server .
-#   docker run -p 8080:8080 blind-rag-server
+#   docker run -p 8080:8080 -e BLIND_RAG_DATA_URL=https://<storage>/<corpus>/ blind-rag-server
+#   docker run -p 8080:8080 -v /srv/corpus:/data:ro blind-rag-server      # or a mounted folder
 # Render builds this automatically from render.yaml. See DEPLOY.md.
 
 FROM golang:1.24-bookworm AS build
@@ -22,12 +24,11 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl libstdc++6 && rm -rf /var/lib/apt/lists/* \
  && useradd -r -u 10001 blindrag && mkdir -p /data /logs && chown blindrag /logs
 COPY --from=build /out/crypto-server /usr/local/bin/crypto-server
-COPY artifacts/manifest.json artifacts/score_table.bin artifacts/fetch_store.bin /data/
 USER blindrag
 # The server binds 0.0.0.0:$PORT. Render sets PORT (default 10000).
 # Hint-mode scoring + real PIR fetch (~210 MB RAM). BLIND_RAG_TOKEN_MODE=1 adds the 33 MB-per-question
 # fallback (~650 MB more); BLIND_RAG_PIR=0 turns off real PIR fetch.
-ENV PORT=8080 BLIND_RAG_TOKEN_MODE=0 BLIND_RAG_PUBLIC_LOG=1
+ENV PORT=8080 BLIND_RAG_TOKEN_MODE=0 BLIND_RAG_PUBLIC_LOG=1 BLIND_RAG_DATA_DIR=/data BLIND_RAG_LOG=/logs/server.log
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s CMD curl -fsS "http://127.0.0.1:${PORT}/v1/manifest" >/dev/null || exit 1
-ENTRYPOINT ["crypto-server", "-data", "/data", "-log", "/logs/server.log"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=120s CMD curl -fsS "http://127.0.0.1:${PORT}/v1/manifest" >/dev/null || exit 1
+ENTRYPOINT ["crypto-server"]

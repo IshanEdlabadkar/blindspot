@@ -57,3 +57,18 @@ python -m pytest tests -q                             # 6 checks, should all pas
 - The questions were written from page titles, not chunk text. Reword any that B's chunks cannot answer.
 - The attacker console is a first version and only means something against the real server.
 - The real embedding model path (`BLIND_RAG_EMBED=real`) has not been run yet; only `fake` was tested.
+
+## Full system on the demo laptop (A + B + C merged)
+
+Four terminals from the repo root. Ollama must be running with `llama3.2:3b` pulled (B's `client/answer.py`).
+
+```bash
+make server                       # A: real crypto server on B's artifacts/, log at data/server.log
+make helper                       # A: key holder on this device
+ollama serve                      # B: local model (skip if the Ollama app is already running)
+BLIND_RAG_CRYPTO=real BLIND_RAG_ANSWER=real python3 -m streamlit run ui/app.py
+```
+
+To develop without crypto: `python3 -m mock_server.server --data artifacts --port 8080`, then run the UI without `BLIND_RAG_CRYPTO`.
+
+`eval/questions.jsonl` is B's set (the eval ran on it). C's 25 are in `eval/questions_c.jsonl`.

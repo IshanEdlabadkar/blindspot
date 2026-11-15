@@ -59,10 +59,22 @@ def _cite(chunk: dict) -> dict:
 
 
 def make_answer(text: str, chunks: list) -> dict:
-    """The answer shape returned by ask(), ask_plain() and answer()."""
-    return {"declined": False, "answer": text, "citations": [_cite(c) for c in chunks]}
+    """The answer shape returned by ask(), ask_plain() and answer().
+
+    B's answer() returns "status": "answered" | "declined"; the UI reads "declined".
+    Both keys are always present (see normalize_result).
+    """
+    return {"status": "answered", "declined": False, "answer": text, "citations": [_cite(c) for c in chunks]}
 
 
 def make_decline(closest: list, text: str = DECLINE_TEXT) -> dict:
     """Same shape; citations hold the closest passages to show instead."""
-    return {"declined": True, "answer": text, "citations": [_cite(c) for c in closest]}
+    return {"status": "declined", "declined": True, "answer": text, "citations": [_cite(c) for c in closest]}
+
+
+def normalize_result(result: dict) -> dict:
+    """Make any answer() result carry both "status" and "declined"."""
+    declined = bool(result.get("declined", result.get("status") == "declined"))
+    result["declined"] = declined
+    result.setdefault("status", "declined" if declined else "answered")
+    return result

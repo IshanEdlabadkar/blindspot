@@ -16,6 +16,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -27,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -45,16 +47,35 @@ type server struct {
 	mu       sync.Mutex // underhood's thread safety is undocumented; serialize
 	logOut   *json.Encoder
 	logMu    sync.Mutex
+	recent   [][]byte // last log lines, for GET /v1/server_log
+}
+
+const recentMax = 200
+
+func envBool(name string, def bool) bool {
+	switch os.Getenv(name) {
+	case "1", "true", "yes":
+		return true
+	case "0", "false", "no":
+		return false
+	}
+	return def
 }
 
 func main() {
 	dataDir := flag.String("data", "../data", "directory with manifest.json, score_table.bin, fetch_store.bin")
-	addr := flag.String("addr", "127.0.0.1:8080", "listen address (use 0.0.0.0:8080 to serve other machines)")
+	defAddr := "127.0.0.1:8080"
+	if port := os.Getenv("PORT"); port != "" { // set by Docker and Render
+		defAddr = "0.0.0.0:" + port
+	}
+	addr := flag.String("addr", defAddr, "listen address (use 0.0.0.0:8080 to serve other machines; $PORT sets 0.0.0.0:$PORT)")
+	tokenMode := flag.Bool("token-mode", envBool("BLIND_RAG_TOKEN_MODE", true), "also serve token mode (~650 MB RAM at 2,101 chunks; hint mode alone ~100 MB)")
+	publicLog := flag.Bool("public-log", envBool("BLIND_RAG_PUBLIC_LOG", false), "serve recent log lines at GET /v1/server_log (for the UI's server panel when the server is remote)")
 	logPath := flag.String("log", "", "request log file (default <data>/server.log)")
 	allowWrap := flag.Bool("allow-wrap", false, "start even if scores can exceed the modulus (random dummy tables only)")
 	flag.Parse()
 
-	s, err := load(*dataDir, *allowWrap)
+	s, err := load(*dataDir, *allowWrap, *tokenMode)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,11 +96,19 @@ func main() {
 	mux.HandleFunc("GET /v1/score_hint", s.logged("/v1/score_hint", s.handleHint))
 	mux.HandleFunc("POST /v1/score", s.logged("/v1/score", s.handleScore))
 	mux.HandleFunc("GET /v1/fetch_store", s.logged("/v1/fetch_store", s.handleFetchStore))
+	if *publicLog {
+		// Not itself logged, so a UI polling it does not flood the log.
+		mux.HandleFunc("GET /v1/server_log", s.handleServerLog)
+		log.Printf("public log enabled: GET /v1/server_log")
+	}
+	if !*tokenMode {
+		log.Printf("token mode off: hint mode only")
+	}
 	log.Printf("serving corpus %s on http://%s", s.version, *addr)
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 
-func load(dir string, allowWrap bool) (*server, error) {
+func load(dir string, allowWrap, tokenMode bool) (*server, error) {
 	raw, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	if err != nil {
 		return nil, err
@@ -128,7 +157,10 @@ func load(dir string, allowWrap bool) (*server, error) {
 	hash := sha256.Sum256(tableBytes)
 	seed := blindcrypto.SeedFromTable(hash)
 	start := time.Now()
-	ss := blindcrypto.NewScoreServer(db, seed)
+	ss := blindcrypto.NewScoreServerHintOnly(db, seed)
+	if tokenMode {
+		ss = blindcrypto.NewScoreServer(db, seed)
+	}
 	hint := blindcrypto.EncodeHint(ss.Hint())
 	log.Printf("precomputed score table (%d x %d) and %.1f MB hint in %v", n, d, float64(len(hint))/1e6, time.Since(start))
 
@@ -141,7 +173,8 @@ func load(dir string, allowWrap bool) (*server, error) {
 	scoring["modulus"] = blindcrypto.P
 	scoring["library"] = "underhood (Tiptoe) + SimplePIR LHE"
 	scoring["params"] = fmt.Sprintf("logq=64 n=2048 p=2^17 d=%d", d)
-	scoring["mode"] = "hint" // clients may still send a token (token mode) instead
+	scoring["mode"] = "hint" // clients may still send a token (token mode) instead, if enabled
+	scoring["token_mode"] = tokenMode
 	scoring["hint_path"] = "/v1/score_hint"
 	scoring["hint_bytes"] = len(hint)
 	scoring["hint_sha256"] = blindcrypto.HintSHA256(hint)
@@ -206,6 +239,30 @@ func (s *server) handleManifest(w http.ResponseWriter, r *http.Request) {
 	w.Write(out)
 }
 
+// handleServerLog returns the last ?n= log lines (default 50) as JSON lines:
+// the same records as the log file, which hold only what any network observer
+// could see anyway (time, endpoint, response size, latency).
+func (s *server) handleServerLog(w http.ResponseWriter, r *http.Request) {
+	n := 50
+	if v, err := strconv.Atoi(r.URL.Query().Get("n")); err == nil && v > 0 && v <= recentMax {
+		n = v
+	}
+	s.logMu.Lock()
+	lines := s.recent
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	var b bytes.Buffer
+	for _, ln := range lines {
+		b.Write(ln)
+		b.WriteByte('\n')
+	}
+	s.logMu.Unlock()
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(b.Bytes())
+}
+
 func (s *server) handleHint(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("X-Corpus-Version", s.version)
@@ -228,6 +285,10 @@ func (s *server) handleScore(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+	if len(req.Token) > 0 && !s.score.TokenMode() {
+		http.Error(w, "token mode is off on this server; use hint mode", http.StatusBadRequest)
+		return
+	}
 	if req.Query.Query.Rows() < s.score.DB.Info.M {
 		http.Error(w, "bad query size", http.StatusBadRequest)
 		return
@@ -241,7 +302,7 @@ func (s *server) compute(req *blindcrypto.ScoreRequest) *blindcrypto.ScoreRespon
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ta := &underhood.HintAnswer{} // hint mode: the client already has the hint
-	if len(req.Token) > 0 {
+	if len(req.Token) > 0 && s.score.TokenMode() {
 		ta = s.score.HintAnswer(&req.Token) // token mode
 	}
 	return &blindcrypto.ScoreResponse{TokenAnswer: ta, Scores: s.score.Answer(req.Query)}
@@ -270,13 +331,18 @@ func (s *server) logged(endpoint string, h http.HandlerFunc) http.HandlerFunc {
 			if rec := recover(); rec != nil {
 				http.Error(cw, "bad request", http.StatusBadRequest)
 			}
-			s.logMu.Lock()
-			s.logOut.Encode(map[string]any{
+			line, _ := json.Marshal(map[string]any{
 				"ts":             start.UTC().Format("2006-01-02T15:04:05.000Z"),
 				"endpoint":       endpoint,
 				"response_bytes": cw.n,
 				"latency_ms":     math.Round(float64(time.Since(start).Microseconds())/10) / 100,
 			})
+			s.logMu.Lock()
+			s.logOut.Encode(json.RawMessage(line))
+			s.recent = append(s.recent, line)
+			if len(s.recent) > recentMax {
+				s.recent = s.recent[len(s.recent)-recentMax:]
+			}
 			s.logMu.Unlock()
 		}()
 		h(cw, r)

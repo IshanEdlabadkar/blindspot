@@ -118,6 +118,8 @@ def keygen(manifest=None) -> Key:
         try:
             _load_hint(key)
         except Exception as e:  # never block a question on the faster path
+            if key._scoring.get("token_mode") is False:
+                raise RuntimeError(f"hint mode failed ({e}) and this server has token mode off") from e
             print(f"crypto_client: hint mode unavailable ({e}); using token mode", file=sys.stderr)
             key.mode = "token"
     key.prepare_next()

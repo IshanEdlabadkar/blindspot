@@ -59,7 +59,7 @@ func TestEndToEndHTTP(t *testing.T) {
 	n, d, L := 5000, 384, 2048
 	dir := t.TempDir()
 	table := writeTestCorpus(t, dir, n, d, L)
-	s, err := load(dir, false)
+	s, err := load(dir, false, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestEndToEndHintModeHTTP(t *testing.T) {
 	n, d, L := 2101, 384, 2048
 	dir := t.TempDir()
 	table := writeTestCorpus(t, dir, n, d, L)
-	s, err := load(dir, false)
+	s, err := load(dir, false, true)
 	if err != nil {
 		t.Fatal(err)
 	}

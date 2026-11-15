@@ -38,3 +38,7 @@ Reuse these tokens for every screen; change only on an explicit request.
 
 ## Copy
 - Plain and specific, no em dashes, no slogans. Library words: call slip, hand it in, receipt.
+
+## Desk objects
+- `web/src/DeskObjects.tsx` scatters real library things on the empty desk at random on each view: pencil, paperclip, date stamp, ink pad, closed books with call numbers, an open book, reading glasses, a magnifying glass, a rubber band, a coffee ring, a date-due card, index tabs.
+- Drawn flat in ink from this palette. They sit behind content and are placed only where they don't touch text, slips, cards, the receipt or the mascot. Existing objects stay put as answers arrive; a new view reshuffles them.

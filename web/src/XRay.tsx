@@ -117,7 +117,7 @@ export function XRay({ turn, number, status, onBack }: { turn: Turn; number: num
   const t = (v?: number, d = 2) => (v === undefined ? '...' : `${v.toFixed(d)} s`)
 
   return (
-    <main className="mx-auto grid max-w-[1120px] gap-10 px-5 pt-6 pb-24 md:grid-cols-[1fr_480px] md:gap-16">
+    <main className="relative z-[1] mx-auto grid max-w-[1120px] gap-10 px-5 pt-6 pb-24 md:grid-cols-[1fr_480px] md:gap-16">
       <div className="md:sticky md:top-8 md:self-start">
         <button onClick={onBack} className="text-[15px] text-ink underline decoration-graphite/50 underline-offset-4 hover:decoration-badger">
           Back to the conversation

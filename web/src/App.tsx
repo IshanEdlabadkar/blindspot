@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ask, getStatus, type Status } from './api'
 import { Burrow } from './Burrow'
 import { Composer, Landing, TurnView } from './Chat'
+import { DeskObjects } from './DeskObjects'
 import type { Turn } from './turn'
 import { XRay } from './XRay'
 
@@ -70,8 +71,10 @@ export default function App() {
   )
 
   return (
-    <div className="desk min-h-dvh">
-      <header className="mx-auto flex h-16 max-w-[1120px] items-center justify-between px-5">
+    <div className="desk relative min-h-dvh">
+      <DeskObjects viewKey={xrayTurn ? `xray-${xrayTurn.id}` : turns.length ? 'chat' : 'landing'}
+        version={turns.map((t) => `${t.phase}${t.proof ? 'p' : ''}`).join(',')} />
+      <header className="relative z-[1] mx-auto flex h-16 max-w-[1120px] items-center justify-between px-5">
         <button onClick={() => setXray(null)} className="flex items-center gap-2 font-display text-[20px] font-black tracking-[-0.02em] text-ink">
           <Burrow size={32} mood="peek" /> Blind RAG
         </button>
@@ -84,11 +87,11 @@ export default function App() {
         <Landing status={status} onAsk={onAsk}>{composer(false)}</Landing>
       ) : (
         <>
-          <main className="mx-auto max-w-[760px] px-5 pb-64">
+          <main className="relative z-[1] mx-auto max-w-[760px] px-5 pb-64">
             {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} onXray={() => setXray(t.id)} />)}
             <div ref={bottom} />
           </main>
-          <div className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4">
+          <div data-fixed className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4">
             <div className="mx-auto max-w-[760px] px-5">{composer(true)}</div>
           </div>
         </>

@@ -57,8 +57,10 @@ def test_run_answers_keeps_ids_and_records_agreement_and_bytes():
     qs = [{"id": "q1", "question": "x", "source_url": "u3", "category": "basic", "expect": "answer", "urgent": None},
           {"id": "q2", "question": "y", "source_url": None, "category": "out_of_scope", "expect": "decline",
            "urgent": None}]
-    rows = run_answers(qs, lambda q: FakePipeline().ask_traced(q), reference_ids={"q1": [3, 4, 5], "q2": [9, 8, 7]})
-    assert [r["id"] for r in rows] == ["q1", "q2"]
+    saved = []
+    rows = run_answers(qs, lambda q: FakePipeline().ask_traced(q), reference_ids={"q1": [3, 4, 5], "q2": [9, 8, 7]},
+                       on_row=lambda r: saved.append(r["id"]))
+    assert [r["id"] for r in rows] == ["q1", "q2"] and saved == ["q1", "q2"]
     assert rows[0]["gold_cited"] is True and rows[0]["behaved"] is True
     assert rows[1]["behaved"] is False  # expected a decline, got an answer
     assert rows[0]["agrees_with_plaintext"] is True and rows[1]["agrees_with_plaintext"] is False

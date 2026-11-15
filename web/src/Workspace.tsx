@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ask, type Status } from './api'
 import { Composer, Landing, TurnView } from './Chat'
 import { DeskObjects } from './DeskObjects'
+import { Reveal } from './Reveal'
 import { Simulation } from './Simulation'
+import { toRun } from './pipeline3d/run'
 import type { Turn } from './turn'
 import { XRay } from './XRay'
+
+const Sim = lazy(() => import('./pipeline3d/Sim'))
 
 export function Workspace({ mode, status, disabled, toggle, homeTick }: { mode: 'chat' | 'demo'; status: Status | null; disabled: Set<string>; toggle: (url: string) => void; homeTick: number }) {
   const demo = mode === 'demo'
@@ -49,6 +53,22 @@ export function Workspace({ mode, status, disabled, toggle, homeTick }: { mode: 
     }
   }, [compare, demo, searched.join(',')])
 
+  // The 3D walkthrough at the bottom of the demo chat: always the latest answered question.
+  const simTurn = demo ? [...turns].reverse().find((t) => t.result && t.proof) : undefined
+  const simKey = simTurn ? `${simTurn.id}` : ''
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const simRun = useMemo(() => (simTurn ? toRun(simTurn, status) : null), [simKey])
+  const simBox = useRef<HTMLElement>(null)
+  const [simNear, setSimNear] = useState(false)   // mount WebGL only when the section is close to the screen
+  const [simIn, setSimIn] = useState(false)       // the composer steps aside while the walkthrough fills the screen
+  useEffect(() => {
+    const el = simBox.current
+    if (!el) { setSimNear(false); setSimIn(false); return }
+    const a = new IntersectionObserver(([e]) => { if (e.isIntersecting) setSimNear(true) }, { rootMargin: '900px 0px' })
+    const b = new IntersectionObserver(([e]) => setSimIn(e.isIntersecting), { rootMargin: '-45% 0px -45% 0px' })
+    a.observe(el); b.observe(el)
+    return () => { a.disconnect(); b.disconnect() }
+  }, [simKey])
   const xrayTurn = turns.find((t) => t.id === xray)
   const lastTrace = [...turns].reverse().find((t) => t.trace)?.trace
   const composer = (compact: boolean) => (
@@ -79,11 +99,25 @@ export function Workspace({ mode, status, disabled, toggle, homeTick }: { mode: 
           <Landing status={status} examples={examples} onAsk={onAsk} product={!demo}>{composer(false)}</Landing>
         ) : (
           <>
-            <main className="relative z-[1] mx-auto max-w-[760px] px-5 pb-64">
-              {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} plain={!demo} onXray={() => setXray(t.id)} onRetry={t.phase === 'error' && !busy ? () => void onAsk(t.question) : undefined} />)}
+            <main className={`relative z-[1] mx-auto max-w-[760px] px-5 ${simRun ? 'pb-16' : 'pb-64'}`}>
+              {turns.map((t) => <TurnView key={t.id} turn={t} number={t.id} nameOf={nameOf} plain={!demo} onXray={() => setXray(t.id)} onSim={demo ? () => simBox.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : undefined} onRetry={t.phase === 'error' && !busy ? () => void onAsk(t.question) : undefined} />)}
               <div ref={bottom} />
             </main>
-            <div data-fixed className="fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4">
+            {simRun && (
+              <section ref={simBox} id="sim3d" aria-label="Watch it run in 3D" className="relative z-[1] scroll-mt-4 pb-40">
+                <Reveal className="mx-auto max-w-[760px] px-5 pb-10">
+                  <p className="typed text-[13px] text-graphite">Your last question, step by step</p>
+                  <h2 className="mt-1 max-w-[16ch] text-[40px] leading-[1.03] font-black tracking-[-0.02em] text-ink sm:text-[60px]">Now watch it run.</h2>
+                  <p className="mt-3 max-w-[50ch] text-[17px] leading-7 text-graphite">A 3D model of that one question, built from what really happened. Keep scrolling.</p>
+                </Reveal>
+                {simNear && (
+                  <Suspense fallback={<div className="grid h-[60dvh] place-items-center bg-[#ECEBE7] font-display text-ink">Setting up the desk…</div>}>
+                    <Sim run={simRun} inline />
+                  </Suspense>
+                )}
+              </section>
+            )}
+            <div data-fixed className={`fixed inset-x-0 bottom-0 z-10 bg-gradient-to-t from-blotter via-blotter/95 to-transparent pt-8 pb-4 transition-opacity duration-500 ${simIn ? 'pointer-events-none opacity-0' : ''}`}>
               <div className="mx-auto max-w-[760px] px-5">{composer(true)}</div>
             </div>
           </>

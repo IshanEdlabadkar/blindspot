@@ -4,6 +4,7 @@ import { Attacker } from './Attacker'
 import { Burrow } from './Burrow'
 import { CATS, catOf, classify, clock, hex, makeEvents, makePeople, rng, tally, type Person, type SimEvent } from './sim'
 import type { Turn } from './turn'
+import { Reveal } from './Reveal'
 
 function Tally({ label, value, strong }: { label: string; value: number | string; strong?: boolean }) {
   return (
@@ -152,7 +153,7 @@ export function Simulation({ lastQuestion, examples }: { lastQuestion?: string; 
       </div>
 
       <div className="mt-12 grid items-start gap-8 md:grid-cols-2">
-        <section className="receipt typed min-w-0 px-6 pt-6 pb-10 text-[14px] leading-6 text-ink" aria-label="Typical library ledger">
+        <Reveal as="section" className="receipt typed min-w-0 px-6 pt-6 pb-10 text-[14px] leading-6 text-ink" label="Typical library ledger">
           <div className="flex items-start justify-between gap-3">
             <div><h2 className="text-[19px] leading-6 font-black">A typical library</h2><p className="text-graphite">Ledger of what it wrote down</p></div>
             <Stamp read />
@@ -187,9 +188,9 @@ export function Simulation({ lastQuestion, examples }: { lastQuestion?: string; 
               )
             })}
           </div>
-        </section>
+        </Reveal>
 
-        <section className="receipt typed min-w-0 px-6 pt-6 pb-10 text-[14px] leading-6 text-ink" aria-label="Blindspot library ledger">
+        <Reveal as="section" className="receipt typed min-w-0 px-6 pt-6 pb-10 text-[14px] leading-6 text-ink" label="Blindspot library ledger" delay={0.12}>
           <div className="flex items-start justify-between gap-3">
             <div><h2 className="text-[19px] leading-6 font-black">The Blindspot library</h2><p className="text-graphite">Ledger of what it wrote down</p></div>
             <Stamp read={false} />
@@ -221,10 +222,10 @@ export function Simulation({ lastQuestion, examples }: { lastQuestion?: string; 
               )
             })}
           </div>
-        </section>
+        </Reveal>
       </div>
 
-      <section className="mt-14" aria-label="One patron's card">
+      <Reveal as="section" className="mt-14" label="One patron's card">
         <h2 className="text-[26px] leading-8 font-black tracking-[-0.01em] text-ink">Open one patron's card</h2>
         <p className="mt-1 max-w-[60ch] text-[16px] leading-6 text-graphite">Click any square above to see what each library holds about that person, and which ads would follow them.</p>
         {!sel || selEvents.length === 0 ? (
@@ -274,9 +275,9 @@ export function Simulation({ lastQuestion, examples }: { lastQuestion?: string; 
             })()}
           </div>
         )}
-      </section>
+      </Reveal>
 
-      <section className="mt-14" aria-label="Hand over the ledgers">
+      <Reveal as="section" className="mt-14" label="Hand over the ledgers">
         <h2 className="text-[26px] leading-8 font-black tracking-[-0.01em] text-ink">Now hand over the ledgers</h2>
         <p className="mt-1 max-w-[60ch] text-[16px] leading-6 text-graphite">A breach, a rogue employee or a court order gets someone the same files. Here is what each pile gives them.</p>
         <button type="button" onClick={() => setDump((d) => !d)} aria-expanded={dump}
@@ -316,7 +317,7 @@ export function Simulation({ lastQuestion, examples }: { lastQuestion?: string; 
         {dump && yours.length > 0 && (
           <div className="mt-8 max-w-[560px]"><Attacker turn={attackerTurn} pool={examples} /></div>
         )}
-      </section>
+      </Reveal>
 
       <p className="mt-14 max-w-[70ch] text-[13px] leading-5 text-graphite">
         The hundred patrons, their questions, addresses and sealed requests are made up. Labels and ads come from a simple word-matching rule, a stand-in for real ad tech.

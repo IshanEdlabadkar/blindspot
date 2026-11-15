@@ -261,7 +261,7 @@ function CarbonCopy({ plain, onXray, libraries }: { plain?: Plain; onXray: () =>
   )
 }
 
-export function TurnView({ turn, number, onXray, onRetry, nameOf, plain }: { turn: Turn; number: number; onXray: () => void; onRetry?: () => void; nameOf: (url?: string) => string | undefined; plain?: boolean }) {
+export function TurnView({ turn, number, onXray, onSim, onRetry, nameOf, plain }: { turn: Turn; number: number; onXray: () => void; onSim?: () => void; onRetry?: () => void; nameOf: (url?: string) => string | undefined; plain?: boolean }) {
   const [open, setOpen] = useState<number | null>(null)
   const r = turn.result
   const { body, disclaimer } = r ? splitAnswer(r) : { body: '', disclaimer: '' }
@@ -307,9 +307,16 @@ export function TurnView({ turn, number, onXray, onRetry, nameOf, plain }: { tur
             {plain ? (
               <span className="typed text-[13px] font-bold text-sealed">Sealed: the libraries never saw this question</span>
             ) : (
-              <button onClick={onXray} className="press typed text-[15px] font-bold text-badger underline underline-offset-4 hover:text-stamp">
-                {turn.proof ? 'Print the receipt: what left this laptop' : 'Checking what left this laptop…'}
-              </button>
+              <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <button onClick={onXray} className="press typed text-[15px] font-bold text-badger underline underline-offset-4 hover:text-stamp">
+                  {turn.proof ? 'Print the receipt: what left this laptop' : 'Checking what left this laptop…'}
+                </button>
+                {onSim && (
+                  <button onClick={onSim} disabled={!turn.proof} className="press h-9 rounded-[2px] bg-ink px-3.5 font-display text-[14px] font-bold text-card disabled:opacity-40">
+                    Watch it run in 3D
+                  </button>
+                )}
+              </span>
             )}
           </div>
         </motion.div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Proof } from './api'
 import { CATS, makeEvents, makePeople, tally } from './sim'
+import { Reveal } from './Reveal'
 
 type Card = {
   retrieval_n?: number; top10_float?: number; top10_int8?: number
@@ -98,7 +99,7 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
         Blindspot answered as well as a normal AI service on our test questions. What the library learns about the person asking is where they differ.
       </p>
 
-      <div className="slip typed mt-5 px-6 pt-7 pb-3 sm:px-8" aria-label="The verdict">
+      <Reveal as="div" className="slip typed mt-5 px-6 pt-7 pb-3 sm:px-8" label="The verdict" delay={0.05}>
         <p className="font-display text-[15px] font-black text-ink">The verdict</p>
         <div className={`grid gap-x-10 ${q ? 'md:grid-cols-2' : ''}`}>
           {q && <Verdict label="Right source in the top 10" normal={`${top10n}%`} blind={`${top10b}%`} sub="Same ranking, rounded to 8-bit numbers" />}
@@ -107,7 +108,7 @@ export function Scoreboard({ proof }: { proof?: Proof }) {
           <Verdict label="Your words visible on the wire" normal={wire ? `${wire.normal}%` : '...'} blind={wire ? `${wire.blind}%` : '...'}
             sub={wire ? `${wire.n} of ${wire.w} in the clear, ${wire.bf} of ${wire.bw} sealed` : 'Tick the unsealed-copy box and ask to measure this'} />
         </div>
-      </div>
+      </Reveal>
 
       <div className={`mt-5 grid gap-5 ${q ? 'md:grid-cols-2' : ''}`}>
         {q && <div className="receipt typed px-6 pt-5 pb-3 text-[15px] leading-6 text-ink" aria-label="Answer quality">

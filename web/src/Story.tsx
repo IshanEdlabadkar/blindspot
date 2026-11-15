@@ -1,5 +1,6 @@
 import { motion, useInView, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Reveal } from './Reveal'
 import { hex, rng } from './sim'
 
 const QUERIES = [
@@ -110,11 +111,6 @@ export function SearchDemo({ mode }: { mode: 'leak' | 'sealed' }) {
 function Beat({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <section className={`relative z-[1] mx-auto flex min-h-[60dvh] max-w-[860px] flex-col justify-center px-5 py-16 ${className}`}>{children}</section>
 }
-
-const Reveal = ({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) => (
-  <motion.div initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.6 }}
-    transition={{ duration: 0.45, delay, ease: 'easeOut' }}>{children}</motion.div>
-)
 
 const SENT = ['Your name', 'Your IP address', 'The pages you visited', 'Whether you were signed in', 'What you searched']
 

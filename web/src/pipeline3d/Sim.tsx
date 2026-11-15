@@ -72,7 +72,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, x: number, y: number,
   if (line && n < lines) ctx.fillText(line, x, y + n * lh)
 }
 
-export default function Sim({ run, onClose }: { run: SimRun; onClose: () => void }) {
+export default function Sim({ run, onClose, inline }: { run: SimRun; onClose?: () => void; inline?: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlay = useRef<HTMLDivElement>(null)
@@ -503,6 +503,16 @@ export default function Sim({ run, onClose }: { run: SimRun; onClose: () => void
     // Scroll drives everything: which step is on screen, and how far through it you are.
     // Each step owns STEP of scroll; the camera moves in the first 30%, the step plays out by 80%, then holds.
     const scrollEl = scroller.current!
+    // Inline, the page itself scrolls: progress is how far the top of this block has gone above the viewport.
+    const progress = () => (inline ? Math.max(0, -scrollEl.getBoundingClientRect().top) : scrollEl.scrollTop)
+    const scrollTo = (top: number) => {
+      const behavior = reduce ? 'auto' : 'smooth'
+      if (inline) window.scrollTo({ top: window.scrollY + scrollEl.getBoundingClientRect().top + top, behavior })
+      else scrollEl.scrollTo({ top, behavior })
+    }
+    let onScreen = !inline
+    const io = new IntersectionObserver(([en]) => { onScreen = en.isIntersecting }, { rootMargin: '200px 0px' })
+    if (inline) io.observe(scrollEl)
     const STEP = () => box.clientHeight * 1.6
     const fit = (pos: THREE.Vector3, look: THREE.Vector3) => {
       const a = camera.aspect
@@ -521,7 +531,7 @@ export default function Sim({ run, onClose }: { run: SimRun; onClose: () => void
         const base = aim >= 0 && performance.now() < aimUntil ? aim : Math.max(cur, 0)
         const n = d === 0 ? 0 : Math.max(0, Math.min(beats.length - 1, base + d))
         aim = n; aimUntil = performance.now() + 1400
-        scrollEl.scrollTo({ top: n === 0 && d === 0 ? 0 : (n + 0.6) * STEP(), behavior: reduce ? 'auto' : 'smooth' })
+        scrollTo(n === 0 && d === 0 ? 0 : (n + 0.6) * STEP())
       },
     }
 
@@ -537,7 +547,8 @@ export default function Sim({ run, onClose }: { run: SimRun; onClose: () => void
     const camPos = V(0, 0, 0), camLook = V(0, 0, 0)
     const frame = () => {
       elapsed += Math.min(clock.getDelta(), 0.1)
-      const f = Math.min(Math.max(scrollEl.scrollTop / STEP(), 0), beats.length - 0.001)
+      if (!onScreen) { raf = requestAnimationFrame(frame); return }   // nothing to draw while it is scrolled out of view
+      const f = Math.min(Math.max(progress() / STEP(), 0), beats.length - 0.001)
       const n = Math.floor(f), local = f - n
       if (n !== cur) enter(n)
       const t = seg(local, 0.06, 0.55) * beats[n].dur
@@ -562,7 +573,7 @@ export default function Sim({ run, onClose }: { run: SimRun; onClose: () => void
     raf = requestAnimationFrame(frame)
 
     return () => {
-      cancelAnimationFrame(raf); ro.disconnect()
+      cancelAnimationFrame(raf); ro.disconnect(); io.disconnect()
       layer.querySelectorAll('.sim-label').forEach((n) => n.remove()); svg.innerHTML = ''
       scene.traverse((o) => {
         const m = o as THREE.Mesh
@@ -572,11 +583,12 @@ export default function Sim({ run, onClose }: { run: SimRun; onClose: () => void
       })
       renderer.dispose()
     }
-  }, [run])
+  }, [run, inline])
 
   useEffect(() => {
+    if (inline) return   // inline, the arrow keys and space keep scrolling the page
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onClose?.()
       else if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); ctl.current.go(1) }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); ctl.current.go(-1) }
       else if (e.key === 'Home' || e.key === 'r' || e.key === 'R') { e.preventDefault(); ctl.current.go(0) }
@@ -585,10 +597,11 @@ export default function Sim({ run, onClose }: { run: SimRun; onClose: () => void
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
-  }, [onClose])
+  }, [onClose, inline])
 
   return (
-    <div ref={scroller} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-[#ECEBE7]" role="dialog" aria-modal="true"
+    <div ref={scroller} className={inline ? 'relative bg-[#ECEBE7]' : 'fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-[#ECEBE7]'}
+      {...(inline ? { role: 'region' } : { role: 'dialog', 'aria-modal': true })}
       aria-label="How your question went through the pipeline, step by step in 3D">
       <div className="relative" style={{ height: `calc(${count} * 160dvh + 100dvh)` }}>
         <div className="sticky top-0 h-[100dvh] w-full overflow-hidden">
@@ -610,11 +623,11 @@ export default function Sim({ run, onClose }: { run: SimRun; onClose: () => void
           )}
           <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 bg-gradient-to-b from-[#ECEBE7] to-transparent px-5 pt-4 pb-6">
             <p className="max-w-[60ch] truncate text-[14px] text-graphite"><span className="font-display font-black text-ink">Watch it run</span>&nbsp;&nbsp;“{run.question}”</p>
-            <button onClick={onClose} className="shrink-0 rounded-[2px] bg-ink px-3 py-1.5 font-display text-[13px] font-bold text-card">Close</button>
+            {!inline && <button onClick={onClose} className="shrink-0 rounded-[2px] bg-ink px-3 py-1.5 font-display text-[13px] font-bold text-card">Close</button>}
           </div>
           <div className="typed absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 px-5 pb-4 text-[13px] text-graphite">
             <span>Step {beat + 1} of {count}</span>
-            <span className="hidden sm:inline">Scroll at your own pace&nbsp;&nbsp;&nbsp;Space or ↓: next step&nbsp;&nbsp;&nbsp;↑: back&nbsp;&nbsp;&nbsp;Esc: close</span>
+            <span className="hidden sm:inline">{inline ? 'Keep scrolling to move through the steps' : 'Scroll at your own pace   Space or ↓: next step   ↑: back   Esc: close'}</span>
             <span className="flex gap-2">
               <button onClick={() => ctl.current.go(-1)} className="rounded-[2px] border border-graphite/40 bg-card/70 px-2.5 py-1 text-ink">Back</button>
               <button onClick={() => ctl.current.go(1)} className="rounded-[2px] bg-badger px-2.5 py-1 font-bold text-white">Next step</button>

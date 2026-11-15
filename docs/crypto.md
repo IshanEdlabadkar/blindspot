@@ -2,7 +2,7 @@
 
 Search a sensitive knowledge base without the server learning the question, the scores, or which documents were read.
 
-**Setup for everyone: [SETUP.md](SETUP.md).** Remote server (Render + Databricks): on the `deploy/render` branch. Contracts: `contracts.py` (C's branch) is the single source of truth.
+**Setup for everyone: [SETUP.md](SETUP.md).** Remote server: [DEPLOY.md](DEPLOY.md). Contracts: `contracts.py` (C's branch) is the single source of truth.
 
 | Person | Owns |
 | --- | --- |
@@ -21,7 +21,7 @@ Search a sensitive knowledge base without the server learning the question, the 
 - [x] `make measure`: latency, bytes, CPU, log check
 - [x] Hint-mode scoring: 3 KB up, ~6 ms per question; every spec performance target met
 - [x] Real PIR fetch (optional, `BLIND_RAG_FETCH=pir`): 10 private fetches per question, chunks byte-identical to trivial PIR
-- [x] Corpus loaded from a folder or URL, hash-checked and hot-swapped by `corpus_version`. Remote deployment (Render + Databricks) lives on the `deploy/render` branch.
+- [x] Remote deploy: Render runs code only; the corpus lives in the provider's storage (Databricks volume), hash-checked and hot-swapped by `corpus_version` (image not yet built; first Render build is its test)
 - [ ] Run `make measure` on the demo laptop (hours 13 to 16)
 
 ## Crypto design decisions
@@ -43,3 +43,20 @@ Search a sensitive knowledge base without the server learning the question, the 
 ## Library patches
 
 `third_party/` holds Tiptoe's `underhood` and `simplepir`. They are patched for Go 1.24+, which rejects methods on cgo types (`T(0).Bitlen()` became `matrix.Bitlen[T]()`). `go.mod` points at them with `replace`.
+
+## Batched PIR fetch (for C's pipeline)
+
+`crypto_client` exposes `make_selectors(key, indexes, N)` and `decrypt_records(key, blob)`, and the server has `POST /v1/fetch_batch`. In `client/pipeline.py`'s real-PIR branch, this replaces the 10 round trips with one (the mock has no `make_selectors`, so it keeps the old loop):
+
+```python
+else:  # fetch_mode == "pir"
+    if hasattr(self.crypto, "make_selectors"):
+        sels = self.crypto.make_selectors(self.key, [int(i) for i in top], n)
+        blob = self._post("/v1/fetch_batch", sels)
+        sent("/v1/fetch_batch", len(sels), len(blob))
+        chunks = [c.unpack_record(r) for r in self.crypto.decrypt_records(self.key, blob)]
+    else:
+        ...  # existing per-chunk loop
+```
+
+Measured against Render (real PIR, k = 10): one request per chunk took ~1.2 s per question, almost all network round trips. Batched, it's one round trip.

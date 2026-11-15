@@ -69,19 +69,33 @@ def main():
     ap.add_argument("--server", default=os.environ.get("BLIND_RAG_SERVER", "http://127.0.0.1:8080"))
     ap.add_argument("--questions", type=int, default=10)
     ap.add_argument("--think", type=float, default=5.0, help="seconds between questions (user reading)")
-    ap.add_argument("--log", default=str(ROOT / "data" / "server.log"))
+    ap.add_argument("--log", default=None,
+                    help="server log: a file, or a URL (default: data/server.log for a local server, "
+                         "<server>/v1/server_log for a remote one)")
     ap.add_argument("--server-pid", type=int, default=None)
     ap.add_argument("--out", default=str(ROOT / "data" / "measurements.md"))
-    ap.add_argument("--fetch", choices=["download", "pir"], default="download",
-                    help="download = trivial PIR (default); pir = real PIR, k private fetches per question")
+    ap.add_argument("--fetch", choices=["download", "pir", "pir-single"], default="download",
+                    help="download = trivial PIR (default); pir = real PIR, all k selectors in one request; "
+                         "pir-single = real PIR, one request per chunk")
     a = ap.parse_args()
 
     from client import crypto_client as cc
 
     http = requests.Session()
-    log_path = pathlib.Path(a.log)
-    log_start = log_path.stat().st_size if log_path.exists() else 0
-    pid = server_pid(a.server_pid)
+    local = any(h in a.server for h in ("127.0.0.1", "localhost"))
+    if a.log is None:
+        a.log = str(ROOT / "data" / "server.log") if local else a.server.rstrip("/") + "/v1/server_log"
+    remote_log = a.log.startswith("http")
+
+    def read_remote_log():
+        r = http.get(a.log, params={"n": 200}, timeout=30)
+        r.raise_for_status()
+        return r.text.splitlines()
+
+    log_path = pathlib.Path(a.log) if not remote_log else None
+    log_start = (log_path.stat().st_size if log_path.exists() else 0) if log_path else 0
+    remote_before = set(read_remote_log()) if remote_log else set()
+    pid = server_pid(a.server_pid) if (local or a.server_pid) else None
 
     t0 = time.perf_counter()
     r = http.get(a.server + "/v1/manifest", timeout=30)
@@ -123,6 +137,14 @@ def main():
         L = manifest["pir"]["record_bytes"]
         f_up = f_down = 0
         if a.fetch == "pir":
+            sels = cc.make_selectors(key, [int(j) for j in top], n)
+            fr = http.post(a.server + "/v1/fetch_batch", data=sels, timeout=60, headers={
+                "Content-Type": "application/octet-stream", "X-Corpus-Version": manifest["corpus_version"]})
+            fr.raise_for_status()
+            for j, rec in zip(top, cc.decrypt_records(key, fr.content)):
+                assert rec == store[int(j) * L:(int(j) + 1) * L], "PIR record mismatch"
+            f_up, f_down = len(sels), len(fr.content)
+        elif a.fetch == "pir-single":
             for j in top:
                 sel = cc.make_selector(key, int(j), n)
                 fr = http.post(a.server + "/v1/fetch", data=sel, timeout=60, headers={
@@ -143,8 +165,12 @@ def main():
 
     # Log check: only the agreed fields, nothing derived from requests.
     log_ok, log_note = True, "no log file found"
-    if log_path.exists():
+    new = None
+    if remote_log:
+        new = [ln for ln in read_remote_log() if ln not in remote_before]
+    elif log_path.exists():
         new = log_path.read_bytes()[log_start:].decode("utf-8", "replace").splitlines()
+    if new is not None:
         bad = [ln for ln in new if not ln.strip() or set(json.loads(ln)) != LOG_FIELDS]
         leaked = [q.hex()[:32] for q in sent_queries if q.hex()[:32] in "\n".join(new)]
         long_lines = [ln for ln in new if len(ln) > 300]
@@ -160,7 +186,7 @@ def main():
     lines = [
         f"# Blind RAG crypto measurements",
         "",
-        f"Machine: {platform.node()} ({platform.system()} {platform.machine()}), "
+        f"Client: {platform.node()} ({platform.system()} {platform.machine()}), server: {a.server}, "
         f"N = {n}, d = {d}, k = {k}, {a.questions} questions, {a.think:g} s between questions. "
         f"Corpus {manifest['corpus_version']}. Scoring mode: **{mode}**, fetch: **{a.fetch}**. Medians.",
         "",
@@ -168,8 +194,9 @@ def main():
         "| --- | --- | --- | --- |",
         f"| Encrypt on device | (not in spec) | {fmt_t(med['encrypt'])} | |",
         f"| Encrypted scoring round trip | < 2 s | {fmt_t(med['score_rt'])} | {'yes' if med['score_rt'] < 2 else 'no'} |",
-        (f"| Private fetch of k = 10 (real PIR, {k} fetches) | < 3 s | {fmt_t(med['decrypt_rank_fetch'])} per question, each record checked | "
-         if a.fetch == "pir" else
+        (f"| Private fetch of k = 10 (real PIR, {k} fetches{' in one request' if a.fetch == 'pir' else ''}) | < 3 s | "
+         f"{fmt_t(med['decrypt_rank_fetch'])} per question, each record checked | "
+         if a.fetch.startswith("pir") else
          f"| Private fetch of k = 10 (trivial PIR) | < 3 s | {fmt_t(med['decrypt_rank_fetch'])} per question, "
          f"plus {fmt_t(store_secs)} once for the {fmt_b(store_bytes)} store | ")
         + f"{'yes' if med['decrypt_rank_fetch'] < 3 else 'no'} |",
@@ -185,7 +212,7 @@ def main():
         f"One-time per corpus version: manifest {fmt_b(manifest_bytes)}, "
         + (f"scoring hint {fmt_b(hint_bytes)} (cached on disk after the first run), " if hint_bytes else "")
         + (f"fetch hint {fmt_b(manifest['pir'].get('hint_bytes', 0))} (real PIR; the {fmt_b(store_bytes)} store was "
-           "downloaded here only to check every fetched record). " if a.fetch == "pir" else f"fetch store {fmt_b(store_bytes)}. ")
+           "downloaded here only to check every fetched record). " if a.fetch.startswith("pir") else f"fetch store {fmt_b(store_bytes)}. ")
         + f"Setup took {fmt_t(setup_secs)} (key setup {fmt_t(keygen_secs)}).",
         "Rerank and answer generation (B's part) are not included.",
     ]

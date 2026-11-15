@@ -231,3 +231,42 @@ def decrypt_record(key: Key, blob: bytes) -> bytes:
     if r.status_code != 200:
         raise RuntimeError(f"crypto-helper /fetch_decrypt: {r.status_code} {r.text.strip()}")
     return r.content
+
+
+# Batched real PIR: all k selectors in one round trip (POST /v1/fetch_batch).
+# Each selector still has its own fresh secret key; the batch size is always k.
+FETCH_BATCH = True
+
+
+def make_selectors(key: Key, indexes, N: int) -> bytes:
+    """Real PIR, batched: fresh encrypted selectors for all `indexes` -> body for POST /v1/fetch_batch."""
+    if "simplepir" not in key._pir.get("modes", []):
+        raise RuntimeError("this server offers only trivial PIR: use BLIND_RAG_FETCH=download")
+    if not key._fetch_loaded:
+        _ensure_hint(key, "/fetch_hint", _fetch_corpus(key), key._pir)
+        key._fetch_loaded = True
+    params = {**_fetch_corpus(key), "indexes": ",".join(str(int(i)) for i in indexes)}
+    r = key.http.post(HELPER_URL + "/fetch_batch_query", params=params, timeout=60)
+    if r.status_code == 409:  # helper restarted and lost the hint
+        _ensure_hint(key, "/fetch_hint", _fetch_corpus(key), key._pir)
+        r = key.http.post(HELPER_URL + "/fetch_batch_query", params=params, timeout=60)
+    if r.status_code != 200:
+        raise RuntimeError(f"crypto-helper /fetch_batch_query: {r.status_code} {r.text.strip()}")
+    key._fetch_handle = r.headers["X-Handle"]
+    return r.content
+
+
+def decrypt_records(key: Key, blob: bytes) -> list:
+    """Real PIR, batched: /v1/fetch_batch response -> one record (record_bytes bytes) per index, in order."""
+    if key._fetch_handle is None:
+        raise RuntimeError("decrypt_records called before make_selectors")
+    handle, key._fetch_handle = key._fetch_handle, None
+    r = key.http.post(HELPER_URL + "/fetch_batch_decrypt", params={"handle": handle}, data=blob, timeout=60)
+    if r.status_code != 200:
+        raise RuntimeError(f"crypto-helper /fetch_batch_decrypt: {r.status_code} {r.text.strip()}")
+    b, out, off = r.content, [], 4
+    for _ in range(int.from_bytes(b[:4], "little")):
+        n = int.from_bytes(b[off:off + 4], "little")
+        out.append(b[off + 4:off + 4 + n])
+        off += 4 + n
+    return out

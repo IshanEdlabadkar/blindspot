@@ -207,7 +207,7 @@ def _excerpt(chunk: dict, sentences: list[str]) -> str:
 
 def _cite(c: dict, excerpt: str | None = None) -> dict:
     out = {**{k: c[k] for k in ("id", "title", "url", "updated", "text")}, "score": float(c.get("score", 0.0))}
-    for k in ("source", "source_name"):  # set when the chunk came from a multi-server fan-out
+    for k in ("source", "source_name", "server"):  # set when the chunk came from a multi-server fan-out
         if k in c:
             out[k] = c[k]
     if excerpt is not None:

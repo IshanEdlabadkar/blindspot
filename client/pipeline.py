@@ -59,7 +59,7 @@ class PipelineError(RuntimeError):
 OLLAMA_TAGS = "http://localhost:11434/api/tags"
 
 
-def _get(url, timeout=1.5):
+def _get(url, timeout=5):
     try:
         r = requests.get(url, timeout=timeout)
         return r if r.status_code == 200 else None

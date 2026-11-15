@@ -41,23 +41,23 @@ def load_questions(path: Path | None = None) -> list[dict]:
 
 # ---------------------------------------------------------------- retrieval (plaintext tables)
 
-def run_retrieval(questions: list[dict]) -> list[dict]:
-    """Per question: rank of the right page (float, int8), the int8 top-10 ids (the ranking the encrypted
-    path must reproduce exactly), and whether the right page reaches the model's sources."""
+def run_retrieval(questions: list[dict], modes=("float", "int8")) -> list[dict]:
+    """Per question, over every source merged by score: rank of the right page (float, int8), the int8
+    fetched ids as "source:id" (k=10 per source; what the encrypted path must reproduce exactly), and
+    whether the right page reaches the model's sources."""
     idx = default_index()
     rows = []
     for q in questions:
         qvec = embed_query_float(q["question"])
         gold = q["source_url"]
         row = {"id": q["id"], "question": q["question"], "gold": gold}
-        for mode in ("float", "int8"):
-            hits = idx.search_vec(qvec, max(KS), mode)
-            urls = [c["url"] for c in idx.chunks(hits)]
+        for mode in modes:
+            merged = idx.fetch(qvec, max(KS), mode)
+            urls = [c["url"] for c in merged]
             row[f"{mode}_rank"] = first_rank(urls, gold) if gold else None
-            row[f"{mode}_top1"] = round(hits[0][1], 4)
-        hits10 = idx.search_vec(qvec, 10, "int8")
-        row["int8_top10_ids"] = [i for i, _ in hits10]
-        fetched = idx.chunks(hits10)
+            row[f"{mode}_top1"] = round(merged[0]["score"], 4)
+        fetched = idx.fetch(qvec, 10, "int8")
+        row["int8_top10_ids"] = [f"{c['source']}:{c['id']}" for c in fetched]
         reranked = rerank_chunks(q["question"], fetched)
         row["evidence_top5"] = any(c["url"] == gold for c in fetched[:N_CONTEXT]) if gold else None
         row["evidence_rerank5"] = any(c["url"] == gold for c in reranked[:N_CONTEXT]) if gold else None

@@ -1,0 +1,34 @@
+{
+  "protocol": "blind-rag/1",
+  "source_id": "fmla",
+  "source_name": "Federal FMLA regulations (29 CFR Part 825, eCFR)",
+  "corpus_version": "2026-11-10.1",
+  "corpus_name": "The Family and Medical Leave Act regulations, 29 CFR Part 825",
+  "attribution": "Source: Electronic Code of Federal Regulations (eCFR), 29 CFR Part 825",
+  "embedding": {
+    "model": "BAAI/bge-small-en-v1.5",
+    "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "dim": 384,
+    "normalize": "l2",
+    "query_prefix": "Represent this sentence for searching relevant passages: "
+  },
+  "quantization": {
+    "type": "int8",
+    "scale": 127
+  },
+  "scoring": {
+    "library": "set by crypto server",
+    "params": "set by crypto server"
+  },
+  "pir": {
+    "library": "set by crypto server",
+    "params": "set by crypto server",
+    "record_bytes": 2048
+  },
+  "num_chunks": 310,
+  "top_k": 10,
+  "hashes": {
+    "score_table": "sha256:9762ce65eef2d70001a8f9f622b058317c19c8def970ebcc419d3ea39b720021",
+    "fetch_store": "sha256:d055ee0f9665aa9d5f2e172f2d50ce33653d496b96e8e3ee39328eb063e5f791"
+  }
+}

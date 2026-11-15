@@ -28,8 +28,10 @@ demo:          ## everything in one terminal: server + helper + UI with real cry
 demo-compare:  ## make demo plus B's plaintext server (:8001), for the side-by-side log contrast
 	PLAIN=1 ./scripts/start_demo.sh
 
-stop:          ## stop any server, helper or plaintext server left running (do this after git pull)
-	-@pkill -f "[c]rypto-server/crypto-server"; pkill -f "[c]rypto-server/crypto-helper"; pkill -f "[g]o run . -data"; pkill -f "[g]o run ./cmd/crypto-helper"; pkill -f "[b]aseline.server"; echo "stopped"
+stop:          ## stop the server, helper, plaintext server and UI left running (do this after git pull)
+	-@for port in 8080 8090 8001; do pids=$$(lsof -ti tcp:$$port -sTCP:LISTEN 2>/dev/null); [ -n "$$pids" ] && kill $$pids 2>/dev/null; done; \
+	  pkill -f "[g]o run . -data"; pkill -f "[g]o run ./cmd/crypto-helper"; pkill -f "[s]treamlit run ui/app.py"; \
+	  echo "stopped"
 
 preflight:     ## with make demo running: the 8-step smoke test before presenting (real crypto + real model)
 	./scripts/start_demo.sh --preflight
